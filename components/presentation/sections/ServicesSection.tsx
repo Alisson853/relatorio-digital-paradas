@@ -3,9 +3,10 @@
 import { useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Clock, MapPin, Users2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, MapPin, Users2, Wrench } from "lucide-react";
 import type { Servico } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { SectionHeading } from "@/components/ui/SectionHeading";
 import { cn } from "@/lib/utils";
 
 function MetaField({ label, value, className }: { label: string; value: string; className?: string }) {
@@ -19,7 +20,7 @@ function MetaField({ label, value, className }: { label: string; value: string; 
 
 function ServiceSlide({ servico }: { servico: Servico }) {
   return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.15fr_1fr] lg:gap-10">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_1.05fr] lg:gap-10">
       <div>
         <div className="mb-4 flex items-center justify-between gap-3">
           <span className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-brand-600">
@@ -44,10 +45,12 @@ function ServiceSlide({ servico }: { servico: Servico }) {
             <Users2 size={13} className="mt-4 flex-none text-slate-400" />
             <MetaField label="Área Responsável" value={`${servico.equipe} · ${servico.responsavel}`} />
           </div>
-          <div className="col-span-2 flex items-start gap-1.5 sm:col-span-4">
-            <Clock size={13} className="mt-4 flex-none text-slate-400" />
-            <MetaField label="Início — Término" value={`${servico.horaInicio} — ${servico.horaFim}`} />
-          </div>
+          {(servico.horaInicio || servico.horaFim) && (
+            <div className="col-span-2 flex items-start gap-1.5 sm:col-span-4">
+              <Clock size={13} className="mt-4 flex-none text-slate-400" />
+              <MetaField label="Início — Término" value={`${servico.horaInicio || "—"} — ${servico.horaFim || "—"}`} />
+            </div>
+          )}
         </div>
 
         <div className="mt-6 space-y-4 text-sm">
@@ -66,20 +69,34 @@ function ServiceSlide({ servico }: { servico: Servico }) {
         </div>
       </div>
 
-      <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border-2 border-brand-100 bg-brand-50/40 p-4 sm:p-6">
-        <div className="grid w-full grid-cols-2 gap-3">
-          <div>
-            <div className="relative aspect-[4/3] overflow-hidden rounded-xl border-2 border-white shadow-md">
-              <Image src={servico.fotoAntes} alt={`Antes — ${servico.equipamento}`} fill sizes="320px" className="object-cover" />
+      <div className="flex flex-col justify-center gap-4 rounded-3xl border-2 border-brand-100 bg-brand-50/40 p-3 sm:p-4">
+        <div className="flex flex-col gap-4 sm:flex-row lg:flex-col">
+          {[
+            { url: servico.fotoAntes, label: "Antes", badge: "bg-slate-900/80" },
+            ...(servico.fotoDurante ? [{ url: servico.fotoDurante, label: "Durante", badge: "bg-warning-600/90" }] : []),
+            { url: servico.fotoDepois, label: "Depois", badge: "bg-brand-600/90" },
+          ].map((foto) => (
+            <div key={foto.label} className="flex-1">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border-2 border-white shadow-md sm:aspect-[16/11]">
+                <Image
+                  src={foto.url}
+                  alt={`${foto.label} — ${servico.equipamento}`}
+                  fill
+                  sizes="(min-width: 1024px) 560px, (min-width: 640px) 380px, 640px"
+                  className="object-cover"
+                  unoptimized={foto.url.startsWith("data:")}
+                />
+                <span
+                  className={cn(
+                    "absolute left-3 top-3 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white",
+                    foto.badge
+                  )}
+                >
+                  {foto.label}
+                </span>
+              </div>
             </div>
-            <p className="mt-2 text-center text-xs font-bold uppercase tracking-wide text-slate-500">Antes</p>
-          </div>
-          <div>
-            <div className="relative aspect-[4/3] overflow-hidden rounded-xl border-2 border-white shadow-md">
-              <Image src={servico.fotoDepois} alt={`Depois — ${servico.equipamento}`} fill sizes="320px" className="object-cover" />
-            </div>
-            <p className="mt-2 text-center text-xs font-bold uppercase tracking-wide text-slate-500">Depois</p>
-          </div>
+          ))}
         </div>
       </div>
     </div>
@@ -93,6 +110,26 @@ export function ServicesSection({ servicos }: { servicos: Servico[] }) {
 
   const goPrev = () => setIndex((i) => Math.max(0, i - 1));
   const goNext = () => setIndex((i) => Math.min(total - 1, i + 1));
+
+  if (total === 0 || !atual) {
+    return (
+      <section id="servicos" className="section-screen flex items-center bg-slate-50 px-6 py-24 sm:px-10">
+        <div className="mx-auto w-full max-w-6xl">
+          <SectionHeading
+            eyebrow="Serviços Executados"
+            title="Nenhum Serviço Registrado"
+            description="Nenhuma ordem de serviço foi cadastrada para esta parada."
+          />
+          <div className="flex flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-slate-200 bg-white py-20 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+              <Wrench size={22} />
+            </div>
+            <p className="text-sm font-medium text-slate-400">Nenhum serviço foi adicionado a este relatório.</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section id="servicos" className="section-screen flex items-center bg-slate-50 px-6 py-24 sm:px-10">

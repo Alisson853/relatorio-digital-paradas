@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Calendar, Clock, Factory, Trash2, User } from "lucide-react";
+import { ArrowUpRight, Calendar, Clock, Download, Factory, Pencil, Trash2, User } from "lucide-react";
 import type { ParadaResumo } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { MachineIllustration } from "@/components/ui/MachineIllustration";
@@ -13,9 +13,10 @@ interface ParadaCardProps {
   index: number;
   custom?: boolean;
   onDelete?: () => void;
+  onExport?: () => void;
 }
 
-export function ParadaCard({ parada, index, custom = false, onDelete }: ParadaCardProps) {
+export function ParadaCard({ parada, index, custom = false, onDelete, onExport }: ParadaCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 28 }}
@@ -43,17 +44,40 @@ export function ParadaCard({ parada, index, custom = false, onDelete }: ParadaCa
             </span>
           )}
         </div>
-        {custom && onDelete && (
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              onDelete();
-            }}
-            aria-label="Excluir relatório"
-            className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-500 opacity-0 shadow-sm transition-opacity hover:bg-danger-100 hover:text-danger-600 group-hover:opacity-100"
-          >
-            <Trash2 size={14} />
-          </button>
+        {custom && (
+          <div className="absolute right-4 top-4 flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+            <Link
+              href={`/novo?edit=${parada.id}`}
+              aria-label="Editar relatório"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow-sm hover:bg-brand-100 hover:text-brand-600"
+            >
+              <Pencil size={13} />
+            </Link>
+            {onExport && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  onExport();
+                }}
+                aria-label="Exportar relatório"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow-sm hover:bg-brand-100 hover:text-brand-600"
+              >
+                <Download size={13} />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  onDelete();
+                }}
+                aria-label="Excluir relatório"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow-sm hover:bg-danger-100 hover:text-danger-600"
+              >
+                <Trash2 size={13} />
+              </button>
+            )}
+          </div>
         )}
         <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-brand-950/60 to-transparent" />
       </div>

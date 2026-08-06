@@ -6,6 +6,7 @@ import type {
   Servico,
   FotoGaleria,
   CaminhoCriticoItem,
+  Pendencia,
   GraficosData,
   ResultadoFinal,
   Equipe,
@@ -172,6 +173,26 @@ const ACOES = [
   "Manutenção Corretiva em",
   "Revisão Geral em",
 ];
+
+const PENDENCIAS_MOTIVOS = [
+  "Peça de reposição não chegou a tempo",
+  "Aguardando liberação de área para conclusão",
+  "Necessária parada adicional programada",
+  "Falta de mão de obra especializada disponível",
+  "Aguardando laudo técnico do fabricante",
+];
+
+function gerarPendencias(rng: () => number, quantidade: number): Pendencia[] {
+  const pendencias: Pendencia[] = [];
+  for (let i = 0; i < quantidade; i++) {
+    pendencias.push({
+      id: `pend-${i}`,
+      item: `${pick(rng, ACOES)} ${pick(rng, EQUIPAMENTOS)}`,
+      motivo: pick(rng, PENDENCIAS_MOTIVOS),
+    });
+  }
+  return pendencias;
+}
 
 function gerarKpis(rng: () => number): Kpis {
   const osPlanejadas = randInt(rng, 42, 55);
@@ -371,8 +392,9 @@ export function gerarParadaCompleta(id: string): ParadaCompleta | null {
   const servicos = gerarServicos(rng, randInt(rng, 46, 52));
   const fotos = gerarFotos(rng, servicos, 30);
   const caminhoCritico = gerarCaminhoCritico(rng, servicos);
+  const pendencias = gerarPendencias(rng, kpis.pendencias);
   const graficos = gerarGraficos(rng, kpis);
   const resultadoFinal = gerarResultadoFinal(resumo, kpis);
 
-  return { resumo, kpis, timeline, servicos, fotos, caminhoCritico, graficos, resultadoFinal };
+  return { resumo, kpis, timeline, servicos, fotos, caminhoCritico, pendencias, graficos, resultadoFinal };
 }

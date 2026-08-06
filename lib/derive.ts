@@ -1,4 +1,30 @@
-import type { CaminhoCriticoItem, Equipe, FotoGaleria, GraficosData, Kpis, Servico } from "./types";
+import type { CaminhoCriticoItem, Equipe, FotoGaleria, GraficosData, Kpis, Servico, StatusItem } from "./types";
+
+export function textoExecutadoPadrao(status: StatusItem): string {
+  switch (status) {
+    case "concluido":
+      return "Serviço executado e concluído conforme necessidade identificada.";
+    case "em_andamento":
+      return "Serviço em execução, dentro do previsto.";
+    case "atrasado":
+      return "Serviço iniciado, porém com atraso em relação ao previsto.";
+    default:
+      return "Serviço ainda não iniciado.";
+  }
+}
+
+export function textoResultadoPadrao(status: StatusItem): string {
+  switch (status) {
+    case "concluido":
+      return "Equipamento normalizado e liberado para operação.";
+    case "em_andamento":
+      return "Execução em andamento, resultado a confirmar.";
+    case "atrasado":
+      return "Conclusão pendente devido ao atraso identificado.";
+    default:
+      return "Aguardando início da execução.";
+  }
+}
 
 const EQUIPES: Equipe[] = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil"];
 
@@ -34,14 +60,17 @@ export function deriveFotos(servicos: Servico[]): FotoGaleria[] {
   const fotos: FotoGaleria[] = [];
   servicos.forEach((s) => {
     fotos.push({ id: `${s.id}-antes`, categoria: "antes", servico: s.equipamento, area: s.area, url: s.fotoAntes });
+    if (s.fotoDurante) {
+      fotos.push({ id: `${s.id}-durante`, categoria: "durante", servico: s.equipamento, area: s.area, url: s.fotoDurante });
+    }
     fotos.push({ id: `${s.id}-depois`, categoria: "depois", servico: s.equipamento, area: s.area, url: s.fotoDepois });
   });
   return fotos;
 }
 
 export function deriveGraficos(
-  servicos: Array<Servico & { categoria: string }>,
-  caminhoCritico: Array<CaminhoCriticoItem & { causaAtraso: string }>,
+  servicos: Servico[],
+  caminhoCritico: CaminhoCriticoItem[],
   planejadoRealizado: Array<{ etapa: string; planejado: number; realizado: number }>,
   eficiencia: number
 ): GraficosData {
@@ -55,13 +84,16 @@ export function deriveGraficos(
   const horasPorSetor = Array.from(areaMap.entries()).map(([setor, horas]) => ({ setor, horas: Math.round(horas) }));
 
   const categoriaMap = new Map<string, number>();
-  servicos.forEach((s) => categoriaMap.set(s.categoria, (categoriaMap.get(s.categoria) ?? 0) + 1));
+  servicos.forEach((s) => {
+    const categoria = s.categoria ?? "Corretiva";
+    categoriaMap.set(categoria, (categoriaMap.get(categoria) ?? 0) + 1);
+  });
   const distribuicaoServicos = Array.from(categoriaMap.entries()).map(([categoria, valor]) => ({ categoria, valor }));
 
   const causaMap = new Map<string, number>();
   caminhoCritico.forEach((c) => {
     if (c.diferencaMin > 0) {
-      const causa = c.causaAtraso.trim() || "Outros";
+      const causa = c.causaAtraso?.trim() || "Outros";
       causaMap.set(causa, (causaMap.get(causa) ?? 0) + c.diferencaMin / 60);
     }
   });

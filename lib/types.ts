@@ -52,15 +52,23 @@ export interface Servico {
   resultado: string;
   status: StatusItem;
   fotoAntes: string;
+  fotoDurante?: string;
   fotoDepois: string;
+  categoria?: string;
 }
 
 export interface FotoGaleria {
   id: string;
-  categoria: "antes" | "depois";
+  categoria: "antes" | "durante" | "depois";
   servico: string;
   area: string;
   url: string;
+}
+
+export interface Pendencia {
+  id: string;
+  item: string;
+  motivo: string;
 }
 
 export interface CaminhoCriticoItem {
@@ -73,6 +81,7 @@ export interface CaminhoCriticoItem {
   diferencaMin: number;
   responsavel: string;
   status: StatusItem;
+  causaAtraso?: string;
 }
 
 export interface OsPorEquipeDado {
@@ -128,6 +137,7 @@ export interface ParadaCompleta {
   servicos: Servico[];
   fotos: FotoGaleria[];
   caminhoCritico: CaminhoCriticoItem[];
+  pendencias: Pendencia[];
   graficos: GraficosData;
   resultadoFinal: ResultadoFinal;
 }

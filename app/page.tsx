@@ -1,28 +1,26 @@
+import Image from "next/image";
 import Link from "next/link";
-import { Activity, Factory, Gauge, Plus, ShieldCheck } from "lucide-react";
+import { Activity, Gauge, Plus } from "lucide-react";
 import { PARADAS_RESUMO } from "@/lib/mock-data";
 import { ParadaGrid } from "@/components/dashboard/ParadaGrid";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
+import { BackupControls } from "@/components/dashboard/BackupControls";
 
 export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5 sm:px-10">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white">
-              <Factory size={20} strokeWidth={2.2} />
-            </div>
-            <div>
-              <p className="text-sm font-bold leading-none text-slate-900">MaintOps Digital</p>
+          <div className="flex items-center gap-4">
+            <Image src="/santher-logo-azul.png" alt="Santher" width={140} height={37} className="h-8 w-auto sm:h-9" priority />
+            <div className="hidden h-8 w-px bg-slate-200 sm:block" />
+            <div className="hidden sm:block">
+              <p className="text-sm font-bold leading-none text-slate-900">Relatório Digital de Parada</p>
               <p className="mt-1 text-xs font-medium text-slate-400">Gestão de Paradas Industriais</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-500 sm:flex">
-              <ShieldCheck size={14} className="text-success-600" />
-              Ambiente de Demonstração
-            </div>
+            <BackupControls />
             <Link
               href="/novo"
               className="flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-brand-700"
@@ -70,8 +68,9 @@ export default function DashboardPage() {
       </main>
 
       <footer className="border-t border-slate-200 bg-white py-8">
-        <div className="mx-auto max-w-7xl px-6 text-center text-xs font-medium text-slate-400 sm:px-10">
-          MaintOps Digital — Relatórios de Parada de Máquina
+        <div className="mx-auto flex max-w-7xl flex-col items-center gap-3 px-6 text-center sm:px-10">
+          <Image src="/santher-logo-azul.png" alt="Santher" width={100} height={26} className="h-5 w-auto opacity-70" />
+          <p className="text-xs font-medium text-slate-400">Relatórios de Parada de Máquina</p>
         </div>
       </footer>
     </div>

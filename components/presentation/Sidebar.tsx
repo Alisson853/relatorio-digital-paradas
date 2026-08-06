@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Maximize2 } from "lucide-react";
 import { SECTIONS } from "@/lib/sections";
@@ -16,8 +17,11 @@ export function Sidebar({ activeId, onNavigate, onPresent, titulo }: SidebarProp
   return (
     <>
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 flex-col border-r border-slate-200 bg-white lg:flex">
-        <div className="flex items-center gap-2 border-b border-slate-100 px-6 py-5">
-          <Link href="/" className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700">
+        <div className="border-b border-slate-100 px-6 py-5">
+          <Image src="/santher-logo-azul.png" alt="Santher" width={120} height={32} className="h-6 w-auto" />
+        </div>
+        <div className="flex items-center gap-2 border-b border-slate-100 px-6 py-4">
+          <Link href="/" className="flex h-8 w-8 flex-none items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700">
             <ArrowLeft size={16} />
           </Link>
           <div className="min-w-0">

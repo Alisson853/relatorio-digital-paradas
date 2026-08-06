@@ -29,7 +29,7 @@ export function PresentationView({ data }: { data: ParadaCompleta }) {
       <GallerySection key="fotos" fotos={data.fotos} />,
       <ChartsSection key="graficos" graficos={data.graficos} />,
       <CriticalPathSection key="caminho-critico" itens={data.caminhoCritico} />,
-      <ResultSection key="resultado" resultado={data.resultadoFinal} />,
+      <ResultSection key="resultado" resultado={data.resultadoFinal} pendencias={data.pendencias} />,
     ],
     [data]
   );

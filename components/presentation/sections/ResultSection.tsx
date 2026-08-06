@@ -1,12 +1,13 @@
 "use client";
 
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { AlertTriangle, CheckCircle2, Gauge, ShieldCheck, Timer, TrendingUp } from "lucide-react";
-import type { ResultadoFinal } from "@/lib/types";
+import type { Pendencia, ResultadoFinal } from "@/lib/types";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 import { cn } from "@/lib/utils";
 
-export function ResultSection({ resultado }: { resultado: ResultadoFinal }) {
+export function ResultSection({ resultado, pendencias }: { resultado: ResultadoFinal; pendencias: Pendencia[] }) {
   const sucesso = resultado.selo === "concluida";
   const ressalvas = resultado.selo === "ressalvas";
 
@@ -78,6 +79,39 @@ export function ResultSection({ resultado }: { resultado: ResultadoFinal }) {
             </motion.div>
           ))}
         </div>
+
+        {pendencias.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-10% 0px" }}
+            transition={{ duration: 0.5, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-6 text-left backdrop-blur-sm"
+          >
+            <p className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-warning-100">
+              <AlertTriangle size={14} />
+              O Que Não Foi Feito
+            </p>
+            <ul className="space-y-3">
+              {pendencias.map((p) => (
+                <li key={p.id} className="flex flex-col gap-0.5 border-b border-white/10 pb-3 last:border-0 last:pb-0 sm:flex-row sm:items-baseline sm:gap-3">
+                  <span className="text-sm font-bold text-white sm:min-w-[40%]">{p.item}</span>
+                  <span className="text-sm text-brand-200">{p.motivo}</span>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        )}
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.6 }}
+          className="mt-12 flex justify-center"
+        >
+          <Image src="/santher-logo-branco.png" alt="Santher" width={120} height={31} className="h-6 w-auto opacity-80" />
+        </motion.div>
       </div>
     </section>
   );

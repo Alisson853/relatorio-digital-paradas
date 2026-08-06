@@ -8,7 +8,7 @@ import type { FotoGaleria } from "@/lib/types";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { cn } from "@/lib/utils";
 
-type Filtro = "todas" | "antes" | "depois";
+type Filtro = "todas" | "antes" | "durante" | "depois";
 
 export function GallerySection({ fotos }: { fotos: FotoGaleria[] }) {
   const [filtro, setFiltro] = useState<Filtro>("todas");
@@ -40,11 +40,11 @@ export function GallerySection({ fotos }: { fotos: FotoGaleria[] }) {
         <div className="flex flex-wrap items-end justify-between gap-6">
           <SectionHeading
             eyebrow="Registro Fotográfico"
-            title="Galeria Antes & Depois"
+            title="Galeria Antes, Durante & Depois"
             description="Evidências visuais dos serviços executados durante a parada."
           />
           <div className="mb-10 flex gap-1.5 rounded-full border border-slate-200 bg-slate-50 p-1">
-            {(["todas", "antes", "depois"] as Filtro[]).map((f) => (
+            {(["todas", "antes", "durante", "depois"] as Filtro[]).map((f) => (
               <button
                 key={f}
                 onClick={() => setFiltro(f)}
@@ -77,6 +77,7 @@ export function GallerySection({ fotos }: { fotos: FotoGaleria[] }) {
                 fill
                 sizes="200px"
                 className="object-cover transition-transform duration-500 group-hover:scale-110"
+                unoptimized={foto.url.startsWith("data:")}
               />
               <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/60 via-black/0 to-black/0 p-2.5 opacity-0 transition-opacity group-hover:opacity-100">
                 <p className="truncate text-[11px] font-semibold text-white">{foto.servico}</p>
@@ -84,7 +85,7 @@ export function GallerySection({ fotos }: { fotos: FotoGaleria[] }) {
               <span
                 className={cn(
                   "absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase text-white shadow",
-                  foto.categoria === "antes" ? "bg-slate-800/80" : "bg-brand-600/90"
+                  foto.categoria === "antes" ? "bg-slate-800/80" : foto.categoria === "durante" ? "bg-warning-600/90" : "bg-brand-600/90"
                 )}
               >
                 {foto.categoria}
@@ -137,7 +138,7 @@ export function GallerySection({ fotos }: { fotos: FotoGaleria[] }) {
               onClick={(e) => e.stopPropagation()}
               className="relative aspect-[4/3] w-full max-w-3xl overflow-hidden rounded-2xl bg-slate-900"
             >
-              <Image src={active.url} alt={active.servico} fill sizes="800px" className="object-contain" />
+              <Image src={active.url} alt={active.servico} fill sizes="800px" className="object-contain" unoptimized={active.url.startsWith("data:")} />
             </motion.div>
             <div className="absolute bottom-8 left-1/2 -translate-x-1/2 rounded-full bg-white/10 px-5 py-2 text-center text-sm font-semibold text-white">
               {active.servico} · <span className="capitalize text-brand-200">{active.categoria}</span>

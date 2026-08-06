@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { motion, type Variants } from "framer-motion";
 import { Calendar, Clock, Timer, User } from "lucide-react";
 import type { ParadaResumo } from "@/lib/types";
@@ -40,6 +41,14 @@ export function CoverSection({ resumo }: { resumo: ParadaResumo }) {
         />
       </div>
       <div className="pointer-events-none absolute -right-32 -top-32 h-[520px] w-[520px] rounded-full bg-brand-500/20 blur-3xl" />
+
+      <Image
+        src="/santher-logo-branco.png"
+        alt="Santher"
+        width={130}
+        height={33}
+        className="absolute left-6 top-6 h-7 w-auto sm:left-10 sm:top-10 sm:h-8"
+      />
 
       <div className="relative mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-16 lg:grid-cols-2">
         <div>
