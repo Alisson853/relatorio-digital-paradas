@@ -7,6 +7,7 @@ import type { ParadaCompleta } from "@/lib/types";
 import { SECTIONS } from "@/lib/sections";
 import { cn } from "@/lib/utils";
 import { Sidebar } from "./Sidebar";
+import { FitToScreen } from "./FitToScreen";
 import { CoverSection } from "./sections/CoverSection";
 import { SummarySection } from "./sections/SummarySection";
 import { TimelineSection } from "./sections/TimelineSection";
@@ -15,6 +16,18 @@ import { GallerySection } from "./sections/GallerySection";
 import { ChartsSection } from "./sections/ChartsSection";
 import { CriticalPathSection } from "./sections/CriticalPathSection";
 import { ResultSection } from "./sections/ResultSection";
+
+// Mesma cor de fundo de cada seção — evita "bordas" visíveis quando o conteúdo é reduzido para caber na tela.
+const SECTION_BG = [
+  "bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800", // capa
+  "bg-slate-50", // resumo
+  "bg-white", // timeline
+  "bg-slate-50", // servicos
+  "bg-white", // fotos
+  "bg-slate-50", // graficos
+  "bg-white", // caminho-critico
+  "bg-gradient-to-br from-brand-950 via-brand-900 to-slate-950", // resultado
+];
 
 export function PresentationView({ data }: { data: ParadaCompleta }) {
   const [presentationMode, setPresentationMode] = useState(false);
@@ -107,7 +120,7 @@ export function PresentationView({ data }: { data: ParadaCompleta }) {
 
   if (presentationMode) {
     return (
-      <div className="fixed inset-0 z-50 bg-slate-950">
+      <div className={cn("fixed inset-0 z-50 overflow-hidden transition-colors duration-500", SECTION_BG[activeIndex])}>
         <AnimatePresence mode="wait">
           <motion.div
             key={SECTIONS[activeIndex].id}
@@ -115,9 +128,9 @@ export function PresentationView({ data }: { data: ParadaCompleta }) {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.985 }}
             transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-            className="no-scrollbar h-full w-full overflow-y-auto"
+            className="h-full w-full overflow-hidden"
           >
-            {sectionNodes[activeIndex]}
+            <FitToScreen>{sectionNodes[activeIndex]}</FitToScreen>
           </motion.div>
         </AnimatePresence>
 
