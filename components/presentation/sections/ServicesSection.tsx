@@ -84,6 +84,7 @@ function ServiceSlide({ servico }: { servico: Servico }) {
                   fill
                   sizes="(min-width: 1024px) 560px, (min-width: 640px) 380px, 640px"
                   className="object-cover"
+                  loading="eager"
                   unoptimized={foto.url.startsWith("data:")}
                 />
                 <span

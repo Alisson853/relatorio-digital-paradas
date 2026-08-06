@@ -3,13 +3,15 @@
 import { useRef, useState } from "react";
 import Image from "next/image";
 import { ImagePlus, Loader2, X } from "lucide-react";
-import { fileToCompressedDataUrl } from "@/lib/image-utils";
+import { compressImageFile } from "@/lib/image-utils";
+import { uploadFoto } from "@/lib/actions/paradas";
+import { getEditorSenha } from "@/lib/editor-auth";
 import { cn } from "@/lib/utils";
 
 interface PhotoUploadFieldProps {
   label: string;
   value: string;
-  onChange: (dataUrl: string) => void;
+  onChange: (url: string) => void;
   className?: string;
 }
 
@@ -27,10 +29,17 @@ export function PhotoUploadField({ label, value, onChange, className }: PhotoUpl
     setError("");
     setLoading(true);
     try {
-      const dataUrl = await fileToCompressedDataUrl(file);
-      onChange(dataUrl);
+      const comprimido = await compressImageFile(file);
+      const formData = new FormData();
+      formData.set("file", comprimido, file.name);
+      const resultado = await uploadFoto(formData, getEditorSenha());
+      if (!resultado.ok || !resultado.url) {
+        setError(resultado.erro || "Não foi possível enviar essa imagem.");
+        return;
+      }
+      onChange(resultado.url);
     } catch {
-      setError("Não foi possível carregar essa imagem.");
+      setError("Não foi possível enviar essa imagem.");
     } finally {
       setLoading(false);
     }
@@ -78,7 +87,7 @@ export function PhotoUploadField({ label, value, onChange, className }: PhotoUpl
           )}
         >
           {loading ? <Loader2 size={20} className="animate-spin" /> : <ImagePlus size={20} />}
-          <span className="text-[11px] font-bold">{loading ? "Carregando..." : "Adicionar foto"}</span>
+          <span className="text-[11px] font-bold">{loading ? "Enviando..." : "Adicionar foto"}</span>
         </button>
       )}
       {error && <p className="mt-1 text-[11px] font-semibold text-danger-600">{error}</p>}

@@ -13,6 +13,7 @@ export interface ParadaResumo {
   status: StatusGeral;
   responsavel: string;
   imagem: string;
+  fotosMaquina?: string[];
 }
 
 export interface Kpis {

@@ -1,4 +1,4 @@
-export function fileToCompressedDataUrl(file: File, maxWidth = 900, quality = 0.72): Promise<string> {
+export function compressImageFile(file: File, maxWidth = 1600, quality = 0.8): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(reader.error);
@@ -15,11 +15,15 @@ export function fileToCompressedDataUrl(file: File, maxWidth = 900, quality = 0.
         canvas.height = height;
         const ctx = canvas.getContext("2d");
         if (!ctx) {
-          resolve(reader.result as string);
+          reject(new Error("Não foi possível processar a imagem."));
           return;
         }
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
+        canvas.toBlob(
+          (blob) => (blob ? resolve(blob) : reject(new Error("Não foi possível comprimir a imagem."))),
+          "image/jpeg",
+          quality
+        );
       };
       img.src = reader.result as string;
     };

@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Search, SearchX } from "lucide-react";
 import type { ParadaResumo, StatusGeral } from "@/lib/types";
-import { deleteCustomParada, downloadParadaJson, getCustomParadaById, getCustomParadasResumo } from "@/lib/local-store";
+import { deleteParada, getParadaCompleta } from "@/lib/actions/paradas";
+import { getEditorSenha } from "@/lib/editor-auth";
+import { triggerJsonDownload } from "@/lib/local-json";
 import { cn } from "@/lib/utils";
 import { ParadaCard } from "./ParadaCard";
 
@@ -14,37 +17,34 @@ const STATUS_FILTROS: Array<{ value: "todos" | StatusGeral; label: string }> = [
   { value: "ressalvas", label: "Ressalvas" },
 ];
 
-export function ParadaGrid({ estaticas }: { estaticas: ParadaResumo[] }) {
-  const [customizadas, setCustomizadas] = useState<ParadaResumo[]>([]);
+export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
+  const router = useRouter();
   const [busca, setBusca] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<"todos" | StatusGeral>("todos");
 
-  useEffect(() => {
-    setCustomizadas(getCustomParadasResumo());
-  }, []);
-
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!window.confirm("Excluir este relatório? Essa ação não pode ser desfeita.")) return;
-    deleteCustomParada(id);
-    setCustomizadas((prev) => prev.filter((p) => p.id !== id));
+    const resultado = await deleteParada(id, getEditorSenha());
+    if (!resultado.ok) {
+      window.alert(resultado.erro || "Não foi possível excluir.");
+      return;
+    }
+    router.refresh();
   };
 
-  const handleExport = (id: string) => {
-    const completa = getCustomParadaById(id);
-    if (completa) downloadParadaJson(completa);
+  const handleExport = async (id: string) => {
+    const completa = await getParadaCompleta(id);
+    if (completa) triggerJsonDownload(`relatorio-${completa.resumo.id}.json`, completa);
   };
-
-  const todas = [...customizadas, ...estaticas];
 
   const filtradas = useMemo(() => {
     const termo = busca.trim().toLowerCase();
-    return todas.filter((p) => {
+    return paradas.filter((p) => {
       const bateBusca = !termo || [p.nome, p.maquina, p.area, p.responsavel].some((campo) => campo.toLowerCase().includes(termo));
       const bateStatus = statusFiltro === "todos" || p.status === statusFiltro;
       return bateBusca && bateStatus;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [busca, statusFiltro, customizadas, estaticas]);
+  }, [busca, statusFiltro, paradas]);
 
   return (
     <div>
@@ -83,19 +83,15 @@ export function ParadaGrid({ estaticas }: { estaticas: ParadaResumo[] }) {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {filtradas.map((parada, index) => {
-            const isCustom = customizadas.some((c) => c.id === parada.id);
-            return (
-              <ParadaCard
-                key={parada.id}
-                parada={parada}
-                index={index}
-                custom={isCustom}
-                onDelete={isCustom ? () => handleDelete(parada.id) : undefined}
-                onExport={isCustom ? () => handleExport(parada.id) : undefined}
-              />
-            );
-          })}
+          {filtradas.map((parada, index) => (
+            <ParadaCard
+              key={parada.id}
+              parada={parada}
+              index={index}
+              onDelete={() => handleDelete(parada.id)}
+              onExport={() => handleExport(parada.id)}
+            />
+          ))}
         </div>
       )}
     </div>

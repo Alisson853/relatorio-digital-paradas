@@ -1,20 +1,9 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import type { ParadaResumo } from "@/lib/types";
-import { getCustomParadasResumo } from "@/lib/local-store";
 
-export function DashboardStats({ estaticas }: { estaticas: ParadaResumo[] }) {
-  const [customizadas, setCustomizadas] = useState<ParadaResumo[]>([]);
-
-  useEffect(() => {
-    setCustomizadas(getCustomParadasResumo());
-  }, []);
-
-  const todas = [...customizadas, ...estaticas];
-  const total = todas.length;
-  const concluidas = todas.filter((p) => p.status === "concluida").length;
-  const ativas = todas.filter((p) => p.status !== "concluida").length;
+export function DashboardStats({ paradas }: { paradas: ParadaResumo[] }) {
+  const total = paradas.length;
+  const concluidas = paradas.filter((p) => p.status === "concluida").length;
+  const ativas = paradas.filter((p) => p.status !== "concluida").length;
 
   return (
     <div className="grid grid-cols-3 gap-3 sm:min-w-[380px]">

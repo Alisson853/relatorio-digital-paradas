@@ -90,6 +90,23 @@ body {
   scroll-snap-align: start;
 }
 
+/* Modo apresentação: mede a altura real do conteúdo (sem forçar 100dvh) para que o
+   FitToScreen consiga ampliar seções curtas até preencher a tela, em vez de deixá-las
+   pequenas e centralizadas com bordas vazias. */
+.presentation-fit .section-screen {
+  min-height: 0;
+}
+
+/* As larguras máximas centrais (pensadas para leitura com rolagem) deixam muita área
+   vazia nas laterais em tela cheia — no modo apresentação o conteúdo usa quase toda a
+   largura disponível, como um slide de verdade. */
+.presentation-fit .max-w-4xl,
+.presentation-fit .max-w-5xl,
+.presentation-fit .max-w-6xl,
+.presentation-fit .max-w-7xl {
+  max-width: 96vw;
+}
+
 .presentation-scroll {
   scroll-snap-type: y proximity;
 }

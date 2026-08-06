@@ -1,4 +1,5 @@
 import type { CaminhoCriticoItem, Equipe, FotoGaleria, GraficosData, Kpis, Servico, StatusItem } from "./types";
+import { NO_PHOTO_PLACEHOLDER } from "./image-utils";
 
 export function textoExecutadoPadrao(status: StatusItem): string {
   switch (status) {
@@ -56,14 +57,35 @@ export function deriveKpis(servicos: Servico[], seguranca: number): Kpis {
   };
 }
 
+// Foto de capa automática: quando ninguém envia uma foto dedicada da máquina,
+// usamos a primeira foto real (depois > antes > durante) já enviada nos serviços —
+// assim o card e a capa nunca ficam com o ícone genérico se já existe alguma foto.
+export function deriveFotoCapa(servicos: Servico[]): string | null {
+  for (const s of servicos) {
+    if (s.fotoDepois && s.fotoDepois !== NO_PHOTO_PLACEHOLDER) return s.fotoDepois;
+  }
+  for (const s of servicos) {
+    if (s.fotoAntes && s.fotoAntes !== NO_PHOTO_PLACEHOLDER) return s.fotoAntes;
+  }
+  for (const s of servicos) {
+    if (s.fotoDurante) return s.fotoDurante;
+  }
+  return null;
+}
+
 export function deriveFotos(servicos: Servico[]): FotoGaleria[] {
   const fotos: FotoGaleria[] = [];
   servicos.forEach((s) => {
-    fotos.push({ id: `${s.id}-antes`, categoria: "antes", servico: s.equipamento, area: s.area, url: s.fotoAntes });
-    if (s.fotoDurante) {
-      fotos.push({ id: `${s.id}-durante`, categoria: "durante", servico: s.equipamento, area: s.area, url: s.fotoDurante });
+    const nome = s.titulo || s.equipamento;
+    if (s.fotoAntes && s.fotoAntes !== NO_PHOTO_PLACEHOLDER) {
+      fotos.push({ id: `${s.id}-antes`, categoria: "antes", servico: nome, area: s.area, url: s.fotoAntes });
     }
-    fotos.push({ id: `${s.id}-depois`, categoria: "depois", servico: s.equipamento, area: s.area, url: s.fotoDepois });
+    if (s.fotoDurante) {
+      fotos.push({ id: `${s.id}-durante`, categoria: "durante", servico: nome, area: s.area, url: s.fotoDurante });
+    }
+    if (s.fotoDepois && s.fotoDepois !== NO_PHOTO_PLACEHOLDER) {
+      fotos.push({ id: `${s.id}-depois`, categoria: "depois", servico: nome, area: s.area, url: s.fotoDepois });
+    }
   });
   return fotos;
 }

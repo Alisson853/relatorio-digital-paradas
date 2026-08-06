@@ -26,6 +26,7 @@ export const PARADAS_RESUMO: ParadaResumo[] = [
     status: "ressalvas",
     responsavel: "Equipe de Manutenção MP09",
     imagem: "conveyor",
+    fotosMaquina: [`${FOTOS_DIR}/maquina-principal.jpg`],
   },
 ];
 

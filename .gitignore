@@ -43,3 +43,6 @@ next-env.d.ts
 # source decks (already extracted into the site — kept out of git, too large)
 *.pptx
 *.ppt
+
+.vercel
+.env*

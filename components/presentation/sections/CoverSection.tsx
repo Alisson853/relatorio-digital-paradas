@@ -106,9 +106,23 @@ export function CoverSection({ resumo }: { resumo: ParadaResumo }) {
           className="relative mx-auto aspect-square w-full max-w-md"
         >
           <div className="absolute inset-0 rounded-full bg-white/5 blur-2xl" />
-          <div className="relative flex h-full w-full items-center justify-center rounded-3xl border border-white/10 bg-white/5 p-12 backdrop-blur-sm">
-            <MachineIllustration variant={resumo.imagem} className="h-full w-full" />
-          </div>
+          {resumo.fotosMaquina?.length ? (
+            <div className="relative h-full w-full">
+              <div className="absolute inset-0 overflow-hidden rounded-3xl border border-white/10 shadow-2xl">
+                <Image src={resumo.fotosMaquina[0]} alt={resumo.maquina} fill sizes="480px" className="object-cover" priority />
+                <div className="absolute inset-0 bg-gradient-to-t from-brand-950/40 via-transparent to-transparent" />
+              </div>
+              {resumo.fotosMaquina[1] && (
+                <div className="absolute -bottom-6 -right-6 h-32 w-40 overflow-hidden rounded-2xl border-4 border-brand-900 shadow-2xl sm:h-36 sm:w-48">
+                  <Image src={resumo.fotosMaquina[1]} alt={resumo.maquina} fill sizes="200px" className="object-cover" />
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="relative flex h-full w-full items-center justify-center rounded-3xl border border-white/10 bg-white/5 p-12 backdrop-blur-sm">
+              <MachineIllustration variant={resumo.imagem} className="h-full w-full" />
+            </div>
+          )}
         </motion.div>
       </div>
     </section>

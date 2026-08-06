@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowUpRight, Calendar, Clock, Download, Factory, Pencil, Trash2, User } from "lucide-react";
@@ -7,16 +8,19 @@ import type { ParadaResumo } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { MachineIllustration } from "@/components/ui/MachineIllustration";
 import { formatDate } from "@/lib/utils";
+import { useEditorMode } from "@/lib/useEditorMode";
 
 interface ParadaCardProps {
   parada: ParadaResumo;
   index: number;
-  custom?: boolean;
   onDelete?: () => void;
   onExport?: () => void;
 }
 
-export function ParadaCard({ parada, index, custom = false, onDelete, onExport }: ParadaCardProps) {
+export function ParadaCard({ parada, index, onDelete, onExport }: ParadaCardProps) {
+  const { isEditor } = useEditorMode();
+  const showEditorControls = isEditor;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 28 }}
@@ -27,24 +31,26 @@ export function ParadaCard({ parada, index, custom = false, onDelete, onExport }
       className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] transition-shadow duration-300 hover:shadow-[0_12px_28px_rgba(16,24,40,0.12)]"
     >
       <div className="relative h-40 overflow-hidden bg-gradient-to-br from-brand-900 via-brand-800 to-brand-700">
-        <motion.div
-          className="absolute inset-0 flex items-center justify-center opacity-90"
-          whileHover={{ scale: 1.06 }}
-          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <div className="h-40 w-40 -translate-y-2">
-            <MachineIllustration variant={parada.imagem} className="h-full w-full" />
-          </div>
-        </motion.div>
+        {parada.fotosMaquina?.[0] ? (
+          <motion.div className="absolute inset-0" whileHover={{ scale: 1.06 }} transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
+            <Image src={parada.fotosMaquina[0]} alt={parada.maquina} fill sizes="400px" className="object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-brand-950/50 via-transparent to-brand-950/10" />
+          </motion.div>
+        ) : (
+          <motion.div
+            className="absolute inset-0 flex items-center justify-center opacity-90"
+            whileHover={{ scale: 1.06 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <div className="h-40 w-40 -translate-y-2">
+              <MachineIllustration variant={parada.imagem} className="h-full w-full" />
+            </div>
+          </motion.div>
+        )}
         <div className="absolute left-4 top-4 flex items-center gap-2">
           <StatusBadge status={parada.status} className="bg-white/95 shadow-sm" />
-          {custom && (
-            <span className="rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-brand-600 shadow-sm">
-              Meu Relatório
-            </span>
-          )}
         </div>
-        {custom && (
+        {showEditorControls && (
           <div className="absolute right-4 top-4 flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
             <Link
               href={`/novo?edit=${parada.id}`}

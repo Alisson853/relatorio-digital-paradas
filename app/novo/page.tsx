@@ -6,9 +6,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowLeft, History, Plus, X } from "lucide-react";
 import type { CaminhoCriticoItem, ParadaCompleta, ParadaResumo, Pendencia, Servico, StatusGeral, TimelineEvento } from "@/lib/types";
-import { deriveFotos, deriveGraficos, deriveKpis, textoExecutadoPadrao, textoResultadoPadrao } from "@/lib/derive";
+import { deriveGraficos, deriveKpis, textoExecutadoPadrao, textoResultadoPadrao } from "@/lib/derive";
 import { gerarResultadoFinal } from "@/lib/mock-data";
-import { getCustomParadaById, saveCustomParada, slugify } from "@/lib/local-store";
+import { getParadaCompleta, saveParada } from "@/lib/actions/paradas";
+import { getEditorSenha } from "@/lib/editor-auth";
+import { slugify } from "@/lib/utils";
 import { clearDraft, getDraft, saveDraft } from "@/lib/draft-store";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { SelectField, TextAreaField, TextField } from "@/components/forms/FormControls";
@@ -17,6 +19,9 @@ import { TimelineRowEditor, type TimelineRow } from "@/components/forms/Timeline
 import { ServicoRowEditor, type ServicoRow } from "@/components/forms/ServicoRowEditor";
 import { CaminhoRowEditor, type CaminhoRow } from "@/components/forms/CaminhoRowEditor";
 import { PendenciaRowEditor, type PendenciaRow } from "@/components/forms/PendenciaRowEditor";
+import { PhotoUploadField } from "@/components/forms/PhotoUploadField";
+import { EditorPasswordForm } from "@/components/shared/EditorPasswordForm";
+import { useEditorMode } from "@/lib/useEditorMode";
 
 const STATUS_GERAL_OPTIONS = [
   { value: "em_andamento", label: "Em Andamento" },
@@ -102,6 +107,7 @@ interface DraftSnapshot {
   responsavel: string;
   status: StatusGeral;
   imagem: string;
+  fotoMaquina: string;
   seguranca: number;
   servicos: ServicoRow[];
   pendencias: PendenciaRow[];
@@ -171,6 +177,7 @@ function NovaParadaForm() {
   const [responsavel, setResponsavel] = useState("");
   const [status, setStatus] = useState<StatusGeral>("em_andamento");
   const [imagem, setImagem] = useState(IMAGEM_PADRAO);
+  const [fotoMaquina, setFotoMaquina] = useState("");
   const [seguranca, setSeguranca] = useState(100);
 
   const [servicos, setServicos] = useState<ServicoRow[]>([]);
@@ -196,31 +203,35 @@ function NovaParadaForm() {
       setReady(true);
       return;
     }
-    const existing = getCustomParadaById(id);
-    if (!existing) {
-      setNotFound(true);
-      setReady(true);
-      return;
-    }
-    setNome(existing.resumo.nome);
-    setMaquina(existing.resumo.maquina);
-    setData(existing.resumo.data);
-    setDuracaoPlanejada(existing.resumo.duracaoPlanejada);
-    setDuracaoRealizada(existing.resumo.duracaoRealizada);
-    setResponsavel(existing.resumo.responsavel);
-    setStatus(existing.resumo.status);
-    setImagem(existing.resumo.imagem);
-    setSeguranca(existing.kpis.seguranca);
-    setServicos(existing.servicos.map(servicoParaLinha));
-    setPendencias(existing.pendencias.map((p) => ({ ...p })));
-    setTimeline(existing.timeline.map((t) => ({ ...t })));
-    setCaminhoCritico(existing.caminhoCritico.map(caminhoParaLinha));
-    setPlanejadoRealizado(existing.graficos.planejadoRealizado.length ? existing.graficos.planejadoRealizado.map((p) => ({ ...p })) : PLANEJADO_REALIZADO_PADRAO);
-    setResumoFinalCustom(existing.resultadoFinal.resumo);
 
-    const draft = getDraft<DraftSnapshot>(draftKeyRef.current);
-    if (draft && draftPossuiConteudo(draft)) setDraftDisponivel(draft);
-    setReady(true);
+    (async () => {
+      const existing = await getParadaCompleta(id);
+      if (!existing) {
+        setNotFound(true);
+        setReady(true);
+        return;
+      }
+      setNome(existing.resumo.nome);
+      setMaquina(existing.resumo.maquina);
+      setData(existing.resumo.data);
+      setDuracaoPlanejada(existing.resumo.duracaoPlanejada);
+      setDuracaoRealizada(existing.resumo.duracaoRealizada);
+      setResponsavel(existing.resumo.responsavel);
+      setStatus(existing.resumo.status);
+      setImagem(existing.resumo.imagem);
+      setFotoMaquina(existing.resumo.fotosMaquina?.[0] ?? "");
+      setSeguranca(existing.kpis.seguranca);
+      setServicos(existing.servicos.map(servicoParaLinha));
+      setPendencias(existing.pendencias.map((p) => ({ ...p })));
+      setTimeline(existing.timeline.map((t) => ({ ...t })));
+      setCaminhoCritico(existing.caminhoCritico.map(caminhoParaLinha));
+      setPlanejadoRealizado(existing.graficos.planejadoRealizado.length ? existing.graficos.planejadoRealizado.map((p) => ({ ...p })) : PLANEJADO_REALIZADO_PADRAO);
+      setResumoFinalCustom(existing.resultadoFinal.resumo);
+
+      const draft = getDraft<DraftSnapshot>(draftKeyRef.current);
+      if (draft && draftPossuiConteudo(draft)) setDraftDisponivel(draft);
+      setReady(true);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -239,6 +250,7 @@ function NovaParadaForm() {
         responsavel,
         status,
         imagem,
+        fotoMaquina,
         seguranca,
         servicos,
         pendencias,
@@ -264,6 +276,7 @@ function NovaParadaForm() {
     responsavel,
     status,
     imagem,
+    fotoMaquina,
     seguranca,
     servicos,
     pendencias,
@@ -283,6 +296,7 @@ function NovaParadaForm() {
     setResponsavel(draftDisponivel.responsavel);
     setStatus(draftDisponivel.status);
     setImagem(draftDisponivel.imagem);
+    setFotoMaquina(draftDisponivel.fotoMaquina);
     setSeguranca(draftDisponivel.seguranca);
     setServicos(draftDisponivel.servicos);
     setPendencias(draftDisponivel.pendencias);
@@ -302,7 +316,7 @@ function NovaParadaForm() {
     setter((prev) => prev.map((row) => (row.id === id ? { ...row, ...patch } : row)));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     if (!nome.trim() || !maquina.trim() || !data || !responsavel.trim()) {
@@ -325,6 +339,7 @@ function NovaParadaForm() {
       status,
       responsavel: responsavel.trim(),
       imagem,
+      fotosMaquina: fotoMaquina ? [fotoMaquina] : undefined,
     };
 
     const servicosFinal: Servico[] = servicos
@@ -356,7 +371,6 @@ function NovaParadaForm() {
     const timelineFinal: TimelineEvento[] = timeline;
 
     const kpis = deriveKpis(servicosFinal, seguranca);
-    const fotos = deriveFotos(servicosFinal);
     const graficos = deriveGraficos(servicosFinal, caminhoCriticoFinal, planejadoRealizado, kpis.eficiencia);
     const resultadoFinal = gerarResultadoFinal(resumo, kpis);
     if (resumoFinalCustom.trim()) resultadoFinal.resumo = resumoFinalCustom.trim();
@@ -366,17 +380,16 @@ function NovaParadaForm() {
       kpis,
       timeline: timelineFinal,
       servicos: servicosFinal,
-      fotos,
+      fotos: [],
       caminhoCritico: caminhoCriticoFinal,
       pendencias: pendenciasFinal,
       graficos,
       resultadoFinal,
     };
 
-    try {
-      saveCustomParada(parada);
-    } catch (err) {
-      setErro(err instanceof Error ? err.message : "Não foi possível salvar o relatório.");
+    const resultado = await saveParada(parada, getEditorSenha());
+    if (!resultado.ok) {
+      setErro(resultado.erro || "Não foi possível salvar o relatório.");
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -464,6 +477,12 @@ function NovaParadaForm() {
             <SelectField label="Status Geral" value={status} onChange={(v) => setStatus(v as StatusGeral)} options={STATUS_GERAL_OPTIONS} />
             <TextField label="Tempo Planejado" value={duracaoPlanejada} onChange={setDuracaoPlanejada} placeholder="Ex: 48h" />
             <TextField label="Tempo Realizado" value={duracaoRealizada} onChange={setDuracaoRealizada} placeholder="Ex: 51h 20min" />
+            <PhotoUploadField
+              label="Foto da Máquina (capa e card do dashboard)"
+              value={fotoMaquina}
+              onChange={setFotoMaquina}
+              className="sm:col-span-2 sm:max-w-xs"
+            />
           </div>
         </FormSection>
 
@@ -608,5 +627,29 @@ function NovaParadaForm() {
 }
 
 export default function NovaParadaPage() {
+  const { ready, isEditor, unlock } = useEditorMode();
+
+  if (!ready) {
+    return <div className="min-h-screen bg-slate-50" />;
+  }
+
+  if (!isEditor) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-slate-50 px-6">
+        <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+          <EditorPasswordForm
+            onUnlock={unlock}
+            onSuccess={() => {}}
+            titulo="Acesso Restrito"
+            descricao="Esta área é só para quem alimenta os relatórios. Digite a senha para continuar."
+          />
+        </div>
+        <Link href="/" className="text-sm font-semibold text-slate-400 hover:text-slate-700">
+          Voltar ao Dashboard
+        </Link>
+      </div>
+    );
+  }
+
   return <NovaParadaForm />;
 }

@@ -1,12 +1,18 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Activity, Gauge, Plus } from "lucide-react";
-import { PARADAS_RESUMO } from "@/lib/mock-data";
+import { listParadasResumo } from "@/lib/actions/paradas";
 import { ParadaGrid } from "@/components/dashboard/ParadaGrid";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { BackupControls } from "@/components/dashboard/BackupControls";
+import { EditorOnly } from "@/components/shared/EditorOnly";
+import { EditorToggle } from "@/components/shared/EditorToggle";
 
-export default function DashboardPage() {
+export const dynamic = "force-dynamic";
+
+export default async function DashboardPage() {
+  const paradas = await listParadasResumo();
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-slate-200 bg-white">
@@ -19,16 +25,18 @@ export default function DashboardPage() {
               <p className="mt-1 text-xs font-medium text-slate-400">Gestão de Paradas Industriais</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <BackupControls />
-            <Link
-              href="/novo"
-              className="flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-brand-700"
-            >
-              <Plus size={15} />
-              Nova Parada
-            </Link>
-          </div>
+          <EditorOnly>
+            <div className="flex items-center gap-3">
+              <BackupControls />
+              <Link
+                href="/novo"
+                className="flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-brand-700"
+              >
+                <Plus size={15} />
+                Nova Parada
+              </Link>
+            </div>
+          </EditorOnly>
         </div>
       </header>
 
@@ -47,7 +55,7 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <DashboardStats estaticas={PARADAS_RESUMO} />
+          <DashboardStats paradas={paradas} />
         </div>
 
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
@@ -58,19 +66,22 @@ export default function DashboardPage() {
             <Activity size={16} className="text-brand-500" />
             Atualizado em tempo real
           </div>
-          <Link href="/novo" className="flex items-center gap-1.5 text-sm font-bold text-brand-600 hover:text-brand-700">
-            <Plus size={15} />
-            Alimentar novo relatório
-          </Link>
+          <EditorOnly>
+            <Link href="/novo" className="flex items-center gap-1.5 text-sm font-bold text-brand-600 hover:text-brand-700">
+              <Plus size={15} />
+              Alimentar novo relatório
+            </Link>
+          </EditorOnly>
         </div>
 
-        <ParadaGrid estaticas={PARADAS_RESUMO} />
+        <ParadaGrid paradas={paradas} />
       </main>
 
       <footer className="border-t border-slate-200 bg-white py-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center gap-3 px-6 text-center sm:px-10">
           <Image src="/santher-logo-azul.png" alt="Santher" width={100} height={26} className="h-5 w-auto opacity-70" />
           <p className="text-xs font-medium text-slate-400">Relatórios de Parada de Máquina</p>
+          <EditorToggle />
         </div>
       </footer>
     </div>
