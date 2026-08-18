@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Clock, MapPin, Users2, Wrench } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Clock, MapPin, Users2, Wrench, Zap } from "lucide-react";
 import type { Servico } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -16,6 +16,24 @@ function MetaField({ label, value, className }: { label: string; value: string; 
       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
       <p className="mt-0.5 break-words text-sm font-semibold leading-snug text-slate-800">{value}</p>
     </div>
+  );
+}
+
+// Etiqueta Vermelha/Amarela sinalizam risco de segurança — precisam saltar aos
+// olhos de quem está lendo, não só aparecer como mais um texto no meio do card.
+function CategoriaBadge({ categoria }: { categoria?: string }) {
+  if (!categoria) return null;
+  const estilo =
+    categoria === "Etiqueta Vermelha"
+      ? "bg-danger-100 text-danger-600"
+      : categoria === "Etiqueta Amarela"
+        ? "bg-warning-100 text-warning-600"
+        : "bg-slate-100 text-slate-600";
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide", estilo)}>
+      {(categoria === "Etiqueta Vermelha" || categoria === "Etiqueta Amarela") && <AlertTriangle size={12} />}
+      {categoria}
+    </span>
   );
 }
 
@@ -34,9 +52,21 @@ function ServiceSlide({ servico }: { servico: Servico }) {
           {servico.titulo}
         </h3>
 
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {servico.numeroOS === "Oportunidade" ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-signal-500/15 px-3 py-1 text-xs font-bold uppercase tracking-wide text-signal-500">
+              <Zap size={12} />
+              Oportunidade — sem OS programada
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-slate-600">
+              OS {servico.numeroOS}
+            </span>
+          )}
+          <CategoriaBadge categoria={servico.categoria} />
+        </div>
+
         <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-4">
-          <MetaField label="OS" value={servico.numeroOS} />
-          <MetaField label="Tempo Total" value={servico.tempoGasto} />
           <MetaField label="Equipamento" value={servico.equipamento} className="col-span-2 sm:col-span-4" />
           <div className="col-span-2 flex items-start gap-1.5 sm:col-span-2">
             <MapPin size={13} className="mt-4 flex-none text-slate-400" />
@@ -46,8 +76,12 @@ function ServiceSlide({ servico }: { servico: Servico }) {
             <Users2 size={13} className="mt-4 flex-none text-slate-400" />
             <MetaField label="Área Responsável" value={`${servico.equipe} · ${servico.responsavel}`} />
           </div>
+          <div className="col-span-1 flex items-start gap-1.5 sm:col-span-2">
+            <Clock size={13} className="mt-4 flex-none text-slate-400" />
+            <MetaField label="Tempo Total" value={servico.tempoGasto} />
+          </div>
           {(servico.horaInicio || servico.horaFim) && (
-            <div className="col-span-2 flex items-start gap-1.5 sm:col-span-4">
+            <div className="col-span-1 flex items-start gap-1.5 sm:col-span-2">
               <Clock size={13} className="mt-4 flex-none text-slate-400" />
               <MetaField label="Início — Término" value={`${servico.horaInicio || "—"} — ${servico.horaFim || "—"}`} />
             </div>
