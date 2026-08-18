@@ -166,15 +166,39 @@ function NovaOsForm({ paradaId, onCriada }: { paradaId: string; onCriada: (servi
   );
 }
 
-function EtapaDot({ preenchida, horario, label }: { preenchida: boolean; horario?: string; label: string }) {
+function EtapaDot({
+  preenchida,
+  selecionada,
+  horario,
+  label,
+  onClick,
+}: {
+  preenchida: boolean;
+  selecionada: boolean;
+  horario?: string;
+  label: string;
+  onClick: () => void;
+}) {
   return (
-    <div className={cn("flex flex-1 flex-col items-center gap-1 rounded-lg py-2", preenchida ? "bg-success-100" : "bg-slate-100")}>
-      <div className={cn("flex h-6 w-6 items-center justify-center rounded-full", preenchida ? "bg-success-600 text-white" : "bg-slate-300 text-slate-500")}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex flex-1 flex-col items-center gap-1 rounded-lg py-2 transition-colors",
+        selecionada ? "bg-brand-100 ring-2 ring-brand-400" : preenchida ? "bg-success-100" : "bg-slate-100 hover:bg-slate-200"
+      )}
+    >
+      <div
+        className={cn(
+          "flex h-6 w-6 items-center justify-center rounded-full",
+          selecionada ? "bg-brand-600 text-white" : preenchida ? "bg-success-600 text-white" : "bg-slate-300 text-slate-500"
+        )}
+      >
         {preenchida ? <Check size={13} /> : <span className="text-[10px] font-bold">·</span>}
       </div>
-      <p className={cn("text-[10px] font-bold uppercase", preenchida ? "text-success-700" : "text-slate-400")}>{label}</p>
+      <p className={cn("text-[10px] font-bold uppercase", selecionada ? "text-brand-700" : preenchida ? "text-success-700" : "text-slate-400")}>{label}</p>
       {horario && <p className="text-[10px] font-mono font-semibold text-success-600">{horario}</p>}
-    </div>
+    </button>
   );
 }
 
@@ -195,12 +219,18 @@ function ServicoCapturaCard({
   // campo) para que "Tentar novamente" reenvie o mesmo arquivo sem precisar
   // reabrir a câmera e tirar a foto de novo.
   const [pendente, setPendente] = useState<{ blob: Blob; nome: string } | null>(null);
+  // Etapa escolhida manualmente pelo usuário — se nulo, usa a próxima vazia
+  // (Antes -> Depois -> Durante) como sugestão automática.
+  const [etapaEscolhida, setEtapaEscolhida] = useState<"Antes" | "Durante" | "Depois" | null>(null);
 
   const temAntes = !!servico.fotoAntes && servico.fotoAntes !== NO_PHOTO_PLACEHOLDER;
   const temDurante = !!servico.fotoDurante;
   const temDepois = !!servico.fotoDepois && servico.fotoDepois !== NO_PHOTO_PLACEHOLDER;
 
-  async function enviar(blob: Blob, nome: string, tentativas = 3) {
+  const etapaSugerida: "Antes" | "Durante" | "Depois" = !temAntes ? "Antes" : !temDepois ? "Depois" : !temDurante ? "Durante" : "Depois";
+  const etapaAtiva = etapaEscolhida ?? etapaSugerida;
+
+  async function enviar(blob: Blob, nome: string, etapa: "Antes" | "Durante" | "Depois", tentativas = 3) {
     setErro("");
     setUltimoResultado("");
     setLoading(true);
@@ -228,7 +258,7 @@ function ServicoCapturaCard({
         return;
       }
 
-      const resultado = await capturarFotoServico(paradaId, servico.id, upload.url, senha);
+      const resultado = await capturarFotoServico(paradaId, servico.id, upload.url, senha, etapa);
       if (!resultado.ok) {
         setPendente(null);
         setErro(resultado.erro || "Não foi possível registrar a foto.");
@@ -236,6 +266,7 @@ function ServicoCapturaCard({
       }
 
       setPendente(null);
+      setEtapaEscolhida(null);
       const campo = resultado.label === "Antes" ? "fotoAntes" : resultado.label === "Durante" ? "fotoDurante" : "fotoDepois";
       const horarioCampo = resultado.label === "Antes" ? "fotoAntesHorario" : resultado.label === "Durante" ? "fotoDuranteHorario" : "fotoDepoisHorario";
       onCaptured(servico.id, { [campo]: upload.url, [horarioCampo]: resultado.horario } as Partial<Servico>);
@@ -255,7 +286,7 @@ function ServicoCapturaCard({
     setLoading(true);
     try {
       const comprimido = await compressImageFile(file);
-      await enviar(comprimido, file.name);
+      await enviar(comprimido, file.name, etapaAtiva);
     } catch {
       setErro("Não foi possível processar a foto. Tente novamente.");
       setLoading(false);
@@ -263,7 +294,7 @@ function ServicoCapturaCard({
   }
 
   function handleTentarNovamente() {
-    if (pendente) enviar(pendente.blob, pendente.nome);
+    if (pendente) enviar(pendente.blob, pendente.nome, etapaAtiva);
   }
 
   return (
@@ -273,10 +304,11 @@ function ServicoCapturaCard({
       <h3 className="mt-0.5 text-base font-bold leading-snug text-slate-900">{servico.equipamento}</h3>
       <p className="mt-0.5 text-xs text-slate-400">{servico.area}</p>
 
-      <div className="mt-3 flex gap-2">
-        <EtapaDot preenchida={temAntes} horario={servico.fotoAntesHorario} label="Antes" />
-        <EtapaDot preenchida={temDurante} horario={servico.fotoDuranteHorario} label="Durante" />
-        <EtapaDot preenchida={temDepois} horario={servico.fotoDepoisHorario} label="Depois" />
+      <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-slate-400">Toque para escolher a etapa da foto</p>
+      <div className="mt-1.5 flex gap-2">
+        <EtapaDot preenchida={temAntes} selecionada={etapaAtiva === "Antes"} horario={servico.fotoAntesHorario} label="Antes" onClick={() => setEtapaEscolhida("Antes")} />
+        <EtapaDot preenchida={temDurante} selecionada={etapaAtiva === "Durante"} horario={servico.fotoDuranteHorario} label="Durante" onClick={() => setEtapaEscolhida("Durante")} />
+        <EtapaDot preenchida={temDepois} selecionada={etapaAtiva === "Depois"} horario={servico.fotoDepoisHorario} label="Depois" onClick={() => setEtapaEscolhida("Depois")} />
       </div>
 
       {pendente ? (
@@ -312,7 +344,7 @@ function ServicoCapturaCard({
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3.5 text-sm font-bold text-white transition-colors hover:bg-brand-700 disabled:opacity-60"
         >
           {loading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
-          {loading ? "Enviando..." : "Tirar Foto"}
+          {loading ? "Enviando..." : `Tirar Foto — ${etapaAtiva}`}
         </button>
       )}
 

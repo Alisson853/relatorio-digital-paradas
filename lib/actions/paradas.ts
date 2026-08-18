@@ -283,11 +283,18 @@ function etapaEstaVazia(servico: Servico, etapa: Etapa): boolean {
 // captura em campo não corre o risco de sobrescrever outras edições feitas ao
 // mesmo tempo em outras partes do relatório (diferente do formulário completo,
 // que reenvia o relatório inteiro a cada salvamento).
+const ETAPAS_POR_LABEL: Record<"Antes" | "Durante" | "Depois", Etapa> = {
+  Antes: ETAPA_ANTES,
+  Durante: ETAPA_DURANTE,
+  Depois: ETAPA_DEPOIS,
+};
+
 export async function capturarFotoServico(
   paradaId: string,
   servicoId: string,
   url: string,
-  senha: string
+  senha: string,
+  etapaEscolhida?: "Antes" | "Durante" | "Depois"
 ): Promise<{ ok: boolean; erro?: string; label?: string; horario?: string }> {
   const autorizado = await verifyEditorPassword(senha);
   if (!autorizado) return { ok: false, erro: "Não autorizado." };
@@ -299,7 +306,9 @@ export async function capturarFotoServico(
   if (idx === -1) return { ok: false, erro: "Serviço não encontrado." };
 
   const servico = row.servicos[idx];
-  const etapaVazia = ORDEM_CAPTURA.find((e) => etapaEstaVazia(servico, e)) ?? ETAPA_DEPOIS;
+  // Se o usuário escolheu a etapa manualmente (Antes/Durante/Depois), usa essa
+  // direto — só cai na detecção automática quando nada foi escolhido.
+  const etapaVazia = etapaEscolhida ? ETAPAS_POR_LABEL[etapaEscolhida] : (ORDEM_CAPTURA.find((e) => etapaEstaVazia(servico, e)) ?? ETAPA_DEPOIS);
 
   const horario = horarioAgora();
   const servicoAtualizado: Servico = { ...servico, [etapaVazia.campo]: url, [etapaVazia.horarioCampo]: horario };
