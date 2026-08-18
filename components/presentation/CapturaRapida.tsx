@@ -4,14 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, ArrowLeft, Camera, Check, ChevronDown, Loader2, Plus, RefreshCw } from "lucide-react";
 import type { Equipe, ParadaCompleta, Servico } from "@/lib/types";
-import { getParadaCompleta, capturarFotoServico, uploadFoto, adicionarServicoRapido } from "@/lib/actions/paradas";
+import { getParadaCompleta, capturarFotoServico, uploadFoto, adicionarServicoRapido, marcarStatusServico } from "@/lib/actions/paradas";
 import { compressImageFile, NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { getEditorSenha } from "@/lib/editor-auth";
 import { EditorPasswordForm } from "@/components/shared/EditorPasswordForm";
 import { useEditorMode } from "@/lib/useEditorMode";
 import { cn } from "@/lib/utils";
 
-const EQUIPE_OPTIONS: Equipe[] = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil", "Caldeiraria"];
+const EQUIPE_OPTIONS: Equipe[] = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil", "Caldeiraria", "Preditiva"];
 const CATEGORIA_OPTIONS = ["Preventiva", "Corretiva", "Preditiva", "Lubrificação", "Melhoria", "Etiqueta Vermelha", "Etiqueta Amarela"];
 
 function NovaOsForm({ paradaId, onCriada }: { paradaId: string; onCriada: (servico: Servico) => void }) {
@@ -222,6 +222,7 @@ function ServicoCapturaCard({
   // Etapa escolhida manualmente pelo usuário — se nulo, usa a próxima vazia
   // (Antes -> Depois -> Durante) como sugestão automática.
   const [etapaEscolhida, setEtapaEscolhida] = useState<"Antes" | "Durante" | "Depois" | null>(null);
+  const [statusLoading, setStatusLoading] = useState(false);
 
   const temAntes = !!servico.fotoAntes && servico.fotoAntes !== NO_PHOTO_PLACEHOLDER;
   const temDurante = !!servico.fotoDurante;
@@ -297,12 +298,41 @@ function ServicoCapturaCard({
     if (pendente) enviar(pendente.blob, pendente.nome, etapaAtiva);
   }
 
+  const concluido = servico.status === "concluido";
+
+  async function handleToggleStatus() {
+    setStatusLoading(true);
+    try {
+      const novoStatus = concluido ? "pendente" : "concluido";
+      const resultado = await marcarStatusServico(paradaId, servico.id, novoStatus, getEditorSenha());
+      if (resultado.ok) onCaptured(servico.id, { status: novoStatus });
+    } finally {
+      setStatusLoading(false);
+    }
+  }
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <input ref={inputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
-      <p className="text-[10px] font-bold uppercase tracking-wide text-brand-600">OS {servico.numeroOS}</p>
-      <h3 className="mt-0.5 text-base font-bold leading-snug text-slate-900">{servico.equipamento}</h3>
-      <p className="mt-0.5 text-xs text-slate-400">{servico.area}</p>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-brand-600">OS {servico.numeroOS}</p>
+          <h3 className="mt-0.5 text-base font-bold leading-snug text-slate-900">{servico.equipamento}</h3>
+          <p className="mt-0.5 text-xs text-slate-400">{servico.area}</p>
+        </div>
+        <button
+          type="button"
+          onClick={handleToggleStatus}
+          disabled={statusLoading}
+          className={cn(
+            "flex flex-none items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase transition-colors disabled:opacity-60",
+            concluido ? "bg-success-100 text-success-700" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+          )}
+        >
+          {statusLoading ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+          {concluido ? "Concluído" : "Pendente"}
+        </button>
+      </div>
 
       <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-slate-400">Toque para escolher a etapa da foto</p>
       <div className="mt-1.5 flex gap-2">

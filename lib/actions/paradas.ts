@@ -320,6 +320,39 @@ export async function capturarFotoServico(
   return { ok: true, label: etapaVazia.label, horario };
 }
 
+// Serviços importados de planilha entram como "pendente" e podem ser marcados
+// concluídos direto do celular, mesmo sem foto — mexe só no campo status, com
+// o mesmo cuidado de update pontual das outras ações de captura em campo.
+export async function marcarStatusServico(
+  paradaId: string,
+  servicoId: string,
+  status: "concluido" | "pendente",
+  senha: string
+): Promise<{ ok: boolean; erro?: string }> {
+  const autorizado = await verifyEditorPassword(senha);
+  if (!autorizado) return { ok: false, erro: "Não autorizado." };
+
+  const [row] = await getDb().select({ servicos: paradas.servicos }).from(paradas).where(eq(paradas.id, paradaId)).limit(1);
+  if (!row) return { ok: false, erro: "Relatório não encontrado." };
+
+  const idx = row.servicos.findIndex((s) => s.id === servicoId);
+  if (idx === -1) return { ok: false, erro: "Serviço não encontrado." };
+
+  const servico = row.servicos[idx];
+  const servicoAtualizado: Servico = {
+    ...servico,
+    status,
+    servicoExecutado: servico.servicoExecutado || textoExecutadoPadrao(status),
+    resultado: servico.resultado || textoResultadoPadrao(status),
+  };
+  const servicosAtualizados = [...row.servicos];
+  servicosAtualizados[idx] = servicoAtualizado;
+
+  await getDb().update(paradas).set({ servicos: servicosAtualizados, atualizadoEm: new Date() }).where(eq(paradas.id, paradaId));
+
+  return { ok: true };
+}
+
 interface NovaOsInput {
   numeroOS: string;
   equipamento: string;

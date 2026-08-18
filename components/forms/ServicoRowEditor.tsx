@@ -15,12 +15,13 @@ export interface ServicoRow {
   categoria: string;
   motivo: string;
   status: StatusItem;
+  tempoGasto: string;
   fotoAntes: string;
   fotoDurante: string;
   fotoDepois: string;
 }
 
-const EQUIPE_OPTIONS = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil", "Caldeiraria"].map((e) => ({ value: e, label: e }));
+const EQUIPE_OPTIONS = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil", "Caldeiraria", "Preditiva"].map((e) => ({ value: e, label: e }));
 const CATEGORIA_OPTIONS = ["Preventiva", "Corretiva", "Preditiva", "Lubrificação", "Melhoria", "Etiqueta Vermelha", "Etiqueta Amarela"].map((c) => ({
   value: c,
   label: c,
@@ -108,6 +109,7 @@ export function ServicoRowEditor({ item, index, onChange, onRemove, onDuplicate 
         <SelectField label="Equipe" value={item.equipe} onChange={(v) => onChange({ equipe: v as Equipe })} options={EQUIPE_OPTIONS} />
         <SelectField label="Categoria" value={item.categoria} onChange={(v) => onChange({ categoria: v })} options={CATEGORIA_OPTIONS} />
         <TextField label="Responsável" value={item.responsavel} onChange={(v) => onChange({ responsavel: v })} />
+        <TextField label="Tempo Gasto" value={item.tempoGasto} onChange={(v) => onChange({ tempoGasto: v })} placeholder="Ex: 2h" />
       </div>
     </div>
   );

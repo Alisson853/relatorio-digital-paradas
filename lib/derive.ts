@@ -27,7 +27,7 @@ export function textoResultadoPadrao(status: StatusItem): string {
   }
 }
 
-const EQUIPES: Equipe[] = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil", "Caldeiraria"];
+const EQUIPES: Equipe[] = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil", "Caldeiraria", "Preditiva"];
 
 function parseHoras(tempo: string): number {
   const match = tempo.match(/(\d+)\s*h(?:\s*(\d+)\s*(?:min)?)?/i);

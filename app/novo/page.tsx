@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowLeft, History, Plus, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, FileSpreadsheet, History, Loader2, Plus, X } from "lucide-react";
 import type { CaminhoCriticoItem, ParadaCompleta, ParadaResumo, Pendencia, Servico, StatusGeral, TimelineEvento } from "@/lib/types";
 import { deriveGraficos, deriveKpis, textoExecutadoPadrao, textoResultadoPadrao } from "@/lib/derive";
 import { gerarResultadoFinal } from "@/lib/mock-data";
@@ -13,6 +13,7 @@ import { getEditorSenha } from "@/lib/editor-auth";
 import { slugify } from "@/lib/utils";
 import { clearDraft, getDraft, saveDraft } from "@/lib/draft-store";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
+import { parsePlanilhaServicos } from "@/lib/import-planilha";
 import { SelectField, TextAreaField, TextField } from "@/components/forms/FormControls";
 import { CollapsibleSection } from "@/components/forms/CollapsibleSection";
 import { TimelineRowEditor, type TimelineRow } from "@/components/forms/TimelineRowEditor";
@@ -58,6 +59,7 @@ function novoServicoItem(defaults: { area: string; responsavel: string }): Servi
     categoria: "Corretiva",
     motivo: "",
     status: "concluido",
+    tempoGasto: "1h",
     fotoAntes: "",
     fotoDurante: "",
     fotoDepois: "",
@@ -94,6 +96,7 @@ function servicoParaLinha(s: Servico): ServicoRow {
     categoria: s.categoria ?? "Corretiva",
     motivo: s.problemaIdentificado,
     status: s.status,
+    tempoGasto: s.tempoGasto || "1h",
     fotoAntes: s.fotoAntes === NO_PHOTO_PLACEHOLDER ? "" : s.fotoAntes,
     fotoDurante: s.fotoDurante ?? "",
     fotoDepois: s.fotoDepois === NO_PHOTO_PLACEHOLDER ? "" : s.fotoDepois,
@@ -201,6 +204,10 @@ function NovaParadaForm() {
   const draftKeyRef = useRef("novo");
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const submetidoRef = useRef(false);
+
+  const [importando, setImportando] = useState(false);
+  const [importResultado, setImportResultado] = useState("");
+  const planilhaInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("edit");
@@ -360,6 +367,57 @@ function NovaParadaForm() {
     setter((prev) => prev.map((row) => (row.id === id ? { ...row, ...patch } : row)));
   }
 
+  async function handleImportarPlanilha(file: File | undefined) {
+    if (!file) return;
+    setImportResultado("");
+    setImportando(true);
+    try {
+      const { servicos: importados, avisos } = await parsePlanilhaServicos(file);
+      if (avisos.length) {
+        setImportResultado(avisos.join(" "));
+        return;
+      }
+
+      const osExistentes = new Set(servicos.map((s) => s.numeroOS).filter((n) => n && n !== "Oportunidade"));
+      const novasLinhas: ServicoRow[] = [];
+      let duplicadas = 0;
+
+      for (const item of importados) {
+        if (item.numeroOS !== "Oportunidade" && osExistentes.has(item.numeroOS)) {
+          duplicadas++;
+          continue;
+        }
+        novasLinhas.push({
+          id: crypto.randomUUID(),
+          numeroOS: item.numeroOS,
+          equipamento: item.equipamento,
+          area: maquina,
+          responsavel: item.responsavel,
+          equipe: item.equipe,
+          categoria: item.categoria,
+          motivo: item.titulo,
+          status: "pendente",
+          tempoGasto: item.tempoGasto,
+          fotoAntes: "",
+          fotoDurante: "",
+          fotoDepois: "",
+        });
+      }
+
+      setServicos((prev) => [...prev, ...novasLinhas]);
+      if (!totalAtividades.trim()) setTotalAtividades(String(servicos.length + novasLinhas.length));
+
+      const partes = [`${novasLinhas.length} serviço${novasLinhas.length === 1 ? "" : "s"} importado${novasLinhas.length === 1 ? "" : "s"}`];
+      if (duplicadas > 0) partes.push(`${duplicadas} já existiam e foram ignorados`);
+      setImportResultado(`${partes.join(", ")}. Marque como concluído pelo celular (Captura Rápida) conforme forem sendo feitos.`);
+    } catch {
+      setImportResultado("Não foi possível ler essa planilha. Confira se é o modelo padrão de programação semanal.");
+    } finally {
+      setImportando(false);
+      if (planilhaInputRef.current) planilhaInputRef.current.value = "";
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -399,7 +457,7 @@ function NovaParadaForm() {
         categoria: s.categoria,
         horaInicio: "",
         horaFim: "",
-        tempoGasto: "1h",
+        tempoGasto: s.tempoGasto.trim() || "1h",
         problemaIdentificado: s.motivo.trim() || "Necessidade identificada durante a parada.",
         servicoExecutado: textoExecutadoPadrao(s.status),
         resultado: textoResultadoPadrao(s.status),
@@ -536,6 +594,33 @@ function NovaParadaForm() {
           <div className="mb-5">
             <PhotoUploadField label="Foto da Máquina (capa e card do dashboard)" value={fotoMaquina} onChange={setFotoMaquina} className="sm:max-w-xs" />
           </div>
+
+          <div className="mb-5 rounded-2xl border-2 border-dashed border-brand-200 bg-brand-50/40 p-4">
+            <input
+              ref={planilhaInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={(e) => handleImportarPlanilha(e.target.files?.[0])}
+            />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-slate-800">Importar planilha de programação</p>
+                <p className="text-xs text-slate-500">Puxa equipamento, OS, oficina, tipo e tempo direto da planilha semanal — todas entram como pendentes.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => planilhaInputRef.current?.click()}
+                disabled={importando}
+                className="flex flex-none items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-brand-700 disabled:opacity-60"
+              >
+                {importando ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />}
+                {importando ? "Importando..." : "Importar .xlsx"}
+              </button>
+            </div>
+            {importResultado && <p className="mt-2.5 text-xs font-semibold text-brand-700">{importResultado}</p>}
+          </div>
+
           <div className="space-y-3">
             {servicos.map((item, i) => (
               <ServicoRowEditor
