@@ -18,6 +18,7 @@ import { SelectField, TextAreaField, TextField } from "@/components/forms/FormCo
 import { CollapsibleSection } from "@/components/forms/CollapsibleSection";
 import { TimelineRowEditor, type TimelineRow } from "@/components/forms/TimelineRowEditor";
 import { ServicoRowEditor, type ServicoRow } from "@/components/forms/ServicoRowEditor";
+import { ServicosChecklist } from "@/components/forms/ServicosChecklist";
 import { CaminhoRowEditor, type CaminhoRow } from "@/components/forms/CaminhoRowEditor";
 import { PendenciaRowEditor, type PendenciaRow } from "@/components/forms/PendenciaRowEditor";
 import { PhotoUploadField } from "@/components/forms/PhotoUploadField";
@@ -620,6 +621,8 @@ function NovaParadaForm() {
             </div>
             {importResultado && <p className="mt-2.5 text-xs font-semibold text-brand-700">{importResultado}</p>}
           </div>
+
+          <ServicosChecklist servicos={servicos} onToggle={(id, concluido) => updateRow(setServicos, id, { status: concluido ? "concluido" : "pendente" })} />
 
           <div className="space-y-3">
             {servicos.map((item, i) => (
