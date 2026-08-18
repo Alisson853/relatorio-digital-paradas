@@ -33,6 +33,18 @@ const STATUS_GERAL_OPTIONS = [
 
 const IMAGEM_PADRAO = "industrial-press";
 
+// Textos que gerarResultadoFinal() gera sozinho a partir do status — se o
+// resumo salvo é um desses, não é um texto que o usuário escreveu à mão, é só
+// o resultado da última geração automática. Preenchê-lo de volta no campo
+// "opcional" travaria a regeneração pra sempre: toda vez que alguém mudasse o
+// Status Geral, esse texto antigo continuaria sendo salvo como se fosse um
+// override manual, mesmo com o status mudado.
+const TEXTOS_RESUMO_AUTOMATICOS = [
+  "Parada executada dentro do planejado, com todos os serviços críticos concluídos e equipamento liberado para operação em plena capacidade.",
+  "Parada concluída com pequenos desvios de prazo e pendências pontuais, já endereçadas em plano de ação de curto prazo.",
+  "Parada em andamento, com execução dentro dos padrões técnicos e de segurança estabelecidos.",
+];
+
 // Rascunhos de relatório NOVO (sem id) compartilham uma única chave no navegador,
 // então um rascunho velho demais é quase certamente de outra tentativa abandonada.
 const DRAFT_MAX_AGE_MS = 6 * 60 * 60 * 1000;
@@ -262,7 +274,7 @@ function NovaParadaForm() {
       setTimeline(existing.timeline.map((t) => ({ ...t })));
       setCaminhoCritico(existing.caminhoCritico.map(caminhoParaLinha));
       setPlanejadoRealizado(existing.graficos.planejadoRealizado.length ? existing.graficos.planejadoRealizado.map((p) => ({ ...p })) : PLANEJADO_REALIZADO_PADRAO);
-      setResumoFinalCustom(existing.resultadoFinal.resumo);
+      setResumoFinalCustom(TEXTOS_RESUMO_AUTOMATICOS.includes(existing.resultadoFinal.resumo) ? "" : existing.resultadoFinal.resumo);
 
       const draft = getDraft<DraftSnapshot>(draftKeyRef.current);
       if (draft && draftPossuiConteudo(draft)) {
@@ -403,7 +415,10 @@ function NovaParadaForm() {
           id: crypto.randomUUID(),
           numeroOS: item.numeroOS,
           equipamento: item.equipamento,
-          area: maquina,
+          // A planilha não tem uma coluna de "local/área física" — usar a
+          // mesma máquina pra todo mundo empilhava todas as horas num único
+          // setor no gráfico. A equipe (oficina) já vem certa e distingue bem.
+          area: item.equipe,
           responsavel: item.responsavel,
           equipe: item.equipe,
           categoria: item.categoria,
