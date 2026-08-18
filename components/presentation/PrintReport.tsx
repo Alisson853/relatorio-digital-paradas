@@ -23,6 +23,7 @@ import {
 import type { ParadaCompleta, Servico, TimelineEvento } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
+import { servicosComFoto } from "@/lib/derive";
 import { cn, formatDate, statusLabel } from "@/lib/utils";
 
 // Versão de impressão do relatório: nada aqui depende de animação, scroll ou
@@ -486,8 +487,8 @@ export function PrintReport({ data }: { data: ParadaCompleta }) {
       <CapaPage resumo={data.resumo} />
       <ResumoPage data={data} />
       <TimelinePage data={data} />
-      {data.servicos.map((s, i) => (
-        <ServicoPage key={s.id} data={data} servico={s} indice={i + 1} total={data.servicos.length} />
+      {servicosComFoto(data.servicos).map((s, i) => (
+        <ServicoPage key={s.id} data={data} servico={s} indice={i + 1} total={servicosComFoto(data.servicos).length} />
       ))}
       <GaleriaPage data={data} fotos={data.fotos} />
       <GraficosPage data={data} />

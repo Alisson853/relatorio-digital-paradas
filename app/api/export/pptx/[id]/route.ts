@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import PptxGenJS from "pptxgenjs";
 import { getParadaCompleta } from "@/lib/actions/paradas";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
+import { servicosComFoto } from "@/lib/derive";
 import { formatDate, statusLabel } from "@/lib/utils";
 import type { ParadaCompleta } from "@/lib/types";
 
@@ -215,11 +216,12 @@ function addTimeline(pres: PptxGenJS, data: ParadaCompleta) {
 }
 
 async function addServicos(pres: PptxGenJS, data: ParadaCompleta, origin: string) {
-  for (let i = 0; i < data.servicos.length; i++) {
-    const s = data.servicos[i];
+  const servicos = servicosComFoto(data.servicos);
+  for (let i = 0; i < servicos.length; i++) {
+    const s = servicos[i];
     const slide = pres.addSlide({ masterName: "CONTENT" });
 
-    eyebrow(slide, `Serviços Executados · ${i + 1}/${data.servicos.length}`);
+    eyebrow(slide, `Serviços Executados · ${i + 1}/${servicos.length}`);
     slide.addText(s.titulo, { x: 0.55, y: 0.72, w: 6.3, h: 0.85, fontSize: 19, bold: true, color: INK, fontFace: HEAD });
 
     slide.addShape(pres.ShapeType.roundRect, { x: 0.55, y: 1.6, w: 6.35, h: 1.9, rectRadius: 0.06, fill: { color: SLATE_LIGHT }, line: { color: BORDER, width: 0.75 } });

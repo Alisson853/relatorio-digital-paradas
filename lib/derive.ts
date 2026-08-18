@@ -63,6 +63,20 @@ export function deriveKpis(servicos: Servico[], seguranca: number, totalPlanejad
   };
 }
 
+// Só os serviços "principais" — os que já têm ao menos uma foto real — entram
+// na apresentação/exports. Serviços importados de planilha sem foto ainda
+// contam para os KPIs e para o checklist de pendências, mas não viram slide.
+export function temFotoReal(servico: Servico): boolean {
+  const antes = !!servico.fotoAntes && servico.fotoAntes !== NO_PHOTO_PLACEHOLDER;
+  const durante = !!servico.fotoDurante;
+  const depois = !!servico.fotoDepois && servico.fotoDepois !== NO_PHOTO_PLACEHOLDER;
+  return antes || durante || depois;
+}
+
+export function servicosComFoto(servicos: Servico[]): Servico[] {
+  return servicos.filter(temFotoReal);
+}
+
 // Foto de capa automática: quando ninguém envia uma foto dedicada da máquina,
 // usamos a primeira foto real (depois > antes > durante) já enviada nos serviços —
 // assim o card e a capa nunca ficam com o ícone genérico se já existe alguma foto.

@@ -21,6 +21,7 @@ import {
 } from "docx";
 import { getParadaCompleta } from "@/lib/actions/paradas";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
+import { servicosComFoto } from "@/lib/derive";
 import { formatDate, statusLabel } from "@/lib/utils";
 import type { ParadaCompleta } from "@/lib/types";
 
@@ -132,11 +133,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     children.push(...buildTimeline(data));
     children.push(pageBreak());
   }
-  for (let i = 0; i < data.servicos.length; i++) {
-    children.push(...(await buildServico(data.servicos[i], i + 1, data.servicos.length, origin)));
-    if (i < data.servicos.length - 1) children.push(pageBreak());
+  const servicosComFotoLista = servicosComFoto(data.servicos);
+  for (let i = 0; i < servicosComFotoLista.length; i++) {
+    children.push(...(await buildServico(servicosComFotoLista[i], i + 1, servicosComFotoLista.length, origin)));
+    if (i < servicosComFotoLista.length - 1) children.push(pageBreak());
   }
-  if (data.servicos.length > 0) children.push(pageBreak());
+  if (servicosComFotoLista.length > 0) children.push(pageBreak());
   if (data.fotos.length > 0) {
     children.push(...(await buildGaleria(data, origin)));
     children.push(pageBreak());

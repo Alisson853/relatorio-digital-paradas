@@ -8,6 +8,7 @@ import type { Servico } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
+import { servicosComFoto } from "@/lib/derive";
 import { cn } from "@/lib/utils";
 
 function MetaField({ label, value, className }: { label: string; value: string; className?: string }) {
@@ -154,8 +155,9 @@ function ServiceSlide({ servico }: { servico: Servico }) {
   );
 }
 
-export function ServicesSection({ servicos }: { servicos: Servico[] }) {
+export function ServicesSection({ servicos: todosServicos }: { servicos: Servico[] }) {
   const [index, setIndex] = useState(0);
+  const servicos = servicosComFoto(todosServicos);
   const total = servicos.length;
   const atual = servicos[index];
 
@@ -163,19 +165,28 @@ export function ServicesSection({ servicos }: { servicos: Servico[] }) {
   const goNext = () => setIndex((i) => Math.min(total - 1, i + 1));
 
   if (total === 0 || !atual) {
+    const temServicosSemFoto = todosServicos.length > 0;
     return (
       <section id="servicos" className="section-screen flex items-center bg-slate-50 px-6 py-24 sm:px-10">
         <div className="mx-auto w-full max-w-6xl">
           <SectionHeading
             eyebrow="Serviços Executados"
             title="Nenhum Serviço Registrado"
-            description="Nenhuma ordem de serviço foi cadastrada para esta parada."
+            description={
+              temServicosSemFoto
+                ? "As OS desta parada ainda não têm foto — assim que a primeira for enviada, o serviço aparece aqui."
+                : "Nenhuma ordem de serviço foi cadastrada para esta parada."
+            }
           />
           <div className="flex flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-slate-200 bg-white py-20 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
               <Wrench size={22} />
             </div>
-            <p className="text-sm font-medium text-slate-400">Nenhum serviço foi adicionado a este relatório.</p>
+            <p className="text-sm font-medium text-slate-400">
+              {temServicosSemFoto
+                ? `${todosServicos.length} OS aguardando foto para entrar na apresentação.`
+                : "Nenhum serviço foi adicionado a este relatório."}
+            </p>
           </div>
         </div>
       </section>
