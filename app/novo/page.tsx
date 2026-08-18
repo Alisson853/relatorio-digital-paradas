@@ -379,13 +379,24 @@ function NovaParadaForm() {
         return;
       }
 
-      const osExistentes = new Set(servicos.map((s) => s.numeroOS).filter((n) => n && n !== "Oportunidade"));
+      const porOsExistente = new Map(servicos.filter((s) => s.numeroOS && s.numeroOS !== "Oportunidade").map((s) => [s.numeroOS, s]));
       const novasLinhas: ServicoRow[] = [];
-      let duplicadas = 0;
+      // OS que já existem no relatório (ex: adicionadas antes de a planilha ter
+      // essa linha, ou reimportação depois de alguém corrigir a planilha) têm
+      // responsável/equipe/categoria/tempo atualizados a partir da planilha —
+      // mas status, fotos e motivo não são mexidos, pois é trabalho de campo já feito.
+      const atualizadas: string[] = [];
 
       for (const item of importados) {
-        if (item.numeroOS !== "Oportunidade" && osExistentes.has(item.numeroOS)) {
-          duplicadas++;
+        const existente = item.numeroOS !== "Oportunidade" ? porOsExistente.get(item.numeroOS) : undefined;
+        if (existente) {
+          updateRow(setServicos, existente.id, {
+            responsavel: item.responsavel || existente.responsavel,
+            equipe: item.equipe,
+            categoria: item.categoria,
+            tempoGasto: item.tempoGasto,
+          });
+          atualizadas.push(item.numeroOS);
           continue;
         }
         novasLinhas.push({
@@ -405,11 +416,11 @@ function NovaParadaForm() {
         });
       }
 
-      setServicos((prev) => [...prev, ...novasLinhas]);
+      if (novasLinhas.length) setServicos((prev) => [...prev, ...novasLinhas]);
       if (!totalAtividades.trim()) setTotalAtividades(String(servicos.length + novasLinhas.length));
 
       const partes = [`${novasLinhas.length} serviço${novasLinhas.length === 1 ? "" : "s"} importado${novasLinhas.length === 1 ? "" : "s"}`];
-      if (duplicadas > 0) partes.push(`${duplicadas} já existiam e foram ignorados`);
+      if (atualizadas.length > 0) partes.push(`${atualizadas.length} já existiam e tiveram responsável/equipe/tempo atualizados`);
       setImportResultado(`${partes.join(", ")}. Marque como concluído pelo celular (Captura Rápida) conforme forem sendo feitos.`);
     } catch {
       setImportResultado("Não foi possível ler essa planilha. Confira se é o modelo padrão de programação semanal.");
