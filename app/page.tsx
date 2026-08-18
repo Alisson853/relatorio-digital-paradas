@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Activity, Gauge, Plus } from "lucide-react";
+import { Activity, ClipboardList, Gauge, Plus } from "lucide-react";
 import { listParadasResumo } from "@/lib/actions/paradas";
 import { ParadaGrid } from "@/components/dashboard/ParadaGrid";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
@@ -27,6 +27,13 @@ export default async function DashboardPage() {
           </div>
           <EditorOnly>
             <div className="flex items-center gap-3">
+              <Link
+                href="/pendencias"
+                className="flex items-center gap-1.5 rounded-full border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+              >
+                <ClipboardList size={15} />
+                Pendências
+              </Link>
               <BackupControls />
               <Link
                 href="/novo"

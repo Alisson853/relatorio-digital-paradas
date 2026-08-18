@@ -41,6 +41,22 @@ export function BackupControls() {
       }
 
       const candidatos = Array.isArray(parsed) ? parsed : [parsed];
+      const validos = candidatos.filter(isValidParadaCompleta);
+      const existentes = await listParadasResumo();
+      const existentesIds = new Set(existentes.map((p) => p.id));
+      const seraoSubstituidos = validos.filter((c) => existentesIds.has(c.resumo.id));
+
+      if (seraoSubstituidos.length > 0) {
+        const nomes = seraoSubstituidos.map((c) => `"${c.resumo.nome}"`).join(", ");
+        const confirmado = window.confirm(
+          `Este arquivo vai SUBSTITUIR ${seraoSubstituidos.length} relatório(s) já existente(s) (${nomes}) pelos dados do backup — os dados atuais desses relatórios serão perdidos. Continuar?`
+        );
+        if (!confirmado) {
+          setOcupado(false);
+          return;
+        }
+      }
+
       let importados = 0;
       let ignorados = 0;
       const senha = getEditorSenha();

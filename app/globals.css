@@ -34,12 +34,17 @@
   --warning-100: #fbedd4;
   --danger-600: #c23a2f;
   --danger-100: #fadbd7;
+
+  --signal-500: #f2a930;
+  --signal-400: #f7c469;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter);
+  --font-display: var(--font-oswald);
+  --font-mono: var(--font-jetbrains-mono);
 
   --color-brand-950: var(--brand-950);
   --color-brand-900: var(--brand-900);
@@ -71,6 +76,9 @@
   --color-warning-100: var(--warning-100);
   --color-danger-600: var(--danger-600);
   --color-danger-100: var(--danger-100);
+
+  --color-signal-500: var(--signal-500);
+  --color-signal-400: var(--signal-400);
 }
 
 * {
@@ -125,5 +133,33 @@ body {
   }
   100% {
     background-position: 400px 0;
+  }
+}
+
+/* Exportação em PDF: cada .print-page vira uma página, cores/gradientes preservados. */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 0;
+  }
+
+  html,
+  body {
+    background: white !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-page {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .print-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
   }
 }

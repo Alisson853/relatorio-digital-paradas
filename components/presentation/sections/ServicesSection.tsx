@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Clock, MapPin, Users2, Wrench } from "lucide
 import type { Servico } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 
 function MetaField({ label, value, className }: { label: string; value: string; className?: string }) {
@@ -70,35 +71,50 @@ function ServiceSlide({ servico }: { servico: Servico }) {
       </div>
 
       <div className="flex flex-col justify-center gap-4 rounded-3xl border-2 border-brand-100 bg-brand-50/40 p-3 sm:p-4">
-        <div className="flex flex-col gap-4 sm:flex-row lg:flex-col">
-          {[
-            { url: servico.fotoAntes, label: "Antes", badge: "bg-slate-900/80" },
-            ...(servico.fotoDurante ? [{ url: servico.fotoDurante, label: "Durante", badge: "bg-warning-600/90" }] : []),
-            { url: servico.fotoDepois, label: "Depois", badge: "bg-brand-600/90" },
-          ].map((foto) => (
-            <div key={foto.label} className="flex-1">
-              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border-2 border-white shadow-md sm:aspect-[16/11]">
-                <Image
-                  src={foto.url}
-                  alt={`${foto.label} — ${servico.equipamento}`}
-                  fill
-                  sizes="(min-width: 1024px) 560px, (min-width: 640px) 380px, 640px"
-                  className="object-cover"
-                  loading="eager"
-                  unoptimized={foto.url.startsWith("data:")}
-                />
-                <span
-                  className={cn(
-                    "absolute left-3 top-3 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white",
-                    foto.badge
-                  )}
-                >
-                  {foto.label}
-                </span>
-              </div>
+        {(() => {
+          const fotosDisponiveis = [
+            ...(servico.fotoAntes && servico.fotoAntes !== NO_PHOTO_PLACEHOLDER
+              ? [{ key: "antes", url: servico.fotoAntes, label: "Antes", horario: servico.fotoAntesHorario, badge: "bg-slate-900/80" }]
+              : []),
+            ...(servico.fotoDurante
+              ? [{ key: "durante", url: servico.fotoDurante, label: "Durante", horario: servico.fotoDuranteHorario, badge: "bg-warning-600/90" }]
+              : []),
+            ...(servico.fotoDepois && servico.fotoDepois !== NO_PHOTO_PLACEHOLDER
+              ? [{ key: "depois", url: servico.fotoDepois, label: "Depois", horario: servico.fotoDepoisHorario, badge: "bg-brand-600/90" }]
+              : []),
+          ];
+          const mostrarRotulo = fotosDisponiveis.length > 1;
+          return (
+            <div className="flex flex-col gap-4 sm:flex-row lg:flex-col">
+              {fotosDisponiveis.map((foto) => (
+                <div key={foto.key} className="flex-1">
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border-2 border-white shadow-md sm:aspect-[16/11]">
+                    <Image
+                      src={foto.url}
+                      alt={servico.equipamento}
+                      fill
+                      sizes="(min-width: 1024px) 560px, (min-width: 640px) 380px, 640px"
+                      className="object-cover"
+                      loading="eager"
+                      unoptimized={foto.url.startsWith("data:")}
+                    />
+                    {mostrarRotulo && (
+                      <span
+                        className={cn(
+                          "absolute left-3 top-3 flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white",
+                          foto.badge
+                        )}
+                      >
+                        {foto.label}
+                        {foto.horario && <span className="font-mono normal-case opacity-80">· {foto.horario}</span>}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          );
+        })()}
       </div>
     </div>
   );

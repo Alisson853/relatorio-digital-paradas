@@ -16,6 +16,7 @@ import { GallerySection } from "./sections/GallerySection";
 import { ChartsSection } from "./sections/ChartsSection";
 import { CriticalPathSection } from "./sections/CriticalPathSection";
 import { ResultSection } from "./sections/ResultSection";
+import { PrintReport } from "./PrintReport";
 
 // Mesma cor de fundo de cada seção — evita "bordas" visíveis quando o conteúdo é reduzido para caber na tela.
 const SECTION_BG = [
@@ -120,7 +121,7 @@ export function PresentationView({ data }: { data: ParadaCompleta }) {
 
   if (presentationMode) {
     return (
-      <div className={cn("fixed inset-0 z-50 overflow-hidden transition-colors duration-500", SECTION_BG[activeIndex])}>
+      <div className={cn("fixed inset-0 z-50 overflow-hidden transition-colors duration-500 print:hidden", SECTION_BG[activeIndex])}>
         <AnimatePresence mode="wait">
           <motion.div
             key={SECTIONS[activeIndex].id}
@@ -177,8 +178,17 @@ export function PresentationView({ data }: { data: ParadaCompleta }) {
 
   return (
     <div className="min-h-screen bg-white">
-      <Sidebar activeId={SECTIONS[activeIndex].id} onNavigate={(id) => goTo(SECTIONS.findIndex((s) => s.id === id))} onPresent={enterPresentation} titulo={data.resumo.nome} />
-      <main className="presentation-scroll pb-20 lg:pb-0 lg:pl-72">{sectionNodes}</main>
+      <div className="print:hidden">
+        <Sidebar
+          activeId={SECTIONS[activeIndex].id}
+          onNavigate={(id) => goTo(SECTIONS.findIndex((s) => s.id === id))}
+          onPresent={enterPresentation}
+          titulo={data.resumo.nome}
+          paradaId={data.resumo.id}
+        />
+        <main className="presentation-scroll pb-20 lg:pb-0 lg:pl-72">{sectionNodes}</main>
+      </div>
+      <PrintReport data={data} />
     </div>
   );
 }

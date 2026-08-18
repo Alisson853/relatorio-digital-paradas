@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Calendar, Clock, Download, Factory, Pencil, Trash2, User } from "lucide-react";
+import { ArrowUpRight, Calendar, Camera, Clock, Copy, Download, Factory, Pencil, Trash2, User } from "lucide-react";
 import type { ParadaResumo } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { MachineIllustration } from "@/components/ui/MachineIllustration";
@@ -15,9 +15,10 @@ interface ParadaCardProps {
   index: number;
   onDelete?: () => void;
   onExport?: () => void;
+  onClone?: () => void;
 }
 
-export function ParadaCard({ parada, index, onDelete, onExport }: ParadaCardProps) {
+export function ParadaCard({ parada, index, onDelete, onExport, onClone }: ParadaCardProps) {
   const { isEditor } = useEditorMode();
   const showEditorControls = isEditor;
 
@@ -59,6 +60,18 @@ export function ParadaCard({ parada, index, onDelete, onExport }: ParadaCardProp
             >
               <Pencil size={13} />
             </Link>
+            {onClone && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  onClone();
+                }}
+                aria-label="Clonar relatório"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow-sm hover:bg-brand-100 hover:text-brand-600"
+              >
+                <Copy size={13} />
+              </button>
+            )}
             {onExport && (
               <button
                 onClick={(e) => {
@@ -118,6 +131,16 @@ export function ParadaCard({ parada, index, onDelete, onExport }: ParadaCardProp
           Visualizar Relatório
           <ArrowUpRight size={16} className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
         </Link>
+
+        {showEditorControls && (
+          <Link
+            href={`/parada/${parada.id}/fotos`}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-100"
+          >
+            <Camera size={16} />
+            Captura Rápida (Celular)
+          </Link>
+        )}
       </div>
     </motion.div>
   );

@@ -17,6 +17,11 @@ export function GallerySection({ fotos }: { fotos: FotoGaleria[] }) {
 
   const filtradas = fotos.filter((f) => filtro === "todas" || f.categoria === filtro);
 
+  const contagemPorServico = fotos.reduce<Record<string, number>>((acc, f) => {
+    acc[f.servico] = (acc[f.servico] ?? 0) + 1;
+    return acc;
+  }, {});
+
   const close = () => setActiveIndex(null);
   const next = () => setActiveIndex((i) => (i === null ? null : (i + 1) % filtradas.length));
   const prev = () => setActiveIndex((i) => (i === null ? null : (i - 1 + filtradas.length) % filtradas.length));
@@ -74,7 +79,7 @@ export function GallerySection({ fotos }: { fotos: FotoGaleria[] }) {
             >
               <Image
                 src={foto.url}
-                alt={`${foto.categoria} — ${foto.servico}`}
+                alt={foto.servico}
                 fill
                 sizes="200px"
                 className="object-cover transition-transform duration-500 group-hover:scale-110"
@@ -84,14 +89,16 @@ export function GallerySection({ fotos }: { fotos: FotoGaleria[] }) {
               <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/60 via-black/0 to-black/0 p-2.5 opacity-0 transition-opacity group-hover:opacity-100">
                 <p className="truncate text-[11px] font-semibold text-white">{foto.servico}</p>
               </div>
-              <span
-                className={cn(
-                  "absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase text-white shadow",
-                  foto.categoria === "antes" ? "bg-slate-800/80" : foto.categoria === "durante" ? "bg-warning-600/90" : "bg-brand-600/90"
-                )}
-              >
-                {foto.categoria}
-              </span>
+              {contagemPorServico[foto.servico] > 1 && (
+                <span
+                  className={cn(
+                    "absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase text-white shadow",
+                    foto.categoria === "antes" ? "bg-slate-800/80" : foto.categoria === "durante" ? "bg-warning-600/90" : "bg-brand-600/90"
+                  )}
+                >
+                  {foto.categoria}
+                </span>
+              )}
               <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
                 <Search size={20} className="text-white drop-shadow" />
               </div>
@@ -153,7 +160,7 @@ export function GallerySection({ fotos }: { fotos: FotoGaleria[] }) {
                   />
                 </motion.div>
                 <div className="absolute bottom-8 left-1/2 -translate-x-1/2 rounded-full bg-white/10 px-5 py-2 text-center text-sm font-semibold text-white">
-                  {active.servico} · <span className="capitalize text-brand-200">{active.categoria}</span>
+                  {active.servico}
                 </div>
               </motion.div>
             )}

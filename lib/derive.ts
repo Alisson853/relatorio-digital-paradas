@@ -27,7 +27,7 @@ export function textoResultadoPadrao(status: StatusItem): string {
   }
 }
 
-const EQUIPES: Equipe[] = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil"];
+const EQUIPES: Equipe[] = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil", "Caldeiraria"];
 
 function parseHoras(tempo: string): number {
   const match = tempo.match(/(\d+)\s*h(?:\s*(\d+)\s*(?:min)?)?/i);
@@ -37,13 +37,18 @@ function parseHoras(tempo: string): number {
   return horas + minutos / 60;
 }
 
-export function deriveKpis(servicos: Servico[], seguranca: number): Kpis {
-  const osPlanejadas = servicos.length;
-  const osConcluidas = servicos.filter((s) => s.status === "concluido").length;
+export function deriveKpis(servicos: Servico[], seguranca: number, totalPlanejado?: number, totalExecutadas?: number): Kpis {
+  // OS Programadas e OS Executadas são números informados à parte — nem toda
+  // atividade real vira uma OS detalhada no formulário (só as que têm foto e
+  // valem a pena documentar como "principais"). Só cai na contagem de OS com
+  // status concluído registradas se nada for informado (relatórios antigos).
+  const osConcluidas = totalExecutadas && totalExecutadas > 0 ? totalExecutadas : servicos.filter((s) => s.status === "concluido").length;
+  const osPlanejadas = totalPlanejado && totalPlanejado > 0 ? totalPlanejado : servicos.length;
   const eficiencia = osPlanejadas > 0 ? Math.round((osConcluidas / osPlanejadas) * 1000) / 10 : 0;
   const horasTrabalhadas = Math.round(servicos.reduce((sum, s) => sum + parseHoras(s.tempoGasto), 0));
   const equipeEletrica = servicos.filter((s) => s.equipe === "Elétrica").length;
   const equipeMecanica = servicos.filter((s) => s.equipe === "Mecânica").length;
+  const equipeInstrumentacao = servicos.filter((s) => s.equipe === "Instrumentação").length;
 
   return {
     osPlanejadas,
@@ -52,8 +57,9 @@ export function deriveKpis(servicos: Servico[], seguranca: number): Kpis {
     horasTrabalhadas,
     equipeEletrica,
     equipeMecanica,
+    equipeInstrumentacao,
     seguranca,
-    pendencias: osPlanejadas - osConcluidas,
+    pendencias: Math.max(0, osPlanejadas - osConcluidas),
   };
 }
 

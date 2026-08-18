@@ -342,6 +342,7 @@ function kpisMp09(): Kpis {
     horasTrabalhadas: 26,
     equipeEletrica: 7,
     equipeMecanica: 39,
+    equipeInstrumentacao: 3,
     seguranca: 100,
     pendencias: 9,
   };

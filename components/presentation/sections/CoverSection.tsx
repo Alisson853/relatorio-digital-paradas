@@ -2,11 +2,10 @@
 
 import Image from "next/image";
 import { motion, type Variants } from "framer-motion";
-import { Calendar, Clock, Timer, User } from "lucide-react";
 import type { ParadaResumo } from "@/lib/types";
 import { MachineIllustration } from "@/components/ui/MachineIllustration";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 24 },
@@ -18,19 +17,20 @@ const fadeUp: Variants = {
 };
 
 export function CoverSection({ resumo }: { resumo: ParadaResumo }) {
-  const infos = [
-    { icon: Calendar, label: "Data da Parada", value: formatDate(resumo.data) },
-    { icon: Timer, label: "Tempo Planejado", value: resumo.duracaoPlanejada },
-    { icon: Clock, label: "Tempo Realizado", value: resumo.duracaoRealizada },
-    { icon: User, label: "Responsável", value: resumo.responsavel },
+  const campos = [
+    { label: "Data da Parada", value: formatDate(resumo.data) },
+    { label: "Tempo Planejado", value: resumo.duracaoPlanejada },
+    { label: "Tempo Realizado", value: resumo.duracaoRealizada },
+    { label: "Responsável", value: resumo.responsavel },
   ];
 
   return (
     <section
       id="capa"
-      className="section-screen relative flex items-center overflow-hidden bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800 px-6 py-24 sm:px-10"
+      className="section-screen relative flex items-center overflow-hidden bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800 px-6 py-16 sm:px-10 sm:py-20 lg:py-24"
     >
-      <div className="pointer-events-none absolute inset-0 opacity-40">
+      {/* Fundo tipo prancha técnica: malha fina de desenho industrial */}
+      <div className="pointer-events-none absolute inset-0 opacity-[0.35]">
         <div
           className="absolute inset-0"
           style={{
@@ -40,86 +40,96 @@ export function CoverSection({ resumo }: { resumo: ParadaResumo }) {
           }}
         />
       </div>
-      <div className="pointer-events-none absolute -right-32 -top-32 h-[520px] w-[520px] rounded-full bg-brand-500/20 blur-3xl" />
+      <div className="pointer-events-none absolute -right-32 -top-32 h-[520px] w-[520px] rounded-full bg-brand-500/15 blur-3xl" />
 
       <Image
         src="/santher-logo-branco.png"
         alt="Santher"
-        width={130}
-        height={33}
-        className="absolute left-6 top-6 h-7 w-auto sm:left-10 sm:top-10 sm:h-8"
+        width={190}
+        height={48}
+        className="absolute left-6 top-6 h-10 w-auto sm:left-10 sm:top-10 sm:h-12"
+        priority
       />
 
-      <div className="relative mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-16 lg:grid-cols-2">
+      <div className="relative mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-8 lg:grid-cols-[1.15fr_1fr] lg:gap-16">
         <div>
-          <motion.div initial="hidden" animate="show" custom={0} variants={fadeUp} className="mb-6">
-            <StatusBadge status={resumo.status} className="bg-white/10 text-white ring-1 ring-white/20 [&>span]:bg-current" />
+          <motion.div initial="hidden" animate="show" custom={0} variants={fadeUp} className="mb-6 flex flex-wrap items-center gap-3">
+            <StatusBadge
+              status={resumo.status}
+              className="rounded-sm border border-white/25 bg-white/[0.06] font-mono text-[11px] tracking-[0.08em] text-white [&>span]:bg-current"
+            />
+            <span
+              className="max-w-[220px] truncate rounded-sm border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-brand-300"
+              title={resumo.id}
+            >
+              Nº Registro {resumo.id}
+            </span>
           </motion.div>
 
-          <motion.p
-            initial="hidden"
-            animate="show"
-            custom={1}
-            variants={fadeUp}
-            className="mb-3 text-sm font-bold uppercase tracking-[0.2em] text-brand-300"
-          >
-            {resumo.area} · Relatório Digital
-          </motion.p>
-
-          <motion.h1
-            initial="hidden"
-            animate="show"
-            custom={2}
-            variants={fadeUp}
-            className="text-4xl font-bold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-6xl"
-          >
-            {resumo.nome}
-          </motion.h1>
-
-          <motion.p initial="hidden" animate="show" custom={3} variants={fadeUp} className="mt-5 text-lg font-medium text-brand-200">
-            {resumo.maquina}
-          </motion.p>
+          <motion.div initial="hidden" animate="show" custom={1} variants={fadeUp} className="flex items-stretch gap-4">
+            <span className="mt-1 w-[3px] flex-none rounded-full bg-signal-500" />
+            <div className="min-w-0">
+              <p className="mb-2 font-mono text-[11px] font-medium uppercase tracking-[0.32em] text-brand-300">
+                {resumo.area} · Relatório Digital
+              </p>
+              <h1 className="font-display text-4xl font-semibold uppercase leading-[0.98] tracking-tight text-white sm:text-5xl lg:text-[3.4rem]">
+                {resumo.nome}
+              </h1>
+              <p className="mt-4 text-lg font-medium text-brand-200">{resumo.maquina}</p>
+            </div>
+          </motion.div>
 
           <motion.div
             initial="hidden"
             animate="show"
-            custom={4}
+            custom={2}
             variants={fadeUp}
-            className="mt-12 grid grid-cols-2 gap-6 border-t border-white/10 pt-8 sm:grid-cols-4 lg:grid-cols-2"
+            className="mt-10 grid grid-cols-2 overflow-hidden rounded-md border border-white/15 bg-white/[0.03] sm:grid-cols-4"
           >
-            {infos.map(({ icon: Icon, label, value }) => (
-              <div key={label}>
-                <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-brand-200">
-                  <Icon size={17} />
-                </div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-brand-300">{label}</p>
-                <p className="mt-0.5 text-base font-bold text-white">{value}</p>
+            {campos.map(({ label, value }, i) => (
+              <div
+                key={label}
+                className={cn(
+                  "min-w-0 border-white/10 px-4 py-3.5",
+                  i % 2 === 1 && "max-sm:border-l",
+                  i >= 2 && "max-sm:border-t",
+                  i > 0 && "sm:border-l"
+                )}
+              >
+                <p className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-brand-300">{label}</p>
+                <p className="mt-1 truncate font-mono text-sm font-semibold text-white" title={value}>
+                  {value}
+                </p>
               </div>
             ))}
           </motion.div>
         </div>
 
         <motion.div
-          initial={{ opacity: 0, scale: 0.85, y: 20 }}
+          initial={{ opacity: 0, scale: 0.92, y: 16 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
-          className="relative mx-auto aspect-square w-full max-w-md"
+          className="relative mx-auto aspect-square w-full max-w-[220px] -order-1 sm:max-w-xs lg:order-none lg:max-w-md"
         >
-          <div className="absolute inset-0 rounded-full bg-white/5 blur-2xl" />
           {resumo.fotosMaquina?.length ? (
             <div className="relative h-full w-full">
-              <div className="absolute inset-0 overflow-hidden rounded-3xl border border-white/10 shadow-2xl">
+              <div className="absolute inset-0 overflow-hidden rounded-lg border border-white/20 shadow-2xl">
                 <Image src={resumo.fotosMaquina[0]} alt={resumo.maquina} fill sizes="480px" className="object-cover" priority />
-                <div className="absolute inset-0 bg-gradient-to-t from-brand-950/40 via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-brand-950/50 via-transparent to-transparent" />
+              </div>
+              <span className="absolute -bottom-px -left-px h-3 w-3 border-b-2 border-l-2 border-signal-500" />
+              <span className="absolute -right-px -top-px h-3 w-3 border-r-2 border-t-2 border-signal-500" />
+              <div className="absolute bottom-3 left-3 rounded-sm bg-brand-950/70 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-brand-200 backdrop-blur-sm">
+                Registro Fotográfico
               </div>
               {resumo.fotosMaquina[1] && (
-                <div className="absolute -bottom-6 -right-6 h-32 w-40 overflow-hidden rounded-2xl border-4 border-brand-900 shadow-2xl sm:h-36 sm:w-48">
+                <div className="absolute -bottom-6 -right-6 h-32 w-40 overflow-hidden rounded-md border-4 border-brand-900 shadow-2xl sm:h-36 sm:w-48">
                   <Image src={resumo.fotosMaquina[1]} alt={resumo.maquina} fill sizes="200px" className="object-cover" />
                 </div>
               )}
             </div>
           ) : (
-            <div className="relative flex h-full w-full items-center justify-center rounded-3xl border border-white/10 bg-white/5 p-12 backdrop-blur-sm">
+            <div className="relative flex h-full w-full items-center justify-center rounded-lg border border-white/15 bg-white/5 p-12 backdrop-blur-sm">
               <MachineIllustration variant={resumo.imagem} className="h-full w-full" />
             </div>
           )}

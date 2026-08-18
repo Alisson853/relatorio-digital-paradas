@@ -1,6 +1,6 @@
 export type StatusGeral = "concluida" | "ressalvas" | "em_andamento";
 export type StatusItem = "concluido" | "atrasado" | "pendente" | "em_andamento";
-export type Equipe = "Elétrica" | "Mecânica" | "Instrumentação" | "Operação" | "Segurança" | "Civil";
+export type Equipe = "Elétrica" | "Mecânica" | "Instrumentação" | "Operação" | "Segurança" | "Civil" | "Caldeiraria";
 
 export interface ParadaResumo {
   id: string;
@@ -23,6 +23,7 @@ export interface Kpis {
   horasTrabalhadas: number;
   equipeEletrica: number;
   equipeMecanica: number;
+  equipeInstrumentacao: number;
   seguranca: number;
   pendencias: number;
 }
@@ -53,8 +54,11 @@ export interface Servico {
   resultado: string;
   status: StatusItem;
   fotoAntes: string;
+  fotoAntesHorario?: string;
   fotoDurante?: string;
+  fotoDuranteHorario?: string;
   fotoDepois: string;
+  fotoDepoisHorario?: string;
   categoria?: string;
 }
 

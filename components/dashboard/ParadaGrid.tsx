@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, SearchX } from "lucide-react";
 import type { ParadaResumo, StatusGeral } from "@/lib/types";
-import { deleteParada, getParadaCompleta } from "@/lib/actions/paradas";
+import { clonarParada, deleteParada, getParadaCompleta } from "@/lib/actions/paradas";
 import { getEditorSenha } from "@/lib/editor-auth";
 import { triggerJsonDownload } from "@/lib/local-json";
 import { cn } from "@/lib/utils";
@@ -35,6 +35,16 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
   const handleExport = async (id: string) => {
     const completa = await getParadaCompleta(id);
     if (completa) triggerJsonDownload(`relatorio-${completa.resumo.id}.json`, completa);
+  };
+
+  const handleClone = async (id: string) => {
+    if (!window.confirm("Clonar este relatório como modelo para uma nova parada? Fotos e status serão zerados.")) return;
+    const resultado = await clonarParada(id, getEditorSenha());
+    if (!resultado.ok || !resultado.novoId) {
+      window.alert(resultado.erro || "Não foi possível clonar.");
+      return;
+    }
+    router.push(`/novo?edit=${resultado.novoId}`);
   };
 
   const filtradas = useMemo(() => {
@@ -90,6 +100,7 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
               index={index}
               onDelete={() => handleDelete(parada.id)}
               onExport={() => handleExport(parada.id)}
+              onClone={() => handleClone(parada.id)}
             />
           ))}
         </div>

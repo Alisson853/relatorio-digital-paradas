@@ -2,18 +2,21 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Maximize2 } from "lucide-react";
+import { ArrowLeft, Camera, FileDown, FileText, Maximize2, Presentation } from "lucide-react";
 import { SECTIONS } from "@/lib/sections";
 import { cn } from "@/lib/utils";
+import { useEditorMode } from "@/lib/useEditorMode";
 
 interface SidebarProps {
   activeId: string;
   onNavigate: (id: string) => void;
   onPresent: () => void;
   titulo: string;
+  paradaId: string;
 }
 
-export function Sidebar({ activeId, onNavigate, onPresent, titulo }: SidebarProps) {
+export function Sidebar({ activeId, onNavigate, onPresent, titulo, paradaId }: SidebarProps) {
+  const { isEditor } = useEditorMode();
   return (
     <>
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 flex-col border-r border-slate-200 bg-white lg:flex">
@@ -50,7 +53,7 @@ export function Sidebar({ activeId, onNavigate, onPresent, titulo }: SidebarProp
           })}
         </nav>
 
-        <div className="border-t border-slate-100 p-4">
+        <div className="space-y-2 border-t border-slate-100 p-4">
           <button
             onClick={onPresent}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-950 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-slate-900"
@@ -58,6 +61,38 @@ export function Sidebar({ activeId, onNavigate, onPresent, titulo }: SidebarProp
             <Maximize2 size={16} />
             Modo Apresentação
           </button>
+          {isEditor && (
+            <Link
+              href={`/parada/${paradaId}/fotos`}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-bold text-brand-700 transition-colors hover:bg-brand-100"
+            >
+              <Camera size={16} />
+              Captura Rápida (Celular)
+            </Link>
+          )}
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={() => window.print()}
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-2 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+            >
+              <FileDown size={14} />
+              PDF
+            </button>
+            <a
+              href={`/api/export/pptx/${paradaId}`}
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-2 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+            >
+              <Presentation size={14} />
+              PPTX
+            </a>
+            <a
+              href={`/api/export/docx/${paradaId}`}
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-2 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+            >
+              <FileText size={14} />
+              DOCX
+            </a>
+          </div>
         </div>
       </aside>
 
@@ -87,6 +122,36 @@ export function Sidebar({ activeId, onNavigate, onPresent, titulo }: SidebarProp
             <Maximize2 size={14} />
             Apresentar
           </button>
+          {isEditor && (
+            <Link
+              href={`/parada/${paradaId}/fotos`}
+              className="flex flex-none items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-[10px] font-bold text-brand-700"
+            >
+              <Camera size={14} />
+              Captura
+            </Link>
+          )}
+          <button
+            onClick={() => window.print()}
+            className="flex flex-none items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-500"
+          >
+            <FileDown size={14} />
+            PDF
+          </button>
+          <a
+            href={`/api/export/pptx/${paradaId}`}
+            className="flex flex-none items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-500"
+          >
+            <Presentation size={14} />
+            PPTX
+          </a>
+          <a
+            href={`/api/export/docx/${paradaId}`}
+            className="flex flex-none items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-500"
+          >
+            <FileText size={14} />
+            DOCX
+          </a>
         </div>
       </div>
     </>

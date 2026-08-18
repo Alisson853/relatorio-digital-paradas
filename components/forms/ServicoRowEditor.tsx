@@ -7,6 +7,7 @@ import { PhotoUploadField } from "./PhotoUploadField";
 
 export interface ServicoRow {
   id: string;
+  numeroOS: string;
   equipamento: string;
   area: string;
   responsavel: string;
@@ -19,8 +20,11 @@ export interface ServicoRow {
   fotoDepois: string;
 }
 
-const EQUIPE_OPTIONS = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil"].map((e) => ({ value: e, label: e }));
-const CATEGORIA_OPTIONS = ["Preventiva", "Corretiva", "Preditiva", "Melhoria"].map((c) => ({ value: c, label: c }));
+const EQUIPE_OPTIONS = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil", "Caldeiraria"].map((e) => ({ value: e, label: e }));
+const CATEGORIA_OPTIONS = ["Preventiva", "Corretiva", "Preditiva", "Lubrificação", "Melhoria", "Etiqueta Vermelha", "Etiqueta Amarela"].map((c) => ({
+  value: c,
+  label: c,
+}));
 const STATUS_OPTIONS = [
   { value: "concluido", label: "Concluído" },
   { value: "em_andamento", label: "Em Andamento" },
@@ -64,13 +68,30 @@ export function ServicoRowEditor({ item, index, onChange, onRemove, onDuplicate 
         <PhotoUploadField label="Foto Durante" value={item.fotoDurante} onChange={(v) => onChange({ fotoDurante: v })} />
         <PhotoUploadField label="Foto Depois" value={item.fotoDepois} onChange={(v) => onChange({ fotoDepois: v })} className="col-span-2 sm:col-span-1" />
 
+        <div className="col-span-2 sm:col-span-1">
+          <TextField
+            label="Número da OS"
+            value={item.numeroOS === "Oportunidade" ? "" : item.numeroOS}
+            onChange={(v) => onChange({ numeroOS: v })}
+            placeholder={item.numeroOS === "Oportunidade" ? "Oportunidade" : "Ex: 53.298"}
+          />
+          <label className="mt-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
+            <input
+              type="checkbox"
+              checked={item.numeroOS === "Oportunidade"}
+              onChange={(e) => onChange({ numeroOS: e.target.checked ? "Oportunidade" : "" })}
+              className="h-3.5 w-3.5 rounded border-slate-300 text-brand-600 focus:ring-brand-400"
+            />
+            Oportunidade (sem nº de OS)
+          </label>
+        </div>
         <TextField
-          label="Equipamento / OS"
+          label="Equipamento"
           required
           value={item.equipamento}
           onChange={(v) => onChange({ equipamento: v })}
           placeholder="Ex: Redutor de Velocidade"
-          className="col-span-2 sm:col-span-2"
+          className="col-span-2 sm:col-span-3"
         />
         <TextField label="Local / Área" value={item.area} onChange={(v) => onChange({ area: v })} className="col-span-2 sm:col-span-2" />
 

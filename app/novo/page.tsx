@@ -8,7 +8,7 @@ import { AlertCircle, ArrowLeft, History, Plus, X } from "lucide-react";
 import type { CaminhoCriticoItem, ParadaCompleta, ParadaResumo, Pendencia, Servico, StatusGeral, TimelineEvento } from "@/lib/types";
 import { deriveGraficos, deriveKpis, textoExecutadoPadrao, textoResultadoPadrao } from "@/lib/derive";
 import { gerarResultadoFinal } from "@/lib/mock-data";
-import { getParadaCompleta, saveParada } from "@/lib/actions/paradas";
+import { getParadaAtualizadaEm, getParadaCompleta, saveParada } from "@/lib/actions/paradas";
 import { getEditorSenha } from "@/lib/editor-auth";
 import { slugify } from "@/lib/utils";
 import { clearDraft, getDraft, saveDraft } from "@/lib/draft-store";
@@ -31,6 +31,10 @@ const STATUS_GERAL_OPTIONS = [
 
 const IMAGEM_PADRAO = "industrial-press";
 
+// Rascunhos de relatório NOVO (sem id) compartilham uma única chave no navegador,
+// então um rascunho velho demais é quase certamente de outra tentativa abandonada.
+const DRAFT_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+
 const PLANEJADO_REALIZADO_PADRAO = [
   { etapa: "Desmontagem", planejado: 0, realizado: 0 },
   { etapa: "Inspeção", planejado: 0, realizado: 0 },
@@ -46,6 +50,7 @@ function novoTimelineItem(): TimelineRow {
 function novoServicoItem(defaults: { area: string; responsavel: string }): ServicoRow {
   return {
     id: crypto.randomUUID(),
+    numeroOS: "",
     equipamento: "",
     area: defaults.area,
     responsavel: defaults.responsavel,
@@ -81,6 +86,7 @@ function novaPendenciaItem(): PendenciaRow {
 function servicoParaLinha(s: Servico): ServicoRow {
   return {
     id: s.id,
+    numeroOS: s.numeroOS,
     equipamento: s.equipamento,
     area: s.area,
     responsavel: s.responsavel,
@@ -108,6 +114,8 @@ interface DraftSnapshot {
   status: StatusGeral;
   imagem: string;
   fotoMaquina: string;
+  totalAtividades: string;
+  osExecutadas: string;
   seguranca: number;
   servicos: ServicoRow[];
   pendencias: PendenciaRow[];
@@ -178,6 +186,8 @@ function NovaParadaForm() {
   const [status, setStatus] = useState<StatusGeral>("em_andamento");
   const [imagem, setImagem] = useState(IMAGEM_PADRAO);
   const [fotoMaquina, setFotoMaquina] = useState("");
+  const [totalAtividades, setTotalAtividades] = useState("");
+  const [osExecutadas, setOsExecutadas] = useState("");
   const [seguranca, setSeguranca] = useState(100);
 
   const [servicos, setServicos] = useState<ServicoRow[]>([]);
@@ -199,13 +209,29 @@ function NovaParadaForm() {
 
     if (!id) {
       const draft = getDraft<DraftSnapshot>(draftKeyRef.current);
-      if (draft && draftPossuiConteudo(draft)) setDraftDisponivel(draft);
+      if (draft && draftPossuiConteudo(draft)) {
+        // Todo relatório novo (sem id ainda) usa a mesma chave de rascunho —
+        // um rascunho muito antigo provavelmente é de OUTRO relatório abandonado,
+        // não uma continuação do que o usuário está prestes a preencher agora.
+        if (Date.now() - draft.savedAt > DRAFT_MAX_AGE_MS) {
+          clearDraft(draftKeyRef.current);
+        } else {
+          setDraftDisponivel(draft);
+        }
+      }
       setReady(true);
       return;
     }
 
     (async () => {
-      const existing = await getParadaCompleta(id);
+      let existing;
+      try {
+        existing = await getParadaCompleta(id);
+      } catch {
+        setNotFound(true);
+        setReady(true);
+        return;
+      }
       if (!existing) {
         setNotFound(true);
         setReady(true);
@@ -220,6 +246,8 @@ function NovaParadaForm() {
       setStatus(existing.resumo.status);
       setImagem(existing.resumo.imagem);
       setFotoMaquina(existing.resumo.fotosMaquina?.[0] ?? "");
+      setTotalAtividades(String(existing.kpis.osPlanejadas || ""));
+      setOsExecutadas(String(existing.kpis.osConcluidas || ""));
       setSeguranca(existing.kpis.seguranca);
       setServicos(existing.servicos.map(servicoParaLinha));
       setPendencias(existing.pendencias.map((p) => ({ ...p })));
@@ -229,7 +257,17 @@ function NovaParadaForm() {
       setResumoFinalCustom(existing.resultadoFinal.resumo);
 
       const draft = getDraft<DraftSnapshot>(draftKeyRef.current);
-      if (draft && draftPossuiConteudo(draft)) setDraftDisponivel(draft);
+      if (draft && draftPossuiConteudo(draft)) {
+        const atualizadoEm = await getParadaAtualizadaEm(id).catch(() => null);
+        if (atualizadoEm !== null && draft.savedAt <= atualizadoEm) {
+          // O relatório foi salvo depois desse rascunho — o rascunho está
+          // desatualizado e restaurá-lo apagaria dados já salvos (ex: OS
+          // adicionadas em edições posteriores). Descarta silenciosamente.
+          clearDraft(draftKeyRef.current);
+        } else {
+          setDraftDisponivel(draft);
+        }
+      }
       setReady(true);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -251,6 +289,8 @@ function NovaParadaForm() {
         status,
         imagem,
         fotoMaquina,
+        totalAtividades,
+        osExecutadas,
         seguranca,
         servicos,
         pendencias,
@@ -277,6 +317,8 @@ function NovaParadaForm() {
     status,
     imagem,
     fotoMaquina,
+    totalAtividades,
+    osExecutadas,
     seguranca,
     servicos,
     pendencias,
@@ -297,6 +339,8 @@ function NovaParadaForm() {
     setStatus(draftDisponivel.status);
     setImagem(draftDisponivel.imagem);
     setFotoMaquina(draftDisponivel.fotoMaquina);
+    setTotalAtividades(draftDisponivel.totalAtividades);
+    setOsExecutadas(draftDisponivel.osExecutadas);
     setSeguranca(draftDisponivel.seguranca);
     setServicos(draftDisponivel.servicos);
     setPendencias(draftDisponivel.pendencias);
@@ -332,7 +376,7 @@ function NovaParadaForm() {
       id,
       nome: nome.trim(),
       maquina: maquina.trim(),
-      area: maquina.trim(),
+      area: "Santher — Unidade Guaíba",
       data,
       duracaoPlanejada: duracaoPlanejada.trim() || "0h",
       duracaoRealizada: duracaoRealizada.trim() || duracaoPlanejada.trim() || "0h",
@@ -344,9 +388,9 @@ function NovaParadaForm() {
 
     const servicosFinal: Servico[] = servicos
       .filter((s) => s.equipamento.trim())
-      .map((s, i) => ({
+      .map((s) => ({
         id: s.id,
-        numeroOS: String(i + 1).padStart(3, "0"),
+        numeroOS: s.numeroOS.trim() || "Oportunidade",
         titulo: `Manutenção em ${s.equipamento.trim()}`,
         equipamento: s.equipamento,
         area: s.area,
@@ -370,7 +414,7 @@ function NovaParadaForm() {
 
     const timelineFinal: TimelineEvento[] = timeline;
 
-    const kpis = deriveKpis(servicosFinal, seguranca);
+    const kpis = deriveKpis(servicosFinal, seguranca, Number(totalAtividades) || undefined, Number(osExecutadas) || undefined);
     const graficos = deriveGraficos(servicosFinal, caminhoCriticoFinal, planejadoRealizado, kpis.eficiencia);
     const resultadoFinal = gerarResultadoFinal(resumo, kpis);
     if (resumoFinalCustom.trim()) resultadoFinal.resumo = resumoFinalCustom.trim();
@@ -477,16 +521,21 @@ function NovaParadaForm() {
             <SelectField label="Status Geral" value={status} onChange={(v) => setStatus(v as StatusGeral)} options={STATUS_GERAL_OPTIONS} />
             <TextField label="Tempo Planejado" value={duracaoPlanejada} onChange={setDuracaoPlanejada} placeholder="Ex: 48h" />
             <TextField label="Tempo Realizado" value={duracaoRealizada} onChange={setDuracaoRealizada} placeholder="Ex: 51h 20min" />
-            <PhotoUploadField
-              label="Foto da Máquina (capa e card do dashboard)"
-              value={fotoMaquina}
-              onChange={setFotoMaquina}
-              className="sm:col-span-2 sm:max-w-xs"
-            />
           </div>
         </FormSection>
 
-        <FormSection numero={2} titulo="Serviços Executados (OS)" descricao="O essencial: foto, equipamento e motivo. Cada um vira um slide no relatório.">
+        <FormSection
+          numero={2}
+          titulo="Serviços Executados (OS)"
+          descricao="OS Programadas e Executadas definem a % de eficiência do relatório. Abaixo, detalhe só as principais — as que têm foto."
+        >
+          <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <TextField label="OS Programadas" type="number" value={totalAtividades} onChange={setTotalAtividades} placeholder="Ex: 45" />
+            <TextField label="OS Executadas" type="number" value={osExecutadas} onChange={setOsExecutadas} placeholder="Ex: 40" />
+          </div>
+          <div className="mb-5">
+            <PhotoUploadField label="Foto da Máquina (capa e card do dashboard)" value={fotoMaquina} onChange={setFotoMaquina} className="sm:max-w-xs" />
+          </div>
           <div className="space-y-3">
             {servicos.map((item, i) => (
               <ServicoRowEditor
