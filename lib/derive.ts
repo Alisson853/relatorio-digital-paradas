@@ -29,12 +29,17 @@ export function textoResultadoPadrao(status: StatusItem): string {
 
 const EQUIPES: Equipe[] = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil", "Caldeiraria", "Preditiva"];
 
-function parseHoras(tempo: string): number {
-  const match = tempo.match(/(\d+)\s*h(?:\s*(\d+)\s*(?:min)?)?/i);
-  if (!match) return 0;
-  const horas = Number(match[1] ?? 0);
-  const minutos = Number(match[2] ?? 0);
-  return horas + minutos / 60;
+export function parseHoras(tempo: string): number {
+  const comH = tempo.match(/(\d+)\s*h(?:\s*(\d+)\s*(?:min)?)?/i);
+  if (comH) {
+    const horas = Number(comH[1] ?? 0);
+    const minutos = Number(comH[2] ?? 0);
+    return horas + minutos / 60;
+  }
+  // Alguns relatórios salvam a duração como número puro ("13" em vez de "13h").
+  const soNumero = tempo.match(/^\s*(\d+(?:[.,]\d+)?)\s*$/);
+  if (soNumero) return Number(soNumero[1].replace(",", "."));
+  return 0;
 }
 
 export function deriveKpis(servicos: Servico[], seguranca: number, totalPlanejado?: number, totalExecutadas?: number): Kpis {
@@ -114,16 +119,25 @@ export function deriveGraficos(
   servicos: Servico[],
   caminhoCritico: CaminhoCriticoItem[],
   planejadoRealizado: Array<{ etapa: string; planejado: number; realizado: number }>,
-  eficiencia: number
+  eficiencia: number,
+  duracaoMaximaHoras?: number
 ): GraficosData {
   const osPorEquipe = EQUIPES.map((equipe) => ({
     equipe,
     quantidade: servicos.filter((s) => s.equipe === equipe).length,
   })).filter((d) => d.quantidade > 0);
 
+  // O tempo de cada OS é individual e várias rodam em paralelo (times
+  // diferentes, ou mais de uma pessoa na mesma equipe) — então somar o tempo
+  // de todas as OS de um setor sem limite estoura a duração real da parada.
+  // Sem dados de horário por pessoa, o teto mais honesto é a duração da
+  // própria parada: nenhum setor trabalhou mais tempo do que ela durou.
   const areaMap = new Map<string, number>();
   servicos.forEach((s) => areaMap.set(s.area, (areaMap.get(s.area) ?? 0) + parseHoras(s.tempoGasto)));
-  const horasPorSetor = Array.from(areaMap.entries()).map(([setor, horas]) => ({ setor, horas: Math.round(horas) }));
+  const horasPorSetor = Array.from(areaMap.entries()).map(([setor, horas]) => ({
+    setor,
+    horas: duracaoMaximaHoras ? Math.min(Math.round(horas), duracaoMaximaHoras) : Math.round(horas),
+  }));
 
   const categoriaMap = new Map<string, number>();
   servicos.forEach((s) => {

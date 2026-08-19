@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowLeft, FileSpreadsheet, History, Loader2, Plus, X } from "lucide-react";
 import type { CaminhoCriticoItem, ParadaCompleta, ParadaResumo, Pendencia, Servico, StatusGeral, TimelineEvento } from "@/lib/types";
-import { deriveGraficos, deriveKpis, textoExecutadoPadrao, textoResultadoPadrao } from "@/lib/derive";
+import { deriveGraficos, deriveKpis, parseHoras, textoExecutadoPadrao, textoResultadoPadrao } from "@/lib/derive";
 import { gerarResultadoFinal } from "@/lib/mock-data";
 import { getParadaAtualizadaEm, getParadaCompleta, saveParada } from "@/lib/actions/paradas";
 import { getEditorSenha } from "@/lib/editor-auth";
@@ -500,7 +500,8 @@ function NovaParadaForm() {
     const timelineFinal: TimelineEvento[] = timeline;
 
     const kpis = deriveKpis(servicosFinal, seguranca, Number(totalAtividades) || undefined, Number(osExecutadas) || undefined);
-    const graficos = deriveGraficos(servicosFinal, caminhoCriticoFinal, planejadoRealizado, kpis.eficiencia);
+    const duracaoMaximaHoras = parseHoras(resumo.duracaoRealizada) || parseHoras(resumo.duracaoPlanejada) || undefined;
+    const graficos = deriveGraficos(servicosFinal, caminhoCriticoFinal, planejadoRealizado, kpis.eficiencia, duracaoMaximaHoras);
     const resultadoFinal = gerarResultadoFinal(resumo, kpis);
     if (resumoFinalCustom.trim()) resultadoFinal.resumo = resumoFinalCustom.trim();
 

@@ -5,7 +5,7 @@ import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { paradas } from "@/lib/db/schema";
 import type { CaminhoCriticoItem, Equipe, ParadaCompleta, ParadaResumo, Servico, TimelineEvento } from "@/lib/types";
-import { deriveFotoCapa, deriveFotos, deriveGraficos, deriveKpis, textoExecutadoPadrao, textoResultadoPadrao } from "@/lib/derive";
+import { deriveFotoCapa, deriveFotos, deriveGraficos, deriveKpis, parseHoras, textoExecutadoPadrao, textoResultadoPadrao } from "@/lib/derive";
 import { gerarResultadoFinal } from "@/lib/mock-data";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { verifyEditorPassword } from "./auth";
@@ -176,7 +176,13 @@ export async function clonarParada(idOrigem: string, senha: string): Promise<{ o
   };
 
   const kpisClonados = deriveKpis(servicosClonados, row.kpis.seguranca, row.kpis.osPlanejadas, 0);
-  const graficosClonados = deriveGraficos(servicosClonados, caminhoCriticoClonado, row.graficos.planejadoRealizado, kpisClonados.eficiencia);
+  const graficosClonados = deriveGraficos(
+    servicosClonados,
+    caminhoCriticoClonado,
+    row.graficos.planejadoRealizado,
+    kpisClonados.eficiencia,
+    parseHoras(row.duracaoPlanejada) || undefined
+  );
   const resultadoClonado = gerarResultadoFinal(resumoClonado, kpisClonados);
 
   await getDb().insert(paradas).values({
@@ -402,7 +408,13 @@ export async function adicionarServicoRapido(paradaId: string, input: NovaOsInpu
   // detalhados um a um, já que só os "principais" com foto ganham entrada aqui) —
   // como essa OS nova nasce concluída, soma 1 ao total já registrado.
   const kpisAtualizados = deriveKpis(servicosAtualizados, row.kpis.seguranca, row.kpis.osPlanejadas, row.kpis.osConcluidas + 1);
-  const graficosAtualizados = deriveGraficos(servicosAtualizados, row.caminhoCritico, row.graficos.planejadoRealizado, kpisAtualizados.eficiencia);
+  const graficosAtualizados = deriveGraficos(
+    servicosAtualizados,
+    row.caminhoCritico,
+    row.graficos.planejadoRealizado,
+    kpisAtualizados.eficiencia,
+    parseHoras(row.duracaoRealizada) || parseHoras(row.duracaoPlanejada) || undefined
+  );
   const resultadoAtualizado = { ...row.resultadoFinal, eficiencia: kpisAtualizados.eficiencia, pendenciasAbertas: kpisAtualizados.pendencias };
 
   await getDb()
