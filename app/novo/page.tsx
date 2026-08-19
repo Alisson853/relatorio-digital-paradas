@@ -396,8 +396,11 @@ function NovaParadaForm() {
       // OS que já existem no relatório (ex: adicionadas antes de a planilha ter
       // essa linha, ou reimportação depois de alguém corrigir a planilha) têm
       // responsável/equipe/categoria/tempo atualizados a partir da planilha —
-      // mas status, fotos e motivo não são mexidos, pois é trabalho de campo já feito.
+      // fotos e motivo não são mexidos, pois é trabalho de campo já feito. Status
+      // só é adiantado pra concluído quando a coluna Executado confirma — nunca
+      // volta pra pendente, pra não apagar um "concluído" já marcado no app.
       const atualizadas: string[] = [];
+      let marcadasConcluidas = 0;
 
       for (const item of importados) {
         const existente = item.numeroOS !== "Oportunidade" ? porOsExistente.get(item.numeroOS) : undefined;
@@ -407,8 +410,10 @@ function NovaParadaForm() {
             equipe: item.equipe,
             categoria: item.categoria,
             tempoGasto: item.tempoGasto,
+            status: item.concluido ? "concluido" : existente.status,
           });
           atualizadas.push(item.numeroOS);
+          if (item.concluido && existente.status !== "concluido") marcadasConcluidas++;
           continue;
         }
         novasLinhas.push({
@@ -423,7 +428,7 @@ function NovaParadaForm() {
           equipe: item.equipe,
           categoria: item.categoria,
           motivo: item.titulo,
-          status: "pendente",
+          status: item.concluido ? "concluido" : "pendente",
           tempoGasto: item.tempoGasto,
           fotoAntes: "",
           fotoDurante: "",
@@ -436,6 +441,7 @@ function NovaParadaForm() {
 
       const partes = [`${novasLinhas.length} serviço${novasLinhas.length === 1 ? "" : "s"} importado${novasLinhas.length === 1 ? "" : "s"}`];
       if (atualizadas.length > 0) partes.push(`${atualizadas.length} já existiam e tiveram responsável/equipe/tempo atualizados`);
+      if (marcadasConcluidas > 0) partes.push(`${marcadasConcluidas} marcadas como concluídas pela coluna Executado`);
       setImportResultado(`${partes.join(", ")}. Marque como concluído pelo celular (Captura Rápida) conforme forem sendo feitos.`);
     } catch {
       setImportResultado("Não foi possível ler essa planilha. Confira se é o modelo padrão de programação semanal.");

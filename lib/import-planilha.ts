@@ -9,6 +9,7 @@ export interface ServicoImportado {
   categoria: string;
   responsavel: string;
   tempoGasto: string;
+  concluido: boolean;
 }
 
 export interface ResultadoImportacao {
@@ -34,7 +35,17 @@ const CABECALHOS: Record<string, string[]> = {
   tipo: ["TIPO SERVICO", "TIPO DE SERVICO"],
   hh: ["HH"],
   executante: ["EXECUTANTE"],
+  executado: ["EXECUTADO"],
 };
+
+// Coluna "Executado" costuma ter um ícone (✓ verde / ✗ vermelho) por cima de
+// um valor numérico de dropdown — nessa planilha, 2 é o círculo verde e 0 é o
+// vermelho. Cobre também texto tipo "SIM"/"OK" pra planilhas formatadas diferente.
+function estaExecutado(valor: unknown): boolean {
+  if (typeof valor === "number") return valor >= 2;
+  const texto = normalizar(valor);
+  return texto === "SIM" || texto === "OK" || texto === "EXECUTADO" || texto === "CONCLUIDO" || texto === "TRUE" || texto === "X";
+}
 
 function encontrarLinhaCabecalho(linhas: unknown[][]): number {
   for (let i = 0; i < linhas.length; i++) {
@@ -147,6 +158,7 @@ export async function parsePlanilhaServicos(file: File): Promise<ResultadoImport
     tipo: encontrarColuna(cabecalho, CABECALHOS.tipo),
     hh: encontrarColuna(cabecalho, CABECALHOS.hh),
     executante: encontrarColuna(cabecalho, CABECALHOS.executante),
+    executado: encontrarColuna(cabecalho, CABECALHOS.executado),
   };
 
   // Linhas duplicadas com a mesma OS (o mesmo serviço com horas lançadas por
@@ -170,6 +182,7 @@ export async function parsePlanilhaServicos(file: File): Promise<ResultadoImport
     const tipo = String(linha[col.tipo] ?? "").trim();
     const executante = String(linha[col.executante] ?? "").trim();
     const tempoGasto = formatarTempo(linha[col.hh]);
+    const concluido = col.executado !== -1 && estaExecutado(linha[col.executado]);
 
     const existente = porOs.get(numeroOS);
     if (existente && numeroOS !== "Oportunidade") {
@@ -177,6 +190,8 @@ export async function parsePlanilhaServicos(file: File): Promise<ResultadoImport
       if (executante && !existente.responsavel.includes(executante)) {
         existente.responsavel = existente.responsavel ? `${existente.responsavel} + ${executante}` : executante;
       }
+      // Se qualquer lançamento dessa OS foi marcado executado, a OS toda conta como concluída.
+      if (concluido) existente.concluido = true;
       continue;
     }
 
@@ -188,6 +203,7 @@ export async function parsePlanilhaServicos(file: File): Promise<ResultadoImport
       categoria: mapearCategoria(tipo),
       responsavel: executante,
       tempoGasto,
+      concluido,
     });
   }
 
