@@ -42,7 +42,13 @@ export function parseHoras(tempo: string): number {
   return 0;
 }
 
-export function deriveKpis(servicos: Servico[], seguranca: number, totalPlanejado?: number, totalExecutadas?: number): Kpis {
+export function deriveKpis(
+  servicos: Servico[],
+  seguranca: number,
+  totalPlanejado?: number,
+  totalExecutadas?: number,
+  duracaoMaximaHoras?: number
+): Kpis {
   // OS Programadas e OS Executadas são números informados à parte — nem toda
   // atividade real vira uma OS detalhada no formulário (só as que têm foto e
   // valem a pena documentar como "principais"). Só cai na contagem de OS com
@@ -50,7 +56,11 @@ export function deriveKpis(servicos: Servico[], seguranca: number, totalPlanejad
   const osConcluidas = totalExecutadas && totalExecutadas > 0 ? totalExecutadas : servicos.filter((s) => s.status === "concluido").length;
   const osPlanejadas = totalPlanejado && totalPlanejado > 0 ? totalPlanejado : servicos.length;
   const eficiencia = osPlanejadas > 0 ? Math.round((osConcluidas / osPlanejadas) * 1000) / 10 : 0;
-  const horasTrabalhadas = Math.round(servicos.reduce((sum, s) => sum + parseHoras(s.tempoGasto), 0));
+  // Mesma lógica do gráfico Horas por Setor: somar o tempo de cada OS sem
+  // limite ultrapassa a duração real da parada quando várias rodam em
+  // paralelo, então o teto é a própria duração.
+  const horasBrutas = Math.round(servicos.reduce((sum, s) => sum + parseHoras(s.tempoGasto), 0));
+  const horasTrabalhadas = duracaoMaximaHoras ? Math.min(horasBrutas, duracaoMaximaHoras) : horasBrutas;
   const equipeEletrica = servicos.filter((s) => s.equipe === "Elétrica").length;
   const equipeMecanica = servicos.filter((s) => s.equipe === "Mecânica").length;
   const equipeInstrumentacao = servicos.filter((s) => s.equipe === "Instrumentação").length;

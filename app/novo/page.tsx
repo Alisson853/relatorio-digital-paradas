@@ -517,8 +517,8 @@ function NovaParadaForm() {
 
     const timelineFinal: TimelineEvento[] = timeline;
 
-    const kpis = deriveKpis(servicosFinal, seguranca, Number(totalAtividades) || undefined, Number(osExecutadas) || undefined);
     const duracaoMaximaHoras = parseHoras(resumo.duracaoRealizada) || parseHoras(resumo.duracaoPlanejada) || undefined;
+    const kpis = deriveKpis(servicosFinal, seguranca, Number(totalAtividades) || undefined, Number(osExecutadas) || undefined, duracaoMaximaHoras);
     const graficos = deriveGraficos(servicosFinal, caminhoCriticoFinal, planejadoRealizado, kpis.eficiencia, duracaoMaximaHoras);
     const resultadoFinal = gerarResultadoFinal(resumo, kpis);
     if (resumoFinalCustom.trim()) resultadoFinal.resumo = resumoFinalCustom.trim();

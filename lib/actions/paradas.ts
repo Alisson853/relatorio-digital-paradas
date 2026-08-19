@@ -175,13 +175,14 @@ export async function clonarParada(idOrigem: string, senha: string): Promise<{ o
     fotosMaquina: row.fotosMaquina ?? [],
   };
 
-  const kpisClonados = deriveKpis(servicosClonados, row.kpis.seguranca, row.kpis.osPlanejadas, 0);
+  const tetoHorasClone = parseHoras(row.duracaoPlanejada) || undefined;
+  const kpisClonados = deriveKpis(servicosClonados, row.kpis.seguranca, row.kpis.osPlanejadas, 0, tetoHorasClone);
   const graficosClonados = deriveGraficos(
     servicosClonados,
     caminhoCriticoClonado,
     row.graficos.planejadoRealizado,
     kpisClonados.eficiencia,
-    parseHoras(row.duracaoPlanejada) || undefined
+    tetoHorasClone
   );
   const resultadoClonado = gerarResultadoFinal(resumoClonado, kpisClonados);
 
@@ -338,7 +339,7 @@ export async function marcarStatusServico(
   const autorizado = await verifyEditorPassword(senha);
   if (!autorizado) return { ok: false, erro: "Não autorizado." };
 
-  const [row] = await getDb().select({ servicos: paradas.servicos }).from(paradas).where(eq(paradas.id, paradaId)).limit(1);
+  const [row] = await getDb().select().from(paradas).where(eq(paradas.id, paradaId)).limit(1);
   if (!row) return { ok: false, erro: "Relatório não encontrado." };
 
   const idx = row.servicos.findIndex((s) => s.id === servicoId);
@@ -354,7 +355,20 @@ export async function marcarStatusServico(
   const servicosAtualizados = [...row.servicos];
   servicosAtualizados[idx] = servicoAtualizado;
 
-  await getDb().update(paradas).set({ servicos: servicosAtualizados, atualizadoEm: new Date() }).where(eq(paradas.id, paradaId));
+  // Marcar concluído/pendente pelo celular precisa refletir na eficiência na
+  // hora — por isso, diferente de capturarFotoServico (que não muda status),
+  // aqui os KPIs são recalculados a partir da contagem real de status, não
+  // do número "OS Executadas" digitado manualmente (que fica desatualizado
+  // assim que o trabalho passa a ser marcado em campo).
+  const tetoHoras = parseHoras(row.duracaoRealizada) || parseHoras(row.duracaoPlanejada) || undefined;
+  const kpisAtualizados = deriveKpis(servicosAtualizados, row.kpis.seguranca, row.kpis.osPlanejadas, undefined, tetoHoras);
+  const graficosAtualizados = deriveGraficos(servicosAtualizados, row.caminhoCritico, row.graficos.planejadoRealizado, kpisAtualizados.eficiencia, tetoHoras);
+  const resultadoAtualizado = { ...row.resultadoFinal, eficiencia: kpisAtualizados.eficiencia, pendenciasAbertas: kpisAtualizados.pendencias };
+
+  await getDb()
+    .update(paradas)
+    .set({ servicos: servicosAtualizados, kpis: kpisAtualizados, graficos: graficosAtualizados, resultadoFinal: resultadoAtualizado, atualizadoEm: new Date() })
+    .where(eq(paradas.id, paradaId));
 
   return { ok: true };
 }
@@ -404,17 +418,12 @@ export async function adicionarServicoRapido(paradaId: string, input: NovaOsInpu
   };
 
   const servicosAtualizados = [...row.servicos, novoServico];
+  const tetoHoras = parseHoras(row.duracaoRealizada) || parseHoras(row.duracaoPlanejada) || undefined;
   // OS Executadas é um número informado manualmente (não conta mais os serviços
   // detalhados um a um, já que só os "principais" com foto ganham entrada aqui) —
   // como essa OS nova nasce concluída, soma 1 ao total já registrado.
-  const kpisAtualizados = deriveKpis(servicosAtualizados, row.kpis.seguranca, row.kpis.osPlanejadas, row.kpis.osConcluidas + 1);
-  const graficosAtualizados = deriveGraficos(
-    servicosAtualizados,
-    row.caminhoCritico,
-    row.graficos.planejadoRealizado,
-    kpisAtualizados.eficiencia,
-    parseHoras(row.duracaoRealizada) || parseHoras(row.duracaoPlanejada) || undefined
-  );
+  const kpisAtualizados = deriveKpis(servicosAtualizados, row.kpis.seguranca, row.kpis.osPlanejadas, row.kpis.osConcluidas + 1, tetoHoras);
+  const graficosAtualizados = deriveGraficos(servicosAtualizados, row.caminhoCritico, row.graficos.planejadoRealizado, kpisAtualizados.eficiencia, tetoHoras);
   const resultadoAtualizado = { ...row.resultadoFinal, eficiencia: kpisAtualizados.eficiencia, pendenciasAbertas: kpisAtualizados.pendencias };
 
   await getDb()
