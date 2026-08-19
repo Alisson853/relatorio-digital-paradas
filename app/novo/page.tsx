@@ -391,7 +391,12 @@ function NovaParadaForm() {
         return;
       }
 
-      const porOsExistente = new Map(servicos.filter((s) => s.numeroOS && s.numeroOS !== "Oportunidade").map((s) => [s.numeroOS, s]));
+      // Compara só os dígitos: "53.454" (digitado à mão) e "53454" (vindo puro
+      // da célula) têm que casar mesmo com formatação de milhar diferente.
+      const chaveOS = (numero: string) => numero.replace(/\D/g, "");
+      const porOsExistente = new Map(
+        servicos.filter((s) => s.numeroOS && s.numeroOS !== "Oportunidade").map((s) => [chaveOS(s.numeroOS), s])
+      );
       const novasLinhas: ServicoRow[] = [];
       // OS que já existem no relatório (ex: adicionadas antes de a planilha ter
       // essa linha, ou reimportação depois de alguém corrigir a planilha) têm
@@ -403,7 +408,7 @@ function NovaParadaForm() {
       let marcadasConcluidas = 0;
 
       for (const item of importados) {
-        const existente = item.numeroOS !== "Oportunidade" ? porOsExistente.get(item.numeroOS) : undefined;
+        const existente = item.numeroOS !== "Oportunidade" ? porOsExistente.get(chaveOS(item.numeroOS)) : undefined;
         if (existente) {
           updateRow(setServicos, existente.id, {
             responsavel: item.responsavel || existente.responsavel,

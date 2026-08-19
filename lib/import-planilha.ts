@@ -98,6 +98,16 @@ function mapearCategoria(tipo: string): string {
   return encontrada?.categoria ?? "Corretiva";
 }
 
+// A célula da OS guarda um número puro (53454), mas o time sempre digita/lê
+// com ponto de milhar (53.454) — sem isso, o número importado nunca bate com
+// o de uma OS já cadastrada manualmente, e o merge de "já existe" nunca acha.
+function formatarNumeroOS(valor: unknown): string {
+  const texto = String(valor ?? "").trim();
+  if (!texto) return "Oportunidade";
+  if (!/^\d+$/.test(texto)) return texto;
+  return texto.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
 // A coluna HH vem como fração de dia (0.1667 = 4h) quando o Excel guarda um
 // horário, mas às vezes chega como texto "4:00" — cobre os dois casos.
 function formatarTempo(valor: unknown): string {
@@ -176,7 +186,7 @@ export async function parsePlanilhaServicos(file: File): Promise<ResultadoImport
     }
     linhasVazias = 0;
 
-    const numeroOS = String(linha[col.numeroOS] ?? "").trim() || "Oportunidade";
+    const numeroOS = formatarNumeroOS(linha[col.numeroOS]);
     const descricao = String(linha[col.descricao] ?? "").trim();
     const oficina = String(linha[col.oficina] ?? "").trim();
     const tipo = String(linha[col.tipo] ?? "").trim();
