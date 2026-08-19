@@ -1,17 +1,46 @@
 import { NextRequest } from "next/server";
+import sharp from "sharp";
+import imageSize from "image-size";
 import { getParadaCompleta } from "@/lib/actions/paradas";
 import { servicosComFoto } from "@/lib/derive";
+import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { formatDate, statusLabel } from "@/lib/utils";
-import type { ParadaCompleta } from "@/lib/types";
+import type { ParadaCompleta, Servico } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-// RTF puro, sem fotos — feito pra colar direto num campo de texto de sistema
-// de manutenção (Mantec e afins). RTF com imagem embutida fica gigante e é
-// justamente o que costuma travar esse tipo de importação; o DOCX continua
-// sendo a opção com fotos pra quem quer o documento completo.
+// RTF puro, feito pra colar direto num campo de texto de sistema de manutenção
+// (Mantec e afins). Fotos vêm embutidas como \pict — redimensionadas e
+// recomprimidas antes, senão o arquivo fica gigante e é o que costuma travar
+// esse tipo de importação em sistema legado.
 
 const PAGE_WIDTH_TWIPS = 9026; // A4, margem de 1" de cada lado
+const FOTO_LARGURA_PX = 320;
+
+async function fetchImagemRtf(url: string, origin: string): Promise<{ hex: string; width: number; height: number } | null> {
+  try {
+    const absoluta = url.startsWith("http") ? url : new URL(url, origin).toString();
+    const res = await fetch(absoluta);
+    if (!res.ok) return null;
+    const original = Buffer.from(await res.arrayBuffer());
+    const redimensionada = await sharp(original).resize({ width: FOTO_LARGURA_PX, withoutEnlargement: true }).jpeg({ quality: 60 }).toBuffer();
+    const dims = imageSize(redimensionada);
+    if (!dims.width || !dims.height) return null;
+    return { hex: redimensionada.toString("hex"), width: dims.width, height: dims.height };
+  } catch {
+    return null;
+  }
+}
+
+// Quebra o hex em linhas — evita uma única linha gigantesca, que alguns
+// leitores de RTF truncam ou travam ao processar.
+function pictBlock(foto: { hex: string; width: number; height: number }): string {
+  const goalW = Math.round(foto.width * 15); // ~96dpi -> twips
+  const goalH = Math.round(foto.height * 15);
+  const linhasHex: string[] = [];
+  for (let i = 0; i < foto.hex.length; i += 128) linhasHex.push(foto.hex.slice(i, i + 128));
+  return `{\\pict\\jpegblip\\picw${foto.width}\\pich${foto.height}\\picwgoal${goalW}\\pichgoal${goalH}\n${linhasHex.join("\n")}\n}`;
+}
 
 // Paleta como índice na tabela de cores do RTF (ordem importa).
 const COLORS = ["auto", "101828", "1B4D99", "64749A", "0F8A5F", "B8760F", "C23A2F", "FFFFFF", "0A1E3F", "F7F9FC", "DBE2EE"] as const;
@@ -74,6 +103,8 @@ interface Celula {
   texto: string;
   run?: RunOpts;
   bg?: number;
+  pict?: { hex: string; width: number; height: number };
+  legenda?: string;
 }
 
 // Uma tabela simples: cada linha é um array de células, larguras em frações (somam 1).
@@ -90,7 +121,13 @@ function tabela(linhas: Celula[][], larguras: number[]): string {
     for (let i = 0; i < linha.length; i++) {
       const celula = linha[i];
       const bg = celula.bg !== undefined ? `\\clcbpat${celula.bg}` : "";
-      out += `\\pard\\intbl${bg} ${run(celula.texto, celula.run)}\\cell\n`;
+      if (celula.pict) {
+        out += `\\pard\\intbl\\qc${bg} ${pictBlock(celula.pict)}\\par\n`;
+        if (celula.legenda) out += `\\pard\\intbl\\qc ${run(celula.legenda, { size: 8, color: C_SLATE, font: 1 })}\\par\n`;
+        out += "\\cell\n";
+      } else {
+        out += `\\pard\\intbl${bg} ${run(celula.texto, celula.run)}\\cell\n`;
+      }
     }
     out += "\\row\n";
   }
@@ -127,7 +164,7 @@ function buildCapa(data: ParadaCompleta): string {
   for (let i = 0; i < campos.length; i += 2) {
     const par = campos.slice(i, i + 2);
     linhas.push(
-      par.map(([label, valor]) => ({ texto: `${label.toUpperCase()}\\line ${valor}`, run: { size: 11, color: C_INK, font: 1 } }))
+      par.map(([label, valor]) => ({ texto: `${label.toUpperCase()}\n${valor}`, run: { size: 11, color: C_INK, font: 1 } }))
     );
   }
   out += tabela(linhas, [0.5, 0.5]);
@@ -153,7 +190,7 @@ function buildResumo(data: ParadaCompleta): string {
   const linhas: Celula[][] = [];
   for (let i = 0; i < cards.length; i += 3) {
     const tri = cards.slice(i, i + 3);
-    const linha: Celula[] = tri.map(([label, valor]) => ({ texto: `${valor}\\line ${label}`, run: { size: 14, bold: true, color: C_INK, font: 0 }, bg: C_SLATE_LIGHT }));
+    const linha: Celula[] = tri.map(([label, valor]) => ({ texto: `${valor}\n${label}`, run: { size: 14, bold: true, color: C_INK, font: 0 }, bg: C_SLATE_LIGHT }));
     while (linha.length < 3) linha.push({ texto: "", bg: C_SLATE_LIGHT });
     linhas.push(linha);
   }
@@ -171,10 +208,11 @@ function buildTimeline(data: ParadaCompleta): string {
   return out;
 }
 
-function buildServicos(data: ParadaCompleta): string {
+async function buildServicos(data: ParadaCompleta, origin: string): Promise<string> {
   const servicos = servicosComFoto(data.servicos);
   let out = "";
-  servicos.forEach((servico, i) => {
+  for (let i = 0; i < servicos.length; i++) {
+    const servico = servicos[i];
     out += eyebrow(`Serviços Executados · ${i + 1}/${servicos.length}`);
     out += para(servico.titulo, { bold: true, color: C_INK, size: 15, font: 0 }, { spaceAfter: 100 });
 
@@ -189,7 +227,7 @@ function buildServicos(data: ParadaCompleta): string {
     const linhas: Celula[][] = [];
     for (let j = 0; j < meta.length; j += 2) {
       const par = meta.slice(j, j + 2);
-      linhas.push(par.map(([label, valor]) => ({ texto: `${label.toUpperCase()}\\line ${valor}`, run: { size: 10, bold: true, color: C_INK, font: 1 }, bg: C_SLATE_LIGHT })));
+      linhas.push(par.map(([label, valor]) => ({ texto: `${label.toUpperCase()}\n${valor}`, run: { size: 10, bold: true, color: C_INK, font: 1 }, bg: C_SLATE_LIGHT })));
     }
     out += tabela(linhas, [0.5, 0.5]);
 
@@ -202,8 +240,26 @@ function buildServicos(data: ParadaCompleta): string {
       out += para(label, { bold: true, color: C_BRAND, size: 8, font: 1, caps: true }, { spaceBefore: 120, spaceAfter: 20 });
       out += para(valor, { color: C_SLATE, size: 10, font: 1 }, { spaceAfter: 100 });
     });
+
+    const fotosServico: Array<{ url: string; legenda: string }> = [
+      ...(servico.fotoAntes && servico.fotoAntes !== NO_PHOTO_PLACEHOLDER ? [{ url: servico.fotoAntes, legenda: "Antes" }] : []),
+      ...(servico.fotoDurante ? [{ url: servico.fotoDurante, legenda: "Durante" }] : []),
+      ...(servico.fotoDepois && servico.fotoDepois !== NO_PHOTO_PLACEHOLDER ? [{ url: servico.fotoDepois, legenda: "Depois" }] : []),
+    ];
+    if (fotosServico.length > 0) {
+      const celulas: Celula[] = [];
+      for (const foto of fotosServico) {
+        const pict = await fetchImagemRtf(foto.url, origin);
+        if (pict) celulas.push({ texto: "", pict, legenda: fotosServico.length > 1 ? foto.legenda : undefined });
+      }
+      if (celulas.length > 0) {
+        const largura = 1 / celulas.length;
+        out += tabela([celulas], celulas.map(() => largura));
+      }
+    }
+
     if (i < servicos.length - 1) out += pageBreak();
-  });
+  }
   return out;
 }
 
@@ -271,7 +327,7 @@ function buildResultado(data: ParadaCompleta): string {
   const linhas: Celula[][] = [];
   for (let i = 0; i < metricas.length; i += 2) {
     const par = metricas.slice(i, i + 2);
-    linhas.push(par.map(([label, valor]) => ({ texto: `${valor}\\line ${label}`, run: { bold: true, size: 14, color: C_INK, font: 0 }, bg: C_SLATE_LIGHT })));
+    linhas.push(par.map(([label, valor]) => ({ texto: `${valor}\n${label}`, run: { bold: true, size: 14, color: C_INK, font: 0 }, bg: C_SLATE_LIGHT })));
   }
   out += tabela(linhas, [0.5, 0.5]);
 
@@ -284,7 +340,7 @@ function buildResultado(data: ParadaCompleta): string {
   return out;
 }
 
-function buildRtf(data: ParadaCompleta): string {
+async function buildRtf(data: ParadaCompleta, origin: string): Promise<string> {
   const fontTable = "{\\fonttbl{\\f0\\froman Cambria;}{\\f1\\fswiss Calibri;}{\\f2\\fmodern Consolas;}}";
   const colorTable = "{\\colortbl;" + COLORS.slice(1).map((hex) => `\\red${parseInt(hex.slice(0, 2), 16)}\\green${parseInt(hex.slice(2, 4), 16)}\\blue${parseInt(hex.slice(4, 6), 16)};`).join("") + "}";
 
@@ -299,7 +355,7 @@ function buildRtf(data: ParadaCompleta): string {
   const servicos = servicosComFoto(data.servicos);
   if (servicos.length > 0) {
     body += pageBreak();
-    body += buildServicos(data);
+    body += await buildServicos(data, origin);
   }
   body += pageBreak();
   body += buildGraficos(data);
@@ -313,12 +369,12 @@ function buildRtf(data: ParadaCompleta): string {
   return `{\\rtf1\\ansi\\ansicpg1252\\deff1\\deflang1046\n${fontTable}\n${colorTable}\n\\margl1440\\margr1440\\margt1440\\margb1440\n${body}}`;
 }
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const data = await getParadaCompleta(id);
   if (!data) return new Response("Relatório não encontrado.", { status: 404 });
 
-  const rtf = buildRtf(data);
+  const rtf = await buildRtf(data, req.nextUrl.origin);
   const nomeArquivo = `relatorio-${id}.rtf`;
 
   return new Response(rtf, {

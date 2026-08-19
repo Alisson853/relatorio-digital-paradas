@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "10mb",
     },
   },
+  // sharp é um módulo nativo — empacotar ele no bundle da rota (em vez de deixar
+  // como dependência externa resolvida em runtime) quebra silenciosamente o
+  // export de RTF com fotos.
+  serverExternalPackages: ["sharp"],
   images: {
     remotePatterns: [
       {
