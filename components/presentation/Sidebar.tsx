@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Camera, FileDown, FileText, Maximize2, Presentation } from "lucide-react";
+import { ArrowLeft, Camera, FileDown, FileText, Maximize2, Presentation, ScrollText } from "lucide-react";
 import type { SectionMeta } from "@/lib/sections";
 import { cn } from "@/lib/utils";
 import { useEditorMode } from "@/lib/useEditorMode";
@@ -71,7 +71,7 @@ export function Sidebar({ sections, activeId, onNavigate, onPresent, titulo, par
               Captura Rápida (Celular)
             </Link>
           )}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => window.print()}
               className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-2 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
@@ -92,6 +92,13 @@ export function Sidebar({ sections, activeId, onNavigate, onPresent, titulo, par
             >
               <FileText size={14} />
               DOCX
+            </a>
+            <a
+              href={`/api/export/rtf/${paradaId}`}
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-2 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+            >
+              <ScrollText size={14} />
+              RTF
             </a>
           </div>
         </div>
@@ -152,6 +159,13 @@ export function Sidebar({ sections, activeId, onNavigate, onPresent, titulo, par
           >
             <FileText size={14} />
             DOCX
+          </a>
+          <a
+            href={`/api/export/rtf/${paradaId}`}
+            className="flex flex-none items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-500"
+          >
+            <ScrollText size={14} />
+            RTF
           </a>
         </div>
       </div>
