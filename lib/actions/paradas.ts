@@ -176,7 +176,11 @@ export async function clonarParada(idOrigem: string, senha: string): Promise<{ o
   };
 
   const tetoHorasClone = parseHoras(row.duracaoPlanejada) || undefined;
-  const kpisClonados = deriveKpis(servicosClonados, row.kpis.seguranca, row.kpis.osPlanejadas, 0, tetoHorasClone);
+  const kpisClonados = deriveKpis(servicosClonados, row.kpis.seguranca, {
+    totalPlanejado: row.kpis.osPlanejadas,
+    totalExecutadas: 0,
+    duracaoMaximaHoras: tetoHorasClone,
+  });
   const graficosClonados = deriveGraficos(
     servicosClonados,
     caminhoCriticoClonado,
@@ -361,7 +365,7 @@ export async function marcarStatusServico(
   // do número "OS Executadas" digitado manualmente (que fica desatualizado
   // assim que o trabalho passa a ser marcado em campo).
   const tetoHoras = parseHoras(row.duracaoRealizada) || parseHoras(row.duracaoPlanejada) || undefined;
-  const kpisAtualizados = deriveKpis(servicosAtualizados, row.kpis.seguranca, row.kpis.osPlanejadas, undefined, tetoHoras);
+  const kpisAtualizados = deriveKpis(servicosAtualizados, row.kpis.seguranca, { totalPlanejado: row.kpis.osPlanejadas, duracaoMaximaHoras: tetoHoras });
   const graficosAtualizados = deriveGraficos(servicosAtualizados, row.caminhoCritico, row.graficos.planejadoRealizado, kpisAtualizados.eficiencia, tetoHoras);
   const resultadoAtualizado = { ...row.resultadoFinal, eficiencia: kpisAtualizados.eficiencia, pendenciasAbertas: kpisAtualizados.pendencias };
 
@@ -422,7 +426,11 @@ export async function adicionarServicoRapido(paradaId: string, input: NovaOsInpu
   // OS Executadas é um número informado manualmente (não conta mais os serviços
   // detalhados um a um, já que só os "principais" com foto ganham entrada aqui) —
   // como essa OS nova nasce concluída, soma 1 ao total já registrado.
-  const kpisAtualizados = deriveKpis(servicosAtualizados, row.kpis.seguranca, row.kpis.osPlanejadas, row.kpis.osConcluidas + 1, tetoHoras);
+  const kpisAtualizados = deriveKpis(servicosAtualizados, row.kpis.seguranca, {
+    totalPlanejado: row.kpis.osPlanejadas,
+    totalExecutadas: row.kpis.osConcluidas + 1,
+    duracaoMaximaHoras: tetoHoras,
+  });
   const graficosAtualizados = deriveGraficos(servicosAtualizados, row.caminhoCritico, row.graficos.planejadoRealizado, kpisAtualizados.eficiencia, tetoHoras);
   const resultadoAtualizado = { ...row.resultadoFinal, eficiencia: kpisAtualizados.eficiencia, pendenciasAbertas: kpisAtualizados.pendencias };
 

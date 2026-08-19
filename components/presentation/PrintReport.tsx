@@ -13,6 +13,7 @@ import {
   Radar,
   Search,
   ShieldCheck,
+  Tag,
   Timer,
   Unlock,
   Users,
@@ -156,6 +157,8 @@ const KPI_ICONS: Array<{ key: keyof ParadaCompleta["kpis"]; label: string; icon:
   { key: "equipeInstrumentacao", label: "Instrumentista", icon: Radar },
   { key: "seguranca", label: "Segurança", icon: ShieldCheck, suffix: "%" },
   { key: "pendencias", label: "Pendências", icon: AlertTriangle },
+  { key: "etiquetaVermelha", label: "Etiqueta Vermelha", icon: Tag },
+  { key: "etiquetaAmarela", label: "Etiqueta Amarela", icon: Tag },
 ];
 
 function ResumoPage({ data }: { data: ParadaCompleta }) {

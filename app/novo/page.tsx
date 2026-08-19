@@ -132,6 +132,8 @@ interface DraftSnapshot {
   fotoMaquina: string;
   totalAtividades: string;
   osExecutadas: string;
+  etiquetaVermelhaPlan: string;
+  etiquetaAmarelaPlan: string;
   seguranca: number;
   servicos: ServicoRow[];
   pendencias: PendenciaRow[];
@@ -204,6 +206,8 @@ function NovaParadaForm() {
   const [fotoMaquina, setFotoMaquina] = useState("");
   const [totalAtividades, setTotalAtividades] = useState("");
   const [osExecutadas, setOsExecutadas] = useState("");
+  const [etiquetaVermelhaPlan, setEtiquetaVermelhaPlan] = useState("");
+  const [etiquetaAmarelaPlan, setEtiquetaAmarelaPlan] = useState("");
   const [seguranca, setSeguranca] = useState(100);
 
   const [servicos, setServicos] = useState<ServicoRow[]>([]);
@@ -268,6 +272,8 @@ function NovaParadaForm() {
       setFotoMaquina(existing.resumo.fotosMaquina?.[0] ?? "");
       setTotalAtividades(String(existing.kpis.osPlanejadas || ""));
       setOsExecutadas(String(existing.kpis.osConcluidas || ""));
+      setEtiquetaVermelhaPlan(String(existing.kpis.etiquetaVermelha || ""));
+      setEtiquetaAmarelaPlan(String(existing.kpis.etiquetaAmarela || ""));
       setSeguranca(existing.kpis.seguranca);
       setServicos(existing.servicos.map(servicoParaLinha));
       setPendencias(existing.pendencias.map((p) => ({ ...p })));
@@ -311,6 +317,8 @@ function NovaParadaForm() {
         fotoMaquina,
         totalAtividades,
         osExecutadas,
+        etiquetaVermelhaPlan,
+        etiquetaAmarelaPlan,
         seguranca,
         servicos,
         pendencias,
@@ -339,6 +347,8 @@ function NovaParadaForm() {
     fotoMaquina,
     totalAtividades,
     osExecutadas,
+    etiquetaVermelhaPlan,
+    etiquetaAmarelaPlan,
     seguranca,
     servicos,
     pendencias,
@@ -361,6 +371,8 @@ function NovaParadaForm() {
     setFotoMaquina(draftDisponivel.fotoMaquina);
     setTotalAtividades(draftDisponivel.totalAtividades);
     setOsExecutadas(draftDisponivel.osExecutadas);
+    setEtiquetaVermelhaPlan(draftDisponivel.etiquetaVermelhaPlan ?? "");
+    setEtiquetaAmarelaPlan(draftDisponivel.etiquetaAmarelaPlan ?? "");
     setSeguranca(draftDisponivel.seguranca);
     setServicos(draftDisponivel.servicos);
     setPendencias(draftDisponivel.pendencias);
@@ -385,11 +397,19 @@ function NovaParadaForm() {
     setImportResultado("");
     setImportando(true);
     try {
-      const { servicos: importados, avisos } = await parsePlanilhaServicos(file);
+      const { servicos: importados, avisos, totalProgramado, etiquetaVermelhaProgramada, etiquetaAmarelaProgramada } = await parsePlanilhaServicos(file);
       if (avisos.length) {
         setImportResultado(avisos.join(" "));
         return;
       }
+
+      // "OS Programadas" e as etiquetas sempre são sincronizadas com o painel
+      // da planilha (não só na primeira vez) — é exatamente o número que
+      // deve bater com o que está lá, diferente de responsável/equipe que
+      // só atualizam quando a OS já existe no relatório.
+      if (totalProgramado !== undefined) setTotalAtividades(String(totalProgramado));
+      if (etiquetaVermelhaProgramada !== undefined) setEtiquetaVermelhaPlan(String(etiquetaVermelhaProgramada));
+      if (etiquetaAmarelaProgramada !== undefined) setEtiquetaAmarelaPlan(String(etiquetaAmarelaProgramada));
 
       // Compara só os dígitos: "53.454" (digitado à mão) e "53454" (vindo puro
       // da célula) têm que casar mesmo com formatação de milhar diferente. Se
@@ -449,7 +469,7 @@ function NovaParadaForm() {
       }
 
       if (novasLinhas.length) setServicos((prev) => [...prev, ...novasLinhas]);
-      if (!totalAtividades.trim()) setTotalAtividades(String(servicos.length + novasLinhas.length));
+      if (totalProgramado === undefined) setTotalAtividades((prev) => prev.trim() || String(servicos.length + novasLinhas.length));
 
       const partes = [`${novasLinhas.length} serviço${novasLinhas.length === 1 ? "" : "s"} importado${novasLinhas.length === 1 ? "" : "s"}`];
       if (atualizadas.length > 0) partes.push(`${atualizadas.length} já existiam e tiveram responsável/equipe/tempo atualizados`);
@@ -518,7 +538,13 @@ function NovaParadaForm() {
     const timelineFinal: TimelineEvento[] = timeline;
 
     const duracaoMaximaHoras = parseHoras(resumo.duracaoRealizada) || parseHoras(resumo.duracaoPlanejada) || undefined;
-    const kpis = deriveKpis(servicosFinal, seguranca, Number(totalAtividades) || undefined, Number(osExecutadas) || undefined, duracaoMaximaHoras);
+    const kpis = deriveKpis(servicosFinal, seguranca, {
+      totalPlanejado: Number(totalAtividades) || undefined,
+      totalExecutadas: Number(osExecutadas) || undefined,
+      duracaoMaximaHoras,
+      totalEtiquetaVermelha: Number(etiquetaVermelhaPlan) || undefined,
+      totalEtiquetaAmarela: Number(etiquetaAmarelaPlan) || undefined,
+    });
     const graficos = deriveGraficos(servicosFinal, caminhoCriticoFinal, planejadoRealizado, kpis.eficiencia, duracaoMaximaHoras);
     const resultadoFinal = gerarResultadoFinal(resumo, kpis);
     if (resumoFinalCustom.trim()) resultadoFinal.resumo = resumoFinalCustom.trim();
@@ -633,9 +659,11 @@ function NovaParadaForm() {
           titulo="Serviços Executados (OS)"
           descricao="OS Programadas e Executadas definem a % de eficiência do relatório. Abaixo, detalhe só as principais — as que têm foto."
         >
-          <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <TextField label="OS Programadas" type="number" value={totalAtividades} onChange={setTotalAtividades} placeholder="Ex: 45" />
             <TextField label="OS Executadas" type="number" value={osExecutadas} onChange={setOsExecutadas} placeholder="Ex: 40" />
+            <TextField label="Etiqueta Vermelha" type="number" value={etiquetaVermelhaPlan} onChange={setEtiquetaVermelhaPlan} placeholder="Ex: 9" />
+            <TextField label="Etiqueta Amarela" type="number" value={etiquetaAmarelaPlan} onChange={setEtiquetaAmarelaPlan} placeholder="Ex: 1" />
           </div>
           <div className="mb-5">
             <PhotoUploadField label="Foto da Máquina (capa e card do dashboard)" value={fotoMaquina} onChange={setFotoMaquina} className="sm:max-w-xs" />

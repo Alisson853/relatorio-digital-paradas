@@ -345,6 +345,8 @@ function kpisMp09(): Kpis {
     equipeInstrumentacao: 3,
     seguranca: 100,
     pendencias: 9,
+    etiquetaVermelha: 0,
+    etiquetaAmarela: 0,
   };
 }
 

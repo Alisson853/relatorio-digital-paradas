@@ -15,6 +15,9 @@ export interface ServicoImportado {
 export interface ResultadoImportacao {
   servicos: ServicoImportado[];
   avisos: string[];
+  totalProgramado?: number;
+  etiquetaVermelhaProgramada?: number;
+  etiquetaAmarelaProgramada?: number;
 }
 
 function normalizar(texto: unknown): string {
@@ -143,6 +146,34 @@ function minutosParaTempo(totalMinutos: number): string {
   return minutos === 0 ? `${horas}h` : `${horas}h${minutos}min`;
 }
 
+// O painel no topo da planilha (antes da tabela de OS) traz os totais
+// programados pra semana — bate esses números com o relatório em vez de
+// deixar "OS Planejadas" preso no que foi digitado manualmente uma vez.
+function extrairNumeroDaLinha(linha: unknown[], rotulo: string): number | undefined {
+  const idxRotulo = linha.findIndex((c) => normalizar(c).includes(rotulo));
+  if (idxRotulo === -1) return undefined;
+  for (let i = idxRotulo + 1; i < linha.length; i++) {
+    const valor = linha[i];
+    if (typeof valor === "number") return valor;
+  }
+  return undefined;
+}
+
+function extrairResumoPainel(linhas: unknown[][], ateLinha: number) {
+  let totalProgramado: number | undefined;
+  let etiquetaVermelhaProgramada: number | undefined;
+  let etiquetaAmarelaProgramada: number | undefined;
+
+  for (let i = 0; i < ateLinha; i++) {
+    const linha = linhas[i] ?? [];
+    totalProgramado ??= extrairNumeroDaLinha(linha, "TRABALHOS PROGRAMADOS");
+    etiquetaVermelhaProgramada ??= extrairNumeroDaLinha(linha, "ETIQUETA VERMELHA");
+    etiquetaAmarelaProgramada ??= extrairNumeroDaLinha(linha, "ETIQUETA AMARELA");
+  }
+
+  return { totalProgramado, etiquetaVermelhaProgramada, etiquetaAmarelaProgramada };
+}
+
 export async function parsePlanilhaServicos(file: File): Promise<ResultadoImportacao> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
@@ -220,5 +251,7 @@ export async function parsePlanilhaServicos(file: File): Promise<ResultadoImport
   const servicos = Array.from(porOs.values());
   if (servicos.length === 0) avisos.push("Nenhuma linha de serviço foi encontrada abaixo do cabeçalho.");
 
-  return { servicos, avisos };
+  const resumoPainel = extrairResumoPainel(linhas, idxCabecalho);
+
+  return { servicos, avisos, ...resumoPainel };
 }

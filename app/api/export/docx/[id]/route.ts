@@ -273,6 +273,8 @@ function buildResumo(data: ParadaCompleta): (Paragraph | Table)[] {
     ["Instrumentista", String(kpis.equipeInstrumentacao)],
     ["Segurança", `${kpis.seguranca}%`],
     ["Pendências", String(kpis.pendencias)],
+    ["Etiqueta Vermelha", String(kpis.etiquetaVermelha)],
+    ["Etiqueta Amarela", String(kpis.etiquetaAmarela)],
   ];
   const rows = chunk(cards, 3).map((tri) => new TableRow({ children: [...tri.map(([l, v]) => kpiCell(l, v)), ...Array(3 - tri.length).fill(null).map(() => new TableCell({ width: { size: 33, type: WidthType.PERCENTAGE }, borders: noBorders, children: [new Paragraph("")] }))] }));
 

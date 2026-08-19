@@ -26,6 +26,8 @@ export interface Kpis {
   equipeInstrumentacao: number;
   seguranca: number;
   pendencias: number;
+  etiquetaVermelha: number;
+  etiquetaAmarela: number;
 }
 
 export interface TimelineEvento {

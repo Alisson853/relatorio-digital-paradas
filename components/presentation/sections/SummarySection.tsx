@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, ClipboardList, Gauge, HardHat, Radar, ShieldCheck, Timer, Users } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardList, Gauge, HardHat, Radar, ShieldCheck, Tag, Timer, Users } from "lucide-react";
 import type { Kpis } from "@/lib/types";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -16,6 +16,8 @@ export function SummarySection({ kpis }: { kpis: Kpis }) {
     { label: "Instrumentista", value: kpis.equipeInstrumentacao, icon: Radar, accent: "brand" as const },
     { label: "Segurança", value: kpis.seguranca, suffix: "%", icon: ShieldCheck, accent: "success" as const },
     { label: "Pendências", value: kpis.pendencias, icon: AlertTriangle, accent: kpis.pendencias > 0 ? "warning" as const : "success" as const },
+    { label: "Etiqueta Vermelha", value: kpis.etiquetaVermelha, icon: Tag, accent: "danger" as const },
+    { label: "Etiqueta Amarela", value: kpis.etiquetaAmarela, icon: Tag, accent: "warning" as const },
   ];
 
   return (

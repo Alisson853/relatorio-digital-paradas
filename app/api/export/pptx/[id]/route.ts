@@ -183,16 +183,21 @@ function addResumo(pres: PptxGenJS, data: ParadaCompleta) {
     ["Instrumentista", String(kpis.equipeInstrumentacao)],
     ["Segurança", `${kpis.seguranca}%`],
     ["Pendências", String(kpis.pendencias)],
+    ["Etiqueta Vermelha", String(kpis.etiquetaVermelha)],
+    ["Etiqueta Amarela", String(kpis.etiquetaAmarela)],
   ];
+  const colunas = 6;
+  const cardW = 1.9;
+  const stepX = 2.05;
   cards.forEach(([label, value], i) => {
-    const col = i % 5;
-    const row = Math.floor(i / 5);
-    const x = 0.55 + col * 2.42;
+    const col = i % colunas;
+    const row = Math.floor(i / colunas);
+    const x = 0.55 + col * stepX;
     const y = 1.65 + row * 2.35;
-    slide.addShape(pres.ShapeType.roundRect, { x, y, w: 2.24, h: 2.05, rectRadius: 0.08, fill: { color: SLATE_LIGHT }, line: { color: BORDER, width: 1 } });
+    slide.addShape(pres.ShapeType.roundRect, { x, y, w: cardW, h: 2.05, rectRadius: 0.08, fill: { color: SLATE_LIGHT }, line: { color: BORDER, width: 1 } });
     slide.addShape(pres.ShapeType.roundRect, { x: x + 0.16, y: y + 0.18, w: 0.42, h: 0.42, rectRadius: 0.08, fill: { color: BRAND, transparency: 87 } });
-    slide.addText(value, { x, y: y + 0.7, w: 2.24, h: 0.75, align: "center", fontSize: 28, bold: true, color: INK, fontFace: HEAD });
-    slide.addText(label, { x, y: y + 1.48, w: 2.24, h: 0.5, align: "center", fontSize: 10, color: SLATE, fontFace: BODY });
+    slide.addText(value, { x, y: y + 0.7, w: cardW, h: 0.75, align: "center", fontSize: 26, bold: true, color: INK, fontFace: HEAD });
+    slide.addText(label, { x, y: y + 1.48, w: cardW, h: 0.5, align: "center", fontSize: 9.5, color: SLATE, fontFace: BODY });
   });
 }
 

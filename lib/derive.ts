@@ -42,13 +42,16 @@ export function parseHoras(tempo: string): number {
   return 0;
 }
 
-export function deriveKpis(
-  servicos: Servico[],
-  seguranca: number,
-  totalPlanejado?: number,
-  totalExecutadas?: number,
-  duracaoMaximaHoras?: number
-): Kpis {
+export interface DeriveKpisOpcoes {
+  totalPlanejado?: number;
+  totalExecutadas?: number;
+  duracaoMaximaHoras?: number;
+  totalEtiquetaVermelha?: number;
+  totalEtiquetaAmarela?: number;
+}
+
+export function deriveKpis(servicos: Servico[], seguranca: number, opcoes: DeriveKpisOpcoes = {}): Kpis {
+  const { totalPlanejado, totalExecutadas, duracaoMaximaHoras, totalEtiquetaVermelha, totalEtiquetaAmarela } = opcoes;
   // OS Programadas e OS Executadas são números informados à parte — nem toda
   // atividade real vira uma OS detalhada no formulário (só as que têm foto e
   // valem a pena documentar como "principais"). Só cai na contagem de OS com
@@ -64,6 +67,13 @@ export function deriveKpis(
   const equipeEletrica = servicos.filter((s) => s.equipe === "Elétrica").length;
   const equipeMecanica = servicos.filter((s) => s.equipe === "Mecânica").length;
   const equipeInstrumentacao = servicos.filter((s) => s.equipe === "Instrumentação").length;
+  // Etiqueta Vermelha/Amarela: se a planilha informou o total programado, usa
+  // esse número (bate com o painel dela) — senão conta pela categoria das OS
+  // já documentadas no relatório.
+  const etiquetaVermelha =
+    totalEtiquetaVermelha && totalEtiquetaVermelha > 0 ? totalEtiquetaVermelha : servicos.filter((s) => s.categoria === "Etiqueta Vermelha").length;
+  const etiquetaAmarela =
+    totalEtiquetaAmarela && totalEtiquetaAmarela > 0 ? totalEtiquetaAmarela : servicos.filter((s) => s.categoria === "Etiqueta Amarela").length;
 
   return {
     osPlanejadas,
@@ -72,6 +82,8 @@ export function deriveKpis(
     horasTrabalhadas,
     equipeEletrica,
     equipeMecanica,
+    etiquetaVermelha,
+    etiquetaAmarela,
     equipeInstrumentacao,
     seguranca,
     pendencias: Math.max(0, osPlanejadas - osConcluidas),
