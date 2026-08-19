@@ -18,35 +18,48 @@ import { CriticalPathSection } from "./sections/CriticalPathSection";
 import { ResultSection } from "./sections/ResultSection";
 import { PrintReport } from "./PrintReport";
 
-// Mesma cor de fundo de cada seção — evita "bordas" visíveis quando o conteúdo é reduzido para caber na tela.
-const SECTION_BG = [
-  "bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800", // capa
-  "bg-slate-50", // resumo
-  "bg-white", // timeline
-  "bg-slate-50", // servicos
-  "bg-white", // fotos
-  "bg-slate-50", // graficos
-  "bg-white", // caminho-critico
-  "bg-gradient-to-br from-brand-950 via-brand-900 to-slate-950", // resultado
-];
-
 export function PresentationView({ data }: { data: ParadaCompleta }) {
   const [presentationMode, setPresentationMode] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const sectionNodes = useMemo(
-    () => [
-      <CoverSection key="capa" resumo={data.resumo} />,
-      <SummarySection key="resumo" kpis={data.kpis} />,
-      <TimelineSection key="timeline" timeline={data.timeline} />,
-      <ServicesSection key="servicos" servicos={data.servicos} />,
-      <GallerySection key="fotos" fotos={data.fotos} />,
-      <ChartsSection key="graficos" graficos={data.graficos} />,
-      <CriticalPathSection key="caminho-critico" itens={data.caminhoCritico} />,
-      <ResultSection key="resultado" resultado={data.resultadoFinal} pendencias={data.pendencias} />,
-    ],
-    [data]
+  // Cada seção só entra na apresentação se tiver conteúdo — evita ficar
+  // exibindo um título vazio (ex: "Linha do Tempo" sem nenhum evento).
+  const secoesAtivas = useMemo(() => {
+    const candidatas: Array<{ id: string; node: React.ReactNode; bg: string } | false> = [
+      {
+        id: "capa",
+        node: <CoverSection key="capa" resumo={data.resumo} />,
+        bg: "bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800",
+      },
+      { id: "resumo", node: <SummarySection key="resumo" kpis={data.kpis} />, bg: "bg-slate-50" },
+      data.timeline.length > 0 && {
+        id: "timeline",
+        node: <TimelineSection key="timeline" timeline={data.timeline} />,
+        bg: "bg-white",
+      },
+      { id: "servicos", node: <ServicesSection key="servicos" servicos={data.servicos} />, bg: "bg-slate-50" },
+      { id: "fotos", node: <GallerySection key="fotos" fotos={data.fotos} />, bg: "bg-white" },
+      { id: "graficos", node: <ChartsSection key="graficos" graficos={data.graficos} />, bg: "bg-slate-50" },
+      data.caminhoCritico.length > 0 && {
+        id: "caminho-critico",
+        node: <CriticalPathSection key="caminho-critico" itens={data.caminhoCritico} />,
+        bg: "bg-white",
+      },
+      {
+        id: "resultado",
+        node: <ResultSection key="resultado" resultado={data.resultadoFinal} pendencias={data.pendencias} />,
+        bg: "bg-gradient-to-br from-brand-950 via-brand-900 to-slate-950",
+      },
+    ];
+    return candidatas.filter((s): s is { id: string; node: React.ReactNode; bg: string } => !!s);
+  }, [data]);
+
+  const sections = useMemo(
+    () => SECTIONS.filter((meta) => secoesAtivas.some((s) => s.id === meta.id)),
+    [secoesAtivas]
   );
+  const sectionNodes = useMemo(() => secoesAtivas.map((s) => s.node), [secoesAtivas]);
+  const SECTION_BG = useMemo(() => secoesAtivas.map((s) => s.bg), [secoesAtivas]);
 
   useEffect(() => {
     if (presentationMode) return;
@@ -54,29 +67,29 @@ export function PresentationView({ data }: { data: ParadaCompleta }) {
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            const idx = SECTIONS.findIndex((s) => s.id === entry.target.id);
+            const idx = sections.findIndex((s) => s.id === entry.target.id);
             if (idx !== -1) setActiveIndex(idx);
           }
         });
       },
       { threshold: 0.45 }
     );
-    SECTIONS.forEach((s) => {
+    sections.forEach((s) => {
       const el = document.getElementById(s.id);
       if (el) observer.observe(el);
     });
     return () => observer.disconnect();
-  }, [presentationMode]);
+  }, [presentationMode, sections]);
 
   const goTo = useCallback(
     (idx: number) => {
-      const clamped = Math.max(0, Math.min(SECTIONS.length - 1, idx));
+      const clamped = Math.max(0, Math.min(sections.length - 1, idx));
       setActiveIndex(clamped);
       if (!presentationMode) {
-        document.getElementById(SECTIONS[clamped].id)?.scrollIntoView({ behavior: "smooth" });
+        document.getElementById(sections[clamped].id)?.scrollIntoView({ behavior: "smooth" });
       }
     },
-    [presentationMode]
+    [presentationMode, sections]
   );
 
   const enterPresentation = useCallback(async () => {
@@ -124,7 +137,7 @@ export function PresentationView({ data }: { data: ParadaCompleta }) {
       <div className={cn("fixed inset-0 z-50 overflow-hidden transition-colors duration-500 print:hidden", SECTION_BG[activeIndex])}>
         <AnimatePresence mode="wait">
           <motion.div
-            key={SECTIONS[activeIndex].id}
+            key={sections[activeIndex].id}
             initial={{ opacity: 0, scale: 1.015 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.985 }}
@@ -146,7 +159,7 @@ export function PresentationView({ data }: { data: ParadaCompleta }) {
               <ChevronLeft size={18} />
             </button>
             <div className="flex items-center gap-1.5">
-              {SECTIONS.map((s, i) => (
+              {sections.map((s, i) => (
                 <button
                   key={s.id}
                   onClick={() => goTo(i)}
@@ -157,7 +170,7 @@ export function PresentationView({ data }: { data: ParadaCompleta }) {
             </div>
             <button
               onClick={() => goTo(activeIndex + 1)}
-              disabled={activeIndex === SECTIONS.length - 1}
+              disabled={activeIndex === sections.length - 1}
               className="text-white transition-opacity disabled:opacity-25"
               aria-label="Próxima seção"
             >
@@ -180,8 +193,9 @@ export function PresentationView({ data }: { data: ParadaCompleta }) {
     <div className="min-h-screen bg-white">
       <div className="print:hidden">
         <Sidebar
-          activeId={SECTIONS[activeIndex].id}
-          onNavigate={(id) => goTo(SECTIONS.findIndex((s) => s.id === id))}
+          sections={sections}
+          activeId={sections[activeIndex].id}
+          onNavigate={(id) => goTo(sections.findIndex((s) => s.id === id))}
           onPresent={enterPresentation}
           titulo={data.resumo.nome}
           paradaId={data.resumo.id}

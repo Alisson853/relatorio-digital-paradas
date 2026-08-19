@@ -489,13 +489,13 @@ export function PrintReport({ data }: { data: ParadaCompleta }) {
     <div className="hidden print:block">
       <CapaPage resumo={data.resumo} />
       <ResumoPage data={data} />
-      <TimelinePage data={data} />
+      {data.timeline.length > 0 && <TimelinePage data={data} />}
       {servicosComFoto(data.servicos).map((s, i) => (
         <ServicoPage key={s.id} data={data} servico={s} indice={i + 1} total={servicosComFoto(data.servicos).length} />
       ))}
       <GaleriaPage data={data} fotos={data.fotos} />
       <GraficosPage data={data} />
-      <CaminhoCriticoPage data={data} />
+      {data.caminhoCritico.length > 0 && <CaminhoCriticoPage data={data} />}
       <ResultadoPage data={data} />
     </div>
   );

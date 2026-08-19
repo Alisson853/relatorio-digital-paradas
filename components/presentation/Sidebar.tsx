@@ -3,11 +3,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Camera, FileDown, FileText, Maximize2, Presentation } from "lucide-react";
-import { SECTIONS } from "@/lib/sections";
+import type { SectionMeta } from "@/lib/sections";
 import { cn } from "@/lib/utils";
 import { useEditorMode } from "@/lib/useEditorMode";
 
 interface SidebarProps {
+  sections: SectionMeta[];
   activeId: string;
   onNavigate: (id: string) => void;
   onPresent: () => void;
@@ -15,7 +16,7 @@ interface SidebarProps {
   paradaId: string;
 }
 
-export function Sidebar({ activeId, onNavigate, onPresent, titulo, paradaId }: SidebarProps) {
+export function Sidebar({ sections, activeId, onNavigate, onPresent, titulo, paradaId }: SidebarProps) {
   const { isEditor } = useEditorMode();
   return (
     <>
@@ -34,7 +35,7 @@ export function Sidebar({ activeId, onNavigate, onPresent, titulo, paradaId }: S
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-5">
-          {SECTIONS.map((section) => {
+          {sections.map((section) => {
             const Icon = section.icon;
             const active = section.id === activeId;
             return (
@@ -98,7 +99,7 @@ export function Sidebar({ activeId, onNavigate, onPresent, titulo, paradaId }: S
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden">
         <div className="no-scrollbar flex items-center gap-1 overflow-x-auto px-3 py-2.5">
-          {SECTIONS.map((section) => {
+          {sections.map((section) => {
             const Icon = section.icon;
             const active = section.id === activeId;
             return (
