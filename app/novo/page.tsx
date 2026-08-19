@@ -392,11 +392,18 @@ function NovaParadaForm() {
       }
 
       // Compara só os dígitos: "53.454" (digitado à mão) e "53454" (vindo puro
-      // da célula) têm que casar mesmo com formatação de milhar diferente.
+      // da célula) têm que casar mesmo com formatação de milhar diferente. Se
+      // duas linhas caírem na mesma chave (ex: duplicata deixada por uma
+      // reimportação antiga), a que já tem foto sempre vence — é a real.
       const chaveOS = (numero: string) => numero.replace(/\D/g, "");
-      const porOsExistente = new Map(
-        servicos.filter((s) => s.numeroOS && s.numeroOS !== "Oportunidade").map((s) => [chaveOS(s.numeroOS), s])
-      );
+      const porOsExistente = new Map<string, ServicoRow>();
+      for (const s of servicos) {
+        if (!s.numeroOS || s.numeroOS === "Oportunidade") continue;
+        const chave = chaveOS(s.numeroOS);
+        const atual = porOsExistente.get(chave);
+        const atualTemFoto = !!atual && (!!atual.fotoAntes || !!atual.fotoDepois);
+        if (!atual || !atualTemFoto) porOsExistente.set(chave, s);
+      }
       const novasLinhas: ServicoRow[] = [];
       // OS que já existem no relatório (ex: adicionadas antes de a planilha ter
       // essa linha, ou reimportação depois de alguém corrigir a planilha) têm
