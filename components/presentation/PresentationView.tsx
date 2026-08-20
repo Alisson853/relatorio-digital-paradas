@@ -18,7 +18,7 @@ import { CriticalPathSection } from "./sections/CriticalPathSection";
 import { ResultSection } from "./sections/ResultSection";
 import { PrintReport } from "./PrintReport";
 
-export function PresentationView({ data }: { data: ParadaCompleta }) {
+export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qrDataUrl?: string }) {
   const [presentationMode, setPresentationMode] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -202,7 +202,7 @@ export function PresentationView({ data }: { data: ParadaCompleta }) {
         />
         <main className="presentation-scroll pb-20 lg:pb-0 lg:pl-72">{sectionNodes}</main>
       </div>
-      <PrintReport data={data} />
+      <PrintReport data={data} qrDataUrl={qrDataUrl} />
     </div>
   );
 }

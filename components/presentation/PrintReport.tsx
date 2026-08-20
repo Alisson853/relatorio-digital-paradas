@@ -100,7 +100,7 @@ function DataField({ label, value, mono = true, dark }: { label: string; value: 
   );
 }
 
-function CapaPage({ resumo }: { resumo: ParadaCompleta["resumo"] }) {
+function CapaPage({ resumo, qrDataUrl }: { resumo: ParadaCompleta["resumo"]; qrDataUrl?: string }) {
   const campos = [
     { label: "Data da Parada", value: formatDate(resumo.data) },
     { label: "Tempo Planejado", value: resumo.duracaoPlanejada },
@@ -110,8 +110,19 @@ function CapaPage({ resumo }: { resumo: ParadaCompleta["resumo"] }) {
 
   return (
     <PrintPage dark className="bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800 text-white">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/santher-logo-branco.png" alt="Santher" className="mb-14 h-10 w-auto" />
+      <div className="mb-14 flex items-start justify-between">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/santher-logo-branco.png" alt="Santher" className="h-10 w-auto" />
+        {qrDataUrl && (
+          <div className="flex items-center gap-2.5 rounded-md border border-white/15 bg-white/[0.04] px-3 py-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={qrDataUrl} alt="QR code do relatório digital" className="h-14 w-14 rounded-sm bg-white p-1" />
+            <p className="max-w-[7rem] font-mono text-[9px] font-medium uppercase leading-snug tracking-wide text-brand-200">
+              Aponte a câmera para ver o relatório digital ao vivo
+            </p>
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-[1.1fr_1fr] items-center gap-14">
         <div>
@@ -484,10 +495,10 @@ function ResultadoPage({ data }: { data: ParadaCompleta }) {
   );
 }
 
-export function PrintReport({ data }: { data: ParadaCompleta }) {
+export function PrintReport({ data, qrDataUrl }: { data: ParadaCompleta; qrDataUrl?: string }) {
   return (
     <div className="hidden print:block">
-      <CapaPage resumo={data.resumo} />
+      <CapaPage resumo={data.resumo} qrDataUrl={qrDataUrl} />
       <ResumoPage data={data} />
       {data.timeline.length > 0 && <TimelinePage data={data} />}
       {servicosComFoto(data.servicos).map((s, i) => (

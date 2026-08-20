@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { getParadaCompleta } from "@/lib/actions/paradas";
 import { PresentationView } from "@/components/presentation/PresentationView";
+import { gerarQrCodeDataUrl, urlDaParada } from "@/lib/qrcode";
 
 export const dynamic = "force-dynamic";
 
@@ -25,5 +26,7 @@ export default async function ParadaPage({ params }: { params: Promise<{ id: str
     );
   }
 
-  return <PresentationView data={data} />;
+  const qrDataUrl = await gerarQrCodeDataUrl(urlDaParada(id));
+
+  return <PresentationView data={data} qrDataUrl={qrDataUrl} />;
 }

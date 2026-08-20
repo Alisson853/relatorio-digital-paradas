@@ -4,6 +4,7 @@ import imageSize from "image-size";
 import { getParadaCompleta } from "@/lib/actions/paradas";
 import { servicosComFoto } from "@/lib/derive";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
+import { gerarQrCodeBuffer, urlDaParada } from "@/lib/qrcode";
 import { formatDate, statusLabel } from "@/lib/utils";
 import type { ParadaCompleta, Servico } from "@/lib/types";
 
@@ -91,12 +92,25 @@ interface ParaOpts {
   borderBottom?: boolean;
 }
 
-function para(texto: string, runOpts: RunOpts = {}, paraOpts: ParaOpts = {}): string {
+// Monta o preâmbulo \pard de um parágrafo, sem tocar no conteúdo — usado
+// tanto por para() (que escapa o texto) quanto por paraRaw() (que recebe
+// markup RTF já pronto, ex: um campo HYPERLINK, e não pode ser escapado de novo).
+function pardPreambulo(paraOpts: ParaOpts): string {
   const align = paraOpts.align === "c" ? "\\qc" : paraOpts.align === "r" ? "\\qr" : "\\ql";
   const sb = paraOpts.spaceBefore !== undefined ? `\\sb${paraOpts.spaceBefore}` : "";
   const sa = paraOpts.spaceAfter !== undefined ? `\\sa${paraOpts.spaceAfter}` : "\\sa120";
   const border = paraOpts.borderBottom ? `\\brdrb\\brdrs\\brdrw10\\brsp40\\brdrcf${C_BORDER}` : "";
-  return `\\pard${align}${sb}${sa}${border} ${run(texto, runOpts)}\\par\n`;
+  return `\\pard${align}${sb}${sa}${border}`;
+}
+
+function para(texto: string, runOpts: RunOpts = {}, paraOpts: ParaOpts = {}): string {
+  return `${pardPreambulo(paraOpts)} ${run(texto, runOpts)}\\par\n`;
+}
+
+// Pra conteúdo que já é markup RTF pronto (ex: um campo HYPERLINK) — nunca
+// passar texto solto aqui, ele não passa pelo esc().
+function paraRaw(rtf: string, paraOpts: ParaOpts = {}): string {
+  return `${pardPreambulo(paraOpts)} ${rtf}\\par\n`;
 }
 
 interface Celula {
@@ -146,9 +160,29 @@ function pageBreak(): string {
   return "\\page\n";
 }
 
-function buildCapa(data: ParadaCompleta): string {
+// Link clicável de verdade (campo HYPERLINK do RTF) — útil quando o sistema
+// que recebe o RTF (Mantec) descarta imagens e só o QR não bastaria.
+function hyperlink(url: string, texto: string): string {
+  return `{\\field{\\*\\fldinst HYPERLINK "${url}"}{\\fldrslt ${run(texto, { color: C_BRAND, size: 8, font: 2 })}}}`;
+}
+
+async function buildCapa(data: ParadaCompleta): Promise<string> {
   const { resumo } = data;
   let out = "";
+
+  const url = urlDaParada(resumo.id);
+  const qr = await gerarQrCodeBuffer(url, 180).catch(() => null);
+  if (qr) {
+    const dims = imageSize(qr);
+    if (dims.width && dims.height) {
+      out += tabela(
+        [[{ texto: "", pict: { hex: qr.toString("hex"), width: dims.width, height: dims.height } }]],
+        [1]
+      );
+      out += paraRaw(`${run("Relatório digital ao vivo: ", { size: 8, color: C_SLATE, font: 1 })}${hyperlink(url, url)}`, { align: "c", spaceAfter: 200 });
+    }
+  }
+
   out += para(`${resumo.area.toUpperCase()} · RELATÓRIO DIGITAL`, { bold: true, color: C_BRAND, size: 9, font: 1, caps: true }, { spaceBefore: 200, spaceAfter: 40 });
   out += para(resumo.nome, { bold: true, color: C_NAVY, size: 28, font: 0 }, { spaceAfter: 40 });
   out += para(resumo.maquina, { italic: true, color: C_BRAND, size: 13, font: 1 }, { spaceAfter: 200 });
@@ -345,7 +379,7 @@ async function buildRtf(data: ParadaCompleta, origin: string): Promise<string> {
   const colorTable = "{\\colortbl;" + COLORS.slice(1).map((hex) => `\\red${parseInt(hex.slice(0, 2), 16)}\\green${parseInt(hex.slice(2, 4), 16)}\\blue${parseInt(hex.slice(4, 6), 16)};`).join("") + "}";
 
   let body = "";
-  body += buildCapa(data);
+  body += await buildCapa(data);
   body += pageBreak();
   body += buildResumo(data);
   if (data.timeline.length > 0) {
