@@ -4,7 +4,7 @@ import { del, put } from "@vercel/blob";
 import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { paradas } from "@/lib/db/schema";
-import type { CaminhoCriticoItem, Equipe, ParadaCompleta, ParadaResumo, Servico, TimelineEvento } from "@/lib/types";
+import type { CaminhoCriticoItem, Equipe, Kpis, ParadaCompleta, ParadaResumo, Servico, TimelineEvento } from "@/lib/types";
 import { deriveFotoCapa, deriveFotos, deriveGraficos, deriveKpis, parseHoras, textoExecutadoPadrao, textoResultadoPadrao } from "@/lib/derive";
 import { gerarResultadoFinal } from "@/lib/mock-data";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
@@ -36,7 +36,10 @@ function rowParaCompleta(row: typeof paradas.$inferSelect): ParadaCompleta {
     fotos: deriveFotos(row.servicos),
     caminhoCritico: row.caminhoCritico,
     pendencias: row.pendencias,
-    graficos: row.graficos,
+    // Relatórios salvos antes de um campo novo existir (ex: horasPorServico)
+    // não têm ele no JSON persistido — sem esse fallback, a tela quebra ao
+    // tentar .map() em undefined assim que um campo novo é adicionado ao tipo.
+    graficos: { ...row.graficos, horasPorServico: row.graficos.horasPorServico ?? [] },
     resultadoFinal: row.resultadoFinal,
   };
 }
@@ -49,6 +52,19 @@ export async function listParadasResumo(): Promise<ParadaResumo[]> {
 export async function getParadaCompleta(id: string): Promise<ParadaCompleta | null> {
   const [row] = await getDb().select().from(paradas).where(eq(paradas.id, id)).limit(1);
   return row ? rowParaCompleta(row) : null;
+}
+
+export interface ParadaHistoricoItem {
+  resumo: ParadaResumo;
+  kpis: Kpis;
+}
+
+// Uma linha por relatório com só o que a página de Histórico precisa —
+// evita carregar servicos/fotos/graficos inteiros de cada parada só pra
+// comparar KPIs entre elas.
+export async function listParadasHistorico(): Promise<ParadaHistoricoItem[]> {
+  const rows = await getDb().select().from(paradas).orderBy(asc(paradas.data));
+  return rows.map((row) => ({ resumo: rowParaResumo(row), kpis: row.kpis }));
 }
 
 export async function getParadaAtualizadaEm(id: string): Promise<number | null> {

@@ -101,6 +101,11 @@ export interface HorasPorSetorDado {
   horas: number;
 }
 
+export interface HorasPorServicoDado {
+  servico: string;
+  horas: number;
+}
+
 export interface DistribuicaoServicoDado {
   categoria: string;
   valor: number;
@@ -121,6 +126,7 @@ export interface PlanejadoRealizadoDado {
 export interface GraficosData {
   osPorEquipe: OsPorEquipeDado[];
   horasPorSetor: HorasPorSetorDado[];
+  horasPorServico: HorasPorServicoDado[];
   distribuicaoServicos: DistribuicaoServicoDado[];
   paretoAtrasos: ParetoAtrasoDado[];
   planejadoRealizado: PlanejadoRealizadoDado[];

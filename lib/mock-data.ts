@@ -362,6 +362,10 @@ function graficosMp09(kpis: Kpis): GraficosData {
       { setor: "Elétrica", horas: 9 },
       { setor: "Instrumentação", horas: 8 },
     ],
+    horasPorServico: [
+      { servico: "Substituição do Rolamento do Motor", horas: 4 },
+      { servico: "Revisão do Painel Elétrico", horas: 3 },
+    ],
     distribuicaoServicos: [
       { categoria: "Corretiva", valor: 6 },
       { categoria: "Preventiva", valor: 2 },

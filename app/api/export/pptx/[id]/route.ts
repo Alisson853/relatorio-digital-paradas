@@ -60,6 +60,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   await addServicos(pres, data, origin);
   await addGaleria(pres, data, origin);
   addGraficos(pres, data);
+  addGraficosServico(pres, data);
   addCaminhoCritico(pres, data);
   addResultado(pres, data);
 
@@ -324,6 +325,21 @@ function addGraficos(pres: PptxGenJS, data: ParadaCompleta) {
   slide.addShape(pres.ShapeType.roundRect, { x: 0.5, y: 4.75, w: 3.3, h: 2.0, rectRadius: 0.08, fill: { color: NAVY } });
   slide.addText("PERCENTUAL CONCLUÍDO", { x: 0.5, y: 4.95, w: 3.3, h: 0.3, align: "center", fontSize: 9, bold: true, color: BRAND_LIGHT, fontFace: BODY, charSpacing: 1 });
   slide.addText(`${graficos.percentualConcluido}%`, { x: 0.5, y: 5.3, w: 3.3, h: 1.1, align: "center", fontSize: 42, bold: true, color: WHITE, fontFace: HEAD });
+}
+
+function addGraficosServico(pres: PptxGenJS, data: ParadaCompleta) {
+  const { graficos } = data;
+  const slide = pres.addSlide({ masterName: "CONTENT" });
+  eyebrow(slide, "Indicadores Visuais");
+  pageTitle(slide, "Horas por Serviço");
+
+  const axisOpts = { catAxisLabelColor: SLATE, catAxisLabelFontSize: 9, valAxisLabelColor: SLATE, valAxisLabelFontSize: 9, valGridLine: { color: BORDER, size: 0.75 }, catGridLine: { style: "none" as const } };
+
+  slide.addChart(
+    pres.ChartType.bar,
+    [{ name: "Horas por Serviço", labels: graficos.horasPorServico.map((d) => d.servico), values: graficos.horasPorServico.map((d) => d.horas) }],
+    { x: 0.5, y: 1.55, w: 12.3, h: 5.5, showTitle: false, showValue: true, dataLabelFontSize: 9, barDir: "bar", chartColors: [BRAND_LIGHT], showLegend: false, ...axisOpts }
+  );
 }
 
 function addCaminhoCritico(pres: PptxGenJS, data: ParadaCompleta) {

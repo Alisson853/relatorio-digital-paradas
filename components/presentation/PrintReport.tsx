@@ -392,6 +392,27 @@ function GraficosPage({ data }: { data: ParadaCompleta }) {
   );
 }
 
+// Página própria (não entra no grid 2x2 acima) porque a lista pode ter até
+// 15 OS — misturado com os outros gráficos ficaria espremido ou cortado.
+function GraficosServicoPage({ data }: { data: ParadaCompleta }) {
+  const { graficos } = data;
+  const maxHorasServico = Math.max(1, ...graficos.horasPorServico.map((d) => d.horas));
+
+  return (
+    <PrintPage className="bg-slate-50">
+      <PageHeader eyebrow="Indicadores Visuais" title="Horas por Serviço" />
+      <ChartCard title="Tempo dedicado a cada OS">
+        <div className="space-y-2.5">
+          {graficos.horasPorServico.map((d, i) => (
+            <BarraSimples key={`${d.servico}-${i}`} label={d.servico} valor={d.horas} max={maxHorasServico} color="bg-brand-300" />
+          ))}
+        </div>
+      </ChartCard>
+      <PageFooter resumo={data.resumo} />
+    </PrintPage>
+  );
+}
+
 function CaminhoCriticoPage({ data }: { data: ParadaCompleta }) {
   const itens = data.caminhoCritico;
   if (itens.length === 0) return null;
@@ -506,6 +527,7 @@ export function PrintReport({ data, qrDataUrl }: { data: ParadaCompleta; qrDataU
       ))}
       <GaleriaPage data={data} fotos={data.fotos} />
       <GraficosPage data={data} />
+      <GraficosServicoPage data={data} />
       {data.caminhoCritico.length > 0 && <CaminhoCriticoPage data={data} />}
       <ResultadoPage data={data} />
     </div>

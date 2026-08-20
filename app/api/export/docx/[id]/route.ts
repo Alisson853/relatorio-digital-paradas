@@ -145,6 +145,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
   children.push(...buildGraficos(data));
   children.push(pageBreak());
+  children.push(...buildGraficosServico(data));
+  children.push(pageBreak());
   if (data.caminhoCritico.length > 0) {
     children.push(...buildCaminhoCritico(data));
     children.push(pageBreak());
@@ -466,6 +468,14 @@ function buildGraficos(data: ParadaCompleta): (Paragraph | Table)[] {
     })
   );
 
+  return out;
+}
+
+function buildGraficosServico(data: ParadaCompleta): (Paragraph | Table)[] {
+  const { graficos } = data;
+  const maxHorasServico = Math.max(1, ...graficos.horasPorServico.map((d) => d.horas));
+  const out: (Paragraph | Table)[] = [eyebrow("Indicadores Visuais"), pageTitle("Horas por Serviço")];
+  out.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: noBorders, rows: graficos.horasPorServico.map((d) => barRow(d.servico, d.horas, maxHorasServico, "B7CFF0")) }));
   return out;
 }
 

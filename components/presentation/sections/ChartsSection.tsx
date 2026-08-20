@@ -127,6 +127,18 @@ export function ChartsSection({ graficos }: { graficos: GraficosData }) {
             </ResponsiveContainer>
           </ChartCard>
 
+          <ChartCard title="Horas por Serviço" subtitle="Tempo dedicado a cada OS" index={5}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={graficos.horasPorServico} layout="vertical" margin={{ left: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#eef1f7" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 11, fill: "#64749a" }} />
+                <YAxis dataKey="servico" type="category" width={140} tick={{ fontSize: 10, fill: "#64749a" }} />
+                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#f0f6fd" }} />
+                <Bar dataKey="horas" radius={[0, 6, 6, 0]} fill="#7fabe5" />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}

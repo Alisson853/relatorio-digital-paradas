@@ -161,6 +161,15 @@ export function deriveGraficos(
     horas: duracaoMaximaHoras ? Math.min(Math.round(horas), duracaoMaximaHoras) : Math.round(horas),
   }));
 
+  // Diferente de horasPorSetor, aqui não soma nada entre si — é só o tempo
+  // de cada OS individual, então não corre o risco de estourar a duração da
+  // parada. Ordenado do maior pro menor e limitado às 15 mais demoradas,
+  // senão um relatório com 40+ OS vira um gráfico ilegível.
+  const horasPorServico = [...servicos]
+    .map((s) => ({ servico: s.titulo || s.equipamento, horas: Math.round(parseHoras(s.tempoGasto) * 10) / 10 }))
+    .sort((a, b) => b.horas - a.horas)
+    .slice(0, 15);
+
   const categoriaMap = new Map<string, number>();
   servicos.forEach((s) => {
     const categoria = s.categoria ?? "Corretiva";
@@ -187,6 +196,7 @@ export function deriveGraficos(
   return {
     osPorEquipe: osPorEquipe.length ? osPorEquipe : [{ equipe: "Sem dados", quantidade: 0 }],
     horasPorSetor: horasPorSetor.length ? horasPorSetor : [{ setor: "Sem dados", horas: 0 }],
+    horasPorServico: horasPorServico.length ? horasPorServico : [{ servico: "Sem dados", horas: 0 }],
     distribuicaoServicos: distribuicaoServicos.length ? distribuicaoServicos : [{ categoria: "Sem dados", valor: 1 }],
     paretoAtrasos: paretoAtrasos.length ? paretoAtrasos : [{ causa: "Sem atrasos", horas: 0, acumulado: 0 }],
     planejadoRealizado,

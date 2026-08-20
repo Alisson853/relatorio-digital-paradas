@@ -328,6 +328,14 @@ function buildGraficos(data: ParadaCompleta): string {
   return out;
 }
 
+function buildGraficosServico(data: ParadaCompleta): string {
+  const { graficos } = data;
+  const maxHorasServico = Math.max(1, ...graficos.horasPorServico.map((d) => d.horas));
+  let out = eyebrow("Indicadores Visuais") + pageTitle("Horas por Serviço");
+  out += tabela(graficos.horasPorServico.map((d) => barraTexto(d.servico, d.horas, maxHorasServico)), [0.35, 0.5, 0.15]);
+  return out;
+}
+
 function buildCaminhoCritico(data: ParadaCompleta): string {
   let out = eyebrow("Cronograma Crítico") + pageTitle("Caminho Crítico");
   const cabecalho = ["Serviço", "Início Pl.", "Fim Pl.", "Início Real", "Fim Real", "Diferença", "Responsável", "Status"];
@@ -393,6 +401,8 @@ async function buildRtf(data: ParadaCompleta, origin: string): Promise<string> {
   }
   body += pageBreak();
   body += buildGraficos(data);
+  body += pageBreak();
+  body += buildGraficosServico(data);
   if (data.caminhoCritico.length > 0) {
     body += pageBreak();
     body += buildCaminhoCritico(data);

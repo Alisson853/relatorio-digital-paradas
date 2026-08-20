@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Activity, ClipboardList, Gauge, Plus } from "lucide-react";
+import { Activity, ClipboardList, Gauge, LineChart, Plus } from "lucide-react";
 import { listParadasResumo } from "@/lib/actions/paradas";
 import { ParadaGrid } from "@/components/dashboard/ParadaGrid";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
@@ -25,8 +25,15 @@ export default async function DashboardPage() {
               <p className="mt-1 text-xs font-medium text-slate-400">Gestão de Paradas Industriais</p>
             </div>
           </div>
-          <EditorOnly>
-            <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/historico"
+              className="flex items-center gap-1.5 rounded-full border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+            >
+              <LineChart size={15} />
+              Histórico
+            </Link>
+            <EditorOnly>
               <Link
                 href="/pendencias"
                 className="flex items-center gap-1.5 rounded-full border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
@@ -42,8 +49,8 @@ export default async function DashboardPage() {
                 <Plus size={15} />
                 Nova Parada
               </Link>
-            </div>
-          </EditorOnly>
+            </EditorOnly>
+          </div>
         </div>
       </header>
 
