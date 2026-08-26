@@ -40,8 +40,8 @@ function CategoriaBadge({ categoria }: { categoria?: string }) {
 
 function ServiceSlide({ servico }: { servico: Servico }) {
   return (
-    <div className="grid flex-1 grid-cols-1 gap-8 lg:grid-cols-[1fr_1.05fr] lg:gap-10">
-      <div>
+    <div className="grid grid-rows-[minmax(0,1fr)] flex-1 grid-cols-1 gap-8 overflow-hidden lg:grid-cols-[1fr_1.05fr] lg:gap-10">
+      <div className="min-h-0 overflow-y-auto pr-1">
         <div className="mb-4 flex items-center justify-between gap-3">
           <span className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-brand-600">
             Serviços Executados
@@ -201,7 +201,7 @@ export function ServicesSection({ servicos: todosServicos }: { servicos: Servico
   return (
     <section id="servicos" className="section-screen flex items-center bg-slate-50 px-4 py-8 sm:px-6 sm:py-10">
       <div className="mx-auto w-full max-w-7xl">
-        <div className="relative flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_4px_24px_rgba(16,24,40,0.06)] sm:p-10 lg:min-h-[90vh]">
+        <div className="relative flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_4px_24px_rgba(16,24,40,0.06)] sm:p-10 lg:h-[90vh]">
           <div className="absolute inset-y-0 left-0 w-1.5 bg-brand-600" />
 
           <AnimatePresence mode="wait">
@@ -211,7 +211,7 @@ export function ServicesSection({ servicos: todosServicos }: { servicos: Servico
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -24 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-              className="flex flex-1 flex-col"
+              className="flex min-h-0 flex-1 flex-col"
             >
               <ServiceSlide servico={atual} />
             </motion.div>
