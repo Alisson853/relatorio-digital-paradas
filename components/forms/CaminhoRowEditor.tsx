@@ -2,7 +2,8 @@
 
 import { Trash2 } from "lucide-react";
 import type { StatusItem } from "@/lib/types";
-import { NumberField, SelectField, TextField } from "./FormControls";
+import { SelectField, TextField } from "./FormControls";
+import { cn } from "@/lib/utils";
 
 export interface CaminhoRow {
   id: string;
@@ -50,7 +51,17 @@ export function CaminhoRowEditor({ item, index, onChange, onRemove }: Props) {
         <TextField label="Fim Planej." type="time" value={item.fimPlanejado} onChange={(v) => onChange({ fimPlanejado: v })} />
         <TextField label="Início Real" type="time" value={item.inicioReal} onChange={(v) => onChange({ inicioReal: v })} />
         <TextField label="Fim Real" type="time" value={item.fimReal} onChange={(v) => onChange({ fimReal: v })} />
-        <NumberField label="Diferença (min)" value={item.diferencaMin} onChange={(v) => onChange({ diferencaMin: v })} />
+        <div>
+          <p className="mb-1 text-xs font-semibold text-slate-500">Diferença (min)</p>
+          <p
+            className={cn(
+              "flex h-10 items-center rounded-xl border px-3 text-sm font-bold",
+              item.diferencaMin > 0 ? "border-danger-200 bg-danger-50 text-danger-600" : "border-slate-200 bg-white text-slate-500"
+            )}
+          >
+            {item.diferencaMin > 0 ? `+${item.diferencaMin} min` : "Sem atraso"}
+          </p>
+        </div>
         <SelectField label="Status" value={item.status} onChange={(v) => onChange({ status: v as StatusItem })} options={STATUS_OPTIONS} />
         <TextField
           label="Causa do Atraso (se houver)"

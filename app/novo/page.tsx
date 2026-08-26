@@ -79,6 +79,21 @@ function novoServicoItem(defaults: { area: string; responsavel: string }): Servi
   };
 }
 
+// "Fim Real" pode passar da meia-noite em relação ao "Fim Planejado" (parada
+// que vira a madrugada) — se a diferença bruta desse negativa por causa
+// disso, soma 24h antes de assumir que terminou adiantado.
+function minutosDoHorario(horario: string): number {
+  const [h, m] = horario.split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+function calcularDiferencaMin(fimPlanejado: string, fimReal: string): number {
+  if (!fimPlanejado || !fimReal) return 0;
+  let diferenca = minutosDoHorario(fimReal) - minutosDoHorario(fimPlanejado);
+  if (diferenca < -60 * 12) diferenca += 24 * 60;
+  return Math.max(0, diferenca);
+}
+
 function novoCaminhoItem(): CaminhoRow {
   return {
     id: crypto.randomUUID(),
@@ -117,7 +132,7 @@ function servicoParaLinha(s: Servico): ServicoRow {
 }
 
 function caminhoParaLinha(c: CaminhoCriticoItem): CaminhoRow {
-  return { ...c, causaAtraso: c.causaAtraso ?? "" };
+  return { ...c, diferencaMin: calcularDiferencaMin(c.fimPlanejado, c.fimReal), causaAtraso: c.causaAtraso ?? "" };
 }
 
 interface DraftSnapshot {
@@ -390,6 +405,20 @@ function NovaParadaForm() {
 
   function updateRow<T extends { id: string }>(setter: React.Dispatch<React.SetStateAction<T[]>>, id: string, patch: Partial<T>) {
     setter((prev) => prev.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+  }
+
+  // A diferença é sempre recalculada a partir do Fim Planejado x Fim Real —
+  // não dá pra confiar em alguém digitar o atraso certo no campo manual, e
+  // era exatamente por isso que os atrasos não apareciam no Pareto.
+  function updateCaminhoRow(id: string, patch: Partial<CaminhoRow>) {
+    setCaminhoCritico((prev) =>
+      prev.map((row) => {
+        if (row.id !== id) return row;
+        const atualizado = { ...row, ...patch };
+        atualizado.diferencaMin = calcularDiferencaMin(atualizado.fimPlanejado, atualizado.fimReal);
+        return atualizado;
+      })
+    );
   }
 
   async function handleImportarPlanilha(file: File | undefined) {
@@ -779,7 +808,7 @@ function NovaParadaForm() {
                 key={item.id}
                 item={item}
                 index={i}
-                onChange={(patch) => updateRow(setCaminhoCritico, item.id, patch)}
+                onChange={(patch) => updateCaminhoRow(item.id, patch)}
                 onRemove={() => setCaminhoCritico((prev) => prev.filter((r) => r.id !== item.id))}
               />
             ))}
