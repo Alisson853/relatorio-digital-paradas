@@ -120,31 +120,30 @@ function ServiceSlide({ servico }: { servico: Servico }) {
           ];
           const mostrarRotulo = fotosDisponiveis.length > 1;
           return (
-            // Caixa quadrada em vez de esticar pra preencher a altura ou
-            // largura disponível: esticar produzia proporções bem diferentes
-            // do formato real das fotos (retrato de celular ou widescreen),
-            // e o object-contain sobrava faixa vazia enorme de um dos lados.
-            // Quadrado é o meio-termo que absorve bem os dois formatos, e o
-            // grupo fica centralizado no painel em vez de deformado.
-            <div className="flex h-full flex-1 items-center justify-center">
-              <div
-                className={cn(
-                  "grid w-full grid-cols-1 gap-3",
-                  fotosDisponiveis.length === 2 && "sm:grid-cols-2",
-                  fotosDisponiveis.length >= 3 && "sm:grid-cols-3"
-                )}
-              >
-                {fotosDisponiveis.map((foto) => (
-                  <div key={foto.key} className="relative mx-auto aspect-square max-h-full w-full overflow-hidden rounded-2xl border-2 border-white bg-slate-100 shadow-md">
-                    <Image
-                      src={foto.url}
-                      alt={servico.equipamento}
-                      fill
-                      sizes="(min-width: 1024px) 260px, (min-width: 640px) 220px, 90vw"
-                      className="object-contain"
-                      loading="eager"
-                      unoptimized={foto.url.startsWith("data:")}
-                    />
+            // Grade de 2 colunas (1 só quando há uma única foto), cada célula
+            // preenchendo igualmente a altura disponível (auto-rows-fr) — ao
+            // contrário de empilhar em 1 coluna só (o que dava caixas largas
+            // e baixas demais com 3 fotos) ou forçar quadrado perfeito (o que
+            // limitava o tamanho ao menor dos dois lados), essa grade mantém
+            // a proporção de cada caixa perto da proporção do próprio painel,
+            // então fica grande e sem cortar demais em nenhum sentido.
+            <div
+              className={cn(
+                "grid h-full auto-rows-fr gap-3",
+                fotosDisponiveis.length === 1 ? "grid-cols-1" : "grid-cols-2"
+              )}
+            >
+              {fotosDisponiveis.map((foto) => (
+                <div key={foto.key} className="relative overflow-hidden rounded-2xl border-2 border-white bg-slate-100 shadow-md">
+                  <Image
+                    src={foto.url}
+                    alt={servico.equipamento}
+                    fill
+                    sizes="(min-width: 1024px) 480px, (min-width: 640px) 320px, 90vw"
+                    className="object-cover"
+                    loading="eager"
+                    unoptimized={foto.url.startsWith("data:")}
+                  />
                     {mostrarRotulo && (
                       <span
                         className={cn(
@@ -156,9 +155,8 @@ function ServiceSlide({ servico }: { servico: Servico }) {
                         {foto.horario && <span className="font-mono normal-case opacity-80">· {foto.horario}</span>}
                       </span>
                     )}
-                  </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           );
         })()}
