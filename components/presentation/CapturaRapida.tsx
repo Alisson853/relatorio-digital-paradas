@@ -465,9 +465,14 @@ function ServicoCapturaCard({
       <input ref={inputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-brand-600">OS {servico.numeroOS}</p>
-          <h3 className="mt-0.5 text-base font-bold leading-snug text-slate-900">{servico.equipamento}</h3>
-          <p className="mt-0.5 text-xs text-slate-400">{servico.area}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-brand-600">
+            OS {servico.numeroOS} · {servico.area}
+          </p>
+          {/* O que precisa ser feito é a informação que realmente diferencia uma
+              OS da outra em campo — o equipamento sozinho costuma ser um código
+              técnico genérico que não diz nada de cara. */}
+          <h3 className="mt-0.5 text-base font-bold leading-snug text-slate-900">{servico.problemaIdentificado}</h3>
+          <p className="mt-0.5 text-xs text-slate-400">{servico.equipamento}</p>
         </div>
         <button
           type="button"
@@ -615,7 +620,11 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
     const termo = busca.trim().toLowerCase();
     if (!termo) return servicosOrdenados;
     return servicosOrdenados.filter(
-      (s) => s.numeroOS.toLowerCase().includes(termo) || s.equipamento.toLowerCase().includes(termo) || s.titulo.toLowerCase().includes(termo)
+      (s) =>
+        s.numeroOS.toLowerCase().includes(termo) ||
+        s.equipamento.toLowerCase().includes(termo) ||
+        s.titulo.toLowerCase().includes(termo) ||
+        s.problemaIdentificado.toLowerCase().includes(termo)
     );
   }, [servicosOrdenados, busca]);
 
