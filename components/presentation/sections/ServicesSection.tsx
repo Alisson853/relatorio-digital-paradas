@@ -126,15 +126,16 @@ function ServiceSlide({ servico }: { servico: Servico }) {
                   {/* Sem aspect-ratio fixo de propósito: cada foto tirada em campo
                       tem um tamanho diferente, então a caixa estica pra preencher
                       a altura disponível (que já acompanha a coluna de texto ao
-                      lado) e corta a imagem com object-cover, em vez de sobrar
-                      espaço vazio por causa de uma proporção fixa. */}
-                  <div className="relative h-full min-h-[200px] overflow-hidden rounded-2xl border-2 border-white shadow-md">
+                      lado). object-contain garante que a foto inteira apareça,
+                      sem cortar nada — a caixa escura absorve a sobra quando a
+                      proporção da foto não bate com a da caixa. */}
+                  <div className="relative h-full min-h-[200px] overflow-hidden rounded-2xl border-2 border-white bg-slate-900 shadow-md">
                     <Image
                       src={foto.url}
                       alt={servico.equipamento}
                       fill
                       sizes="(min-width: 1024px) 560px, (min-width: 640px) 380px, 640px"
-                      className="object-cover"
+                      className="object-contain"
                       loading="eager"
                       unoptimized={foto.url.startsWith("data:")}
                     />

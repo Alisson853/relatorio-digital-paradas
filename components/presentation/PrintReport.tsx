@@ -290,9 +290,9 @@ function ServicoPage({ data, servico, indice, total }: { data: ParadaCompleta; s
             <div className="flex aspect-[4/3] items-center justify-center rounded-lg border border-dashed border-slate-300 text-sm text-slate-400">Sem foto</div>
           ) : (
             fotos.map((foto) => (
-              <div key={foto.key} className="relative">
+              <div key={foto.key} className="relative aspect-[16/11] w-full overflow-hidden rounded-lg border-2 border-white bg-slate-900 shadow">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={foto.url} alt={servico.equipamento} className="aspect-[16/11] w-full rounded-lg border-2 border-white object-cover shadow" />
+                <img src={foto.url} alt={servico.equipamento} className="h-full w-full object-contain" />
                 {mostrarRotulo && (
                   <span className="absolute left-2.5 top-2.5 rounded-full bg-slate-900/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
                     {foto.label}
