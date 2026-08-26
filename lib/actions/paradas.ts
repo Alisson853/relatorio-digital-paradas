@@ -458,6 +458,42 @@ export async function adicionarServicoRapido(paradaId: string, input: NovaOsInpu
   return { ok: true, servico: novoServico };
 }
 
+interface NovoEventoInput {
+  titulo: string;
+  responsavel: string;
+  descricao: string;
+  icone: TimelineEvento["icone"];
+}
+
+// Marca um evento da linha do tempo (bloqueio, liberação, partida...) direto
+// do celular, com horário automático — sem isso, só dava pra registrar esses
+// marcos depois, no formulário do computador, longe do momento real.
+export async function adicionarEventoRapido(paradaId: string, input: NovoEventoInput, senha: string): Promise<{ ok: boolean; erro?: string; evento?: TimelineEvento }> {
+  const autorizado = await verifyEditorPassword(senha);
+  if (!autorizado) return { ok: false, erro: "Não autorizado." };
+
+  const titulo = input.titulo.trim();
+  if (!titulo) return { ok: false, erro: "Informe o evento." };
+
+  const [row] = await getDb().select({ timeline: paradas.timeline }).from(paradas).where(eq(paradas.id, paradaId)).limit(1);
+  if (!row) return { ok: false, erro: "Relatório não encontrado." };
+
+  const novoEvento: TimelineEvento = {
+    id: crypto.randomUUID(),
+    horario: horarioAgora(),
+    titulo,
+    responsavel: input.responsavel.trim() || "—",
+    descricao: input.descricao.trim(),
+    icone: input.icone,
+    status: "concluido",
+  };
+
+  const timelineAtualizada = [...row.timeline, novoEvento];
+  await getDb().update(paradas).set({ timeline: timelineAtualizada, atualizadoEm: new Date() }).where(eq(paradas.id, paradaId));
+
+  return { ok: true, evento: novoEvento };
+}
+
 export async function excluirFoto(url: string, senha: string): Promise<void> {
   const autorizado = await verifyEditorPassword(senha);
   if (!autorizado || !url.includes("blob.vercel-storage.com")) return;

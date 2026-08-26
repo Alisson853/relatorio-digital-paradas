@@ -2,9 +2,25 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, Camera, Check, ChevronDown, Loader2, Plus, RefreshCw } from "lucide-react";
-import type { Equipe, ParadaCompleta, Servico } from "@/lib/types";
-import { getParadaCompleta, capturarFotoServico, uploadFoto, adicionarServicoRapido, marcarStatusServico } from "@/lib/actions/paradas";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Camera,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  Flag,
+  Loader2,
+  Lock,
+  Play,
+  Plus,
+  RefreshCw,
+  Search,
+  Unlock,
+  X,
+} from "lucide-react";
+import type { Equipe, ParadaCompleta, Servico, TimelineEvento } from "@/lib/types";
+import { getParadaCompleta, capturarFotoServico, uploadFoto, adicionarServicoRapido, adicionarEventoRapido, marcarStatusServico } from "@/lib/actions/paradas";
 import { compressImageFile, NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { getEditorSenha } from "@/lib/editor-auth";
 import { EditorPasswordForm } from "@/components/shared/EditorPasswordForm";
@@ -199,6 +215,139 @@ function EtapaDot({
       <p className={cn("text-[10px] font-bold uppercase", selecionada ? "text-brand-700" : preenchida ? "text-success-700" : "text-slate-400")}>{label}</p>
       {horario && <p className="text-[10px] font-mono font-semibold text-success-600">{horario}</p>}
     </button>
+  );
+}
+
+const MARCOS_TIMELINE: Array<{ titulo: string; icone: TimelineEvento["icone"]; Icon: typeof Flag }> = [
+  { titulo: "Início da Parada", icone: "play", Icon: Play },
+  { titulo: "Bloqueio", icone: "lock", Icon: Lock },
+  { titulo: "Liberação", icone: "unlock", Icon: Unlock },
+  { titulo: "Partida", icone: "flag", Icon: Flag },
+];
+
+function NovoEventoForm({ paradaId, onCriado }: { paradaId: string; onCriado: (evento: TimelineEvento) => void }) {
+  const [aberto, setAberto] = useState(false);
+  const [titulo, setTitulo] = useState("");
+  const [icone, setIcone] = useState<TimelineEvento["icone"]>("flag");
+  const [responsavel, setResponsavel] = useState("");
+  const [descricao, setDescricao] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState("");
+
+  async function handleSalvar() {
+    if (!titulo.trim()) {
+      setErro("Escolha ou digite o evento.");
+      return;
+    }
+    setErro("");
+    setLoading(true);
+    try {
+      const resultado = await adicionarEventoRapido(paradaId, { titulo, responsavel, descricao, icone }, getEditorSenha());
+      if (!resultado.ok || !resultado.evento) {
+        setErro(resultado.erro || "Não foi possível marcar o evento.");
+        return;
+      }
+      onCriado(resultado.evento);
+      setTitulo("");
+      setDescricao("");
+      setAberto(false);
+    } catch {
+      setErro("Não foi possível marcar o evento. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (!aberto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAberto(true)}
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-white px-4 py-4 text-sm font-bold text-slate-500 transition-colors hover:border-brand-400 hover:text-brand-600"
+      >
+        <Flag size={18} />
+        Marcar Evento da Timeline
+      </button>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-brand-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-bold text-slate-900">Marcar Evento</h3>
+        <button type="button" onClick={() => setAberto(false)} className="text-slate-400">
+          <ChevronDown size={18} />
+        </button>
+      </div>
+
+      <div className="mb-3 grid grid-cols-2 gap-2">
+        {MARCOS_TIMELINE.map((marco) => (
+          <button
+            key={marco.titulo}
+            type="button"
+            onClick={() => {
+              setTitulo(marco.titulo);
+              setIcone(marco.icone);
+            }}
+            className={cn(
+              "flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-bold transition-colors",
+              titulo === marco.titulo ? "border-brand-400 bg-brand-50 text-brand-700" : "border-slate-200 text-slate-500 hover:bg-slate-50"
+            )}
+          >
+            <marco.Icon size={15} />
+            {marco.titulo}
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Evento</label>
+          <input
+            value={titulo}
+            onChange={(e) => setTitulo(e.target.value)}
+            placeholder="Ou digite um evento diferente"
+            className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Responsável (opcional)</label>
+          <input
+            value={responsavel}
+            onChange={(e) => setResponsavel(e.target.value)}
+            placeholder="Quem fez/autorizou"
+            className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Descrição (opcional)</label>
+          <textarea
+            value={descricao}
+            onChange={(e) => setDescricao(e.target.value)}
+            rows={2}
+            placeholder="Detalhe rápido, se precisar"
+            className="w-full resize-none rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+          />
+        </div>
+      </div>
+
+      {erro && (
+        <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-danger-600">
+          <AlertCircle size={13} />
+          {erro}
+        </p>
+      )}
+
+      <button
+        type="button"
+        onClick={handleSalvar}
+        disabled={loading}
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-700 disabled:opacity-60"
+      >
+        {loading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+        {loading ? "Salvando..." : "Marcar Agora"}
+      </button>
+    </div>
   );
 }
 
@@ -404,6 +553,7 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
   const [atualizando, setAtualizando] = useState(false);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<Date | null>(null);
   const [horaAgora, setHoraAgora] = useState<Date | null>(null);
+  const [busca, setBusca] = useState("");
 
   async function carregar(mostrarSpinner = false) {
     if (mostrarSpinner) setAtualizando(true);
@@ -457,6 +607,17 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
     return [...data.servicos].sort((a, b) => Number(faltaFoto(b)) - Number(faltaFoto(a)));
   }, [data]);
   const pendentesCount = data ? data.servicos.filter(faltaFoto).length : 0;
+  const totalServicos = data?.servicos.length ?? 0;
+  const concluidasCount = data ? data.servicos.filter((s) => s.status === "concluido").length : 0;
+  const percConcluido = totalServicos > 0 ? Math.round((concluidasCount / totalServicos) * 100) : 0;
+
+  const servicosFiltrados = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    if (!termo) return servicosOrdenados;
+    return servicosOrdenados.filter(
+      (s) => s.numeroOS.toLowerCase().includes(termo) || s.equipamento.toLowerCase().includes(termo) || s.titulo.toLowerCase().includes(termo)
+    );
+  }, [servicosOrdenados, busca]);
 
   function handleCaptured(servicoId: string, patch: Partial<Servico>) {
     setData((prev) => {
@@ -467,6 +628,10 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
 
   function handleOsCriada(servico: Servico) {
     setData((prev) => (prev ? { ...prev, servicos: [...prev.servicos, servico] } : prev));
+  }
+
+  function handleEventoCriado(evento: TimelineEvento) {
+    setData((prev) => (prev ? { ...prev, timeline: [...prev.timeline, evento] } : prev));
   }
 
   if (status === "loading") return <div className="min-h-screen bg-slate-50" />;
@@ -500,6 +665,19 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
             </span>
           )}
         </div>
+        {totalServicos > 0 && (
+          <div className="px-4 pb-3">
+            <div className="mb-1 flex items-center justify-between text-[11px] font-bold text-slate-500">
+              <span>
+                {concluidasCount}/{totalServicos} OS concluídas
+              </span>
+              <span>{percConcluido}%</span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-success-600 transition-all" style={{ width: `${percConcluido}%` }} />
+            </div>
+          </div>
+        )}
         <button
           type="button"
           onClick={() => carregar(true)}
@@ -519,11 +697,36 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
 
       <main className="mx-auto max-w-lg space-y-3 px-4 py-5">
         <NovaOsForm paradaId={id} onCriada={handleOsCriada} />
+        <NovoEventoForm paradaId={id} onCriado={handleEventoCriado} />
+
+        {totalServicos > 0 && (
+          <div className="relative">
+            <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por OS ou equipamento"
+              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-9 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+            />
+            {busca && (
+              <button
+                type="button"
+                onClick={() => setBusca("")}
+                aria-label="Limpar busca"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
+        )}
 
         {data.servicos.length === 0 ? (
           <p className="py-16 text-center text-sm text-slate-400">Nenhuma OS cadastrada ainda neste relatório.</p>
+        ) : servicosFiltrados.length === 0 ? (
+          <p className="py-16 text-center text-sm text-slate-400">Nenhuma OS encontrada para &quot;{busca}&quot;.</p>
         ) : (
-          servicosOrdenados.map((servico) => <ServicoCapturaCard key={servico.id} paradaId={id} servico={servico} onCaptured={handleCaptured} />)
+          servicosFiltrados.map((servico) => <ServicoCapturaCard key={servico.id} paradaId={id} servico={servico} onCaptured={handleCaptured} />)
         )}
       </main>
     </div>
