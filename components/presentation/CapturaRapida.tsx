@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, ArrowLeft, Camera, Check, ChevronDown, Loader2, Plus, RefreshCw } from "lucide-react";
 import type { Equipe, ParadaCompleta, Servico } from "@/lib/types";
@@ -389,6 +389,15 @@ function ServicoCapturaCard({
   );
 }
 
+// Falta pelo menos a foto de Antes ou Depois — as duas que realmente contam
+// pra fechar o registro (Durante é opcional). Usado tanto pra ordenar a lista
+// quanto pro contador do topo.
+function faltaFoto(servico: Servico): boolean {
+  const temAntes = !!servico.fotoAntes && servico.fotoAntes !== NO_PHOTO_PLACEHOLDER;
+  const temDepois = !!servico.fotoDepois && servico.fotoDepois !== NO_PHOTO_PLACEHOLDER;
+  return !temAntes || !temDepois;
+}
+
 function CapturaRapidaConteudo({ id }: { id: string }) {
   const [data, setData] = useState<ParadaCompleta | null>(null);
   const [status, setStatus] = useState<"loading" | "found" | "not-found">("loading");
@@ -441,6 +450,14 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
 
   const segundosAtras = ultimaAtualizacao && horaAgora ? Math.max(0, Math.round((horaAgora.getTime() - ultimaAtualizacao.getTime()) / 1000)) : null;
 
+  // As que ainda faltam foto vêm primeiro — quem está em campo tirando foto
+  // enxerga de cara o que falta, em vez de rolar a lista toda procurando.
+  const servicosOrdenados = useMemo(() => {
+    if (!data) return [];
+    return [...data.servicos].sort((a, b) => Number(faltaFoto(b)) - Number(faltaFoto(a)));
+  }, [data]);
+  const pendentesCount = data ? data.servicos.filter(faltaFoto).length : 0;
+
   function handleCaptured(servicoId: string, patch: Partial<Servico>) {
     setData((prev) => {
       if (!prev) return prev;
@@ -477,6 +494,11 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
             <p className="truncate text-sm font-bold text-slate-900">Captura Rápida</p>
             <p className="truncate text-xs font-medium text-slate-400">{data.resumo.nome}</p>
           </div>
+          {pendentesCount > 0 && (
+            <span className="flex-none rounded-full bg-warning-100 px-3 py-1.5 text-xs font-bold text-warning-600">
+              {pendentesCount} sem foto
+            </span>
+          )}
         </div>
         <button
           type="button"
@@ -501,7 +523,7 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
         {data.servicos.length === 0 ? (
           <p className="py-16 text-center text-sm text-slate-400">Nenhuma OS cadastrada ainda neste relatório.</p>
         ) : (
-          data.servicos.map((servico) => <ServicoCapturaCard key={servico.id} paradaId={id} servico={servico} onCaptured={handleCaptured} />)
+          servicosOrdenados.map((servico) => <ServicoCapturaCard key={servico.id} paradaId={id} servico={servico} onCaptured={handleCaptured} />)
         )}
       </main>
     </div>

@@ -491,6 +491,19 @@ function NovaParadaForm() {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
+
+    // Fechar como Concluída/Ressalvas com foto faltando é exatamente o que
+    // gera as pendências que só aparecem depois, no Checklist — avisa antes
+    // de salvar em vez de descobrir só depois de a parada já ter acabado.
+    if (status !== "em_andamento") {
+      const semFoto = servicos.filter((s) => s.equipamento.trim() && (!s.fotoAntes || !s.fotoDepois)).length;
+      if (semFoto > 0) {
+        const confirmar = window.confirm(
+          `${semFoto} OS ainda sem foto de Antes ou Depois. Salvar assim mesmo como "${STATUS_GERAL_OPTIONS.find((o) => o.value === status)?.label}"?`
+        );
+        if (!confirmar) return;
+      }
+    }
     setErro("");
 
     const id = editId || `${slugify(nome) || "parada"}-${Date.now().toString(36)}`;
