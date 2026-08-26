@@ -40,7 +40,7 @@ function CategoriaBadge({ categoria }: { categoria?: string }) {
 
 function ServiceSlide({ servico }: { servico: Servico }) {
   return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_1.05fr] lg:gap-10">
+    <div className="grid flex-1 grid-cols-1 gap-8 lg:grid-cols-[1fr_1.05fr] lg:gap-10">
       <div>
         <div className="mb-4 flex items-center justify-between gap-3">
           <span className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-brand-600">
@@ -105,7 +105,7 @@ function ServiceSlide({ servico }: { servico: Servico }) {
         </div>
       </div>
 
-      <div className="flex flex-col justify-center gap-4 rounded-3xl border-2 border-brand-100 bg-brand-50/40 p-3 sm:p-4">
+      <div className="flex h-full flex-col gap-4 rounded-3xl border-2 border-brand-100 bg-brand-50/40 p-3 sm:p-4">
         {(() => {
           const fotosDisponiveis = [
             ...(servico.fotoAntes && servico.fotoAntes !== NO_PHOTO_PLACEHOLDER
@@ -120,10 +120,15 @@ function ServiceSlide({ servico }: { servico: Servico }) {
           ];
           const mostrarRotulo = fotosDisponiveis.length > 1;
           return (
-            <div className="flex flex-col gap-4 sm:flex-row lg:flex-col">
+            <div className="flex h-full flex-1 flex-col gap-4 sm:flex-row lg:flex-col">
               {fotosDisponiveis.map((foto) => (
                 <div key={foto.key} className="flex-1">
-                  <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border-2 border-white shadow-md sm:aspect-[16/11]">
+                  {/* Sem aspect-ratio fixo de propósito: cada foto tirada em campo
+                      tem um tamanho diferente, então a caixa estica pra preencher
+                      a altura disponível (que já acompanha a coluna de texto ao
+                      lado) e corta a imagem com object-cover, em vez de sobrar
+                      espaço vazio por causa de uma proporção fixa. */}
+                  <div className="relative h-full min-h-[200px] overflow-hidden rounded-2xl border-2 border-white shadow-md">
                     <Image
                       src={foto.url}
                       alt={servico.equipamento}
@@ -195,8 +200,8 @@ export function ServicesSection({ servicos: todosServicos }: { servicos: Servico
 
   return (
     <section id="servicos" className="section-screen flex items-center bg-slate-50 px-4 py-8 sm:px-6 sm:py-10">
-      <div className="mx-auto w-full max-w-[1600px]">
-        <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_4px_24px_rgba(16,24,40,0.06)] sm:p-10">
+      <div className="mx-auto w-full max-w-7xl">
+        <div className="relative flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_4px_24px_rgba(16,24,40,0.06)] sm:p-10 lg:min-h-[90vh]">
           <div className="absolute inset-y-0 left-0 w-1.5 bg-brand-600" />
 
           <AnimatePresence mode="wait">
@@ -206,6 +211,7 @@ export function ServicesSection({ servicos: todosServicos }: { servicos: Servico
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -24 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="flex flex-1 flex-col"
             >
               <ServiceSlide servico={atual} />
             </motion.div>
