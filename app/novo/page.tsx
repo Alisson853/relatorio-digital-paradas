@@ -587,7 +587,8 @@ function NovaParadaForm() {
       totalEtiquetaVermelha: Number(etiquetaVermelhaPlan) || undefined,
       totalEtiquetaAmarela: Number(etiquetaAmarelaPlan) || undefined,
     });
-    const graficos = deriveGraficos(servicosFinal, caminhoCriticoFinal, planejadoRealizado, kpis.eficiencia, duracaoMaximaHoras);
+    const atrasoGeralHoras = Math.max(0, parseHoras(resumo.duracaoRealizada) - parseHoras(resumo.duracaoPlanejada));
+    const graficos = deriveGraficos(servicosFinal, caminhoCriticoFinal, planejadoRealizado, kpis.eficiencia, duracaoMaximaHoras, atrasoGeralHoras);
     const resultadoFinal = gerarResultadoFinal(resumo, kpis);
     if (resumoFinalCustom.trim()) resultadoFinal.resumo = resumoFinalCustom.trim();
 

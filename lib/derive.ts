@@ -142,7 +142,8 @@ export function deriveGraficos(
   caminhoCritico: CaminhoCriticoItem[],
   planejadoRealizado: Array<{ etapa: string; planejado: number; realizado: number }>,
   eficiencia: number,
-  duracaoMaximaHoras?: number
+  duracaoMaximaHoras?: number,
+  atrasoGeralHoras?: number
 ): GraficosData {
   const osPorEquipe = EQUIPES.map((equipe) => ({
     equipe,
@@ -184,6 +185,14 @@ export function deriveGraficos(
       causaMap.set(causa, (causaMap.get(causa) ?? 0) + c.diferencaMin / 60);
     }
   });
+  // Sem Caminho Crítico detalhado por atividade, causaMap fica vazio mesmo
+  // quando a parada como um todo estourou o prazo — nesse caso cai pro
+  // atraso geral (duração realizada - planejada) como uma causa única, em
+  // vez de esconder um atraso real atrás de "Sem atrasos".
+  if (causaMap.size === 0 && atrasoGeralHoras && atrasoGeralHoras > 0) {
+    causaMap.set("Atraso Geral da Parada", atrasoGeralHoras);
+  }
+
   let acumulado = 0;
   const paretoAtrasos = Array.from(causaMap.entries())
     .map(([causa, horas]) => ({ causa, horas: Math.round(horas * 10) / 10 }))
