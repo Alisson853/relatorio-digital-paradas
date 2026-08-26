@@ -194,8 +194,8 @@ export function ServicesSection({ servicos: todosServicos }: { servicos: Servico
   }
 
   return (
-    <section id="servicos" className="section-screen flex items-center bg-slate-50 px-6 py-24 sm:px-10">
-      <div className="mx-auto w-full max-w-6xl">
+    <section id="servicos" className="section-screen flex items-center bg-slate-50 px-4 py-8 sm:px-6 sm:py-10">
+      <div className="mx-auto w-full max-w-[1600px]">
         <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_4px_24px_rgba(16,24,40,0.06)] sm:p-10">
           <div className="absolute inset-y-0 left-0 w-1.5 bg-brand-600" />
 
