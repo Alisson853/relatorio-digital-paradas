@@ -120,21 +120,27 @@ function ServiceSlide({ servico }: { servico: Servico }) {
           ];
           const mostrarRotulo = fotosDisponiveis.length > 1;
           return (
-            <div className="flex h-full flex-1 flex-col gap-4 sm:flex-row lg:flex-col">
-              {fotosDisponiveis.map((foto) => (
-                <div key={foto.key} className="flex-1">
-                  {/* Sem aspect-ratio fixo de propósito: cada foto tirada em campo
-                      tem um tamanho diferente, então a caixa estica pra preencher
-                      a altura disponível (que já acompanha a coluna de texto ao
-                      lado). object-contain garante que a foto inteira apareça,
-                      sem cortar nada — a caixa escura absorve a sobra quando a
-                      proporção da foto não bate com a da caixa. */}
-                  <div className="relative h-full min-h-[200px] overflow-hidden rounded-2xl border-2 border-white bg-slate-900 shadow-md">
+            // Caixa quadrada em vez de esticar pra preencher a altura ou
+            // largura disponível: esticar produzia proporções bem diferentes
+            // do formato real das fotos (retrato de celular ou widescreen),
+            // e o object-contain sobrava faixa vazia enorme de um dos lados.
+            // Quadrado é o meio-termo que absorve bem os dois formatos, e o
+            // grupo fica centralizado no painel em vez de deformado.
+            <div className="flex h-full flex-1 items-center justify-center">
+              <div
+                className={cn(
+                  "grid w-full grid-cols-1 gap-3",
+                  fotosDisponiveis.length === 2 && "sm:grid-cols-2",
+                  fotosDisponiveis.length >= 3 && "sm:grid-cols-3"
+                )}
+              >
+                {fotosDisponiveis.map((foto) => (
+                  <div key={foto.key} className="relative mx-auto aspect-square max-h-full w-full overflow-hidden rounded-2xl border-2 border-white bg-slate-100 shadow-md">
                     <Image
                       src={foto.url}
                       alt={servico.equipamento}
                       fill
-                      sizes="(min-width: 1024px) 560px, (min-width: 640px) 380px, 640px"
+                      sizes="(min-width: 1024px) 260px, (min-width: 640px) 220px, 90vw"
                       className="object-contain"
                       loading="eager"
                       unoptimized={foto.url.startsWith("data:")}
@@ -151,8 +157,8 @@ function ServiceSlide({ servico }: { servico: Servico }) {
                       </span>
                     )}
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           );
         })()}
