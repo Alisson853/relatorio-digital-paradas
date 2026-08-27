@@ -57,6 +57,39 @@ const PLANEJADO_REALIZADO_PADRAO = [
   { etapa: "Partida", planejado: 0, realizado: 0 },
 ];
 
+// Palavras que costumam aparecer no título/descrição de cada OS da planilha
+// e indicam em qual etapa da parada aquele serviço se encaixa. Uma OS só cai
+// na primeira etapa cujo padrão bater — a ordem importa (ex: "substituição
+// do rolamento após desmontagem" cai em Substituição, não Desmontagem).
+const ETAPA_PALAVRAS_CHAVE: Array<{ etapa: string; padrao: RegExp }> = [
+  { etapa: "Testes", padrao: /\btest|ensaio|comissionamento/i },
+  { etapa: "Partida", padrao: /\bpartida|start[- ]?up|liga[cç][aã]o|acionamento|energiza/i },
+  { etapa: "Inspeção", padrao: /\binspe[cç]|verific|diagn[oó]stic|medi[cç][aã]o|an[aá]lise/i },
+  { etapa: "Substituição", padrao: /\bsubstitui|troca|trocar|instala[cç][aã]o|instalar/i },
+  { etapa: "Desmontagem", padrao: /\bdesmont|remo[cç][aã]o|remover|retirad|abertura/i },
+];
+
+// Soma o tempo de cada OS da etapa que seu título casar — "planejado" conta
+// toda OS da planilha (é a previsão semanal), "realizado" só as que a coluna
+// Executado já confirmou como feitas. OS que não bate com nenhuma palavra-
+// chave fica de fora do gráfico (não tem etapa clara pra jogar ela).
+function calcularPlanejadoRealizado(servicosAtuais: ServicoRow[]): typeof PLANEJADO_REALIZADO_PADRAO {
+  const totals = new Map(PLANEJADO_REALIZADO_PADRAO.map((e) => [e.etapa, { planejado: 0, realizado: 0 }]));
+  for (const s of servicosAtuais) {
+    const texto = `${s.motivo} ${s.equipamento}`;
+    const match = ETAPA_PALAVRAS_CHAVE.find((e) => e.padrao.test(texto));
+    if (!match) continue;
+    const horas = parseHoras(s.tempoGasto);
+    const acumulado = totals.get(match.etapa)!;
+    acumulado.planejado += horas;
+    if (s.status === "concluido") acumulado.realizado += horas;
+  }
+  return PLANEJADO_REALIZADO_PADRAO.map((e) => {
+    const t = totals.get(e.etapa)!;
+    return { etapa: e.etapa, planejado: Math.round(t.planejado * 10) / 10, realizado: Math.round(t.realizado * 10) / 10 };
+  });
+}
+
 function novoTimelineItem(): TimelineRow {
   return { id: crypto.randomUUID(), horario: "08:00", titulo: "", responsavel: "", descricao: "", icone: "wrench", status: "concluido" };
 }
@@ -462,17 +495,23 @@ function NovaParadaForm() {
       // volta pra pendente, pra não apagar um "concluído" já marcado no app.
       const atualizadas: string[] = [];
       let marcadasConcluidas = 0;
+      // updateRow já dispara o setServicos, mas o state não reflete a mudança
+      // a tempo de recalcular o Planejado x Realizado logo abaixo — guarda os
+      // mesmos patches aqui pra montar a lista final "na mão".
+      const patchesPorId = new Map<string, Partial<ServicoRow>>();
 
       for (const item of importados) {
         const existente = item.numeroOS !== "Oportunidade" ? porOsExistente.get(chaveOS(item.numeroOS)) : undefined;
         if (existente) {
-          updateRow(setServicos, existente.id, {
+          const patch: Partial<ServicoRow> = {
             responsavel: item.responsavel || existente.responsavel,
             equipe: item.equipe,
             categoria: item.categoria,
             tempoGasto: item.tempoGasto,
             status: item.concluido ? "concluido" : existente.status,
-          });
+          };
+          updateRow(setServicos, existente.id, patch);
+          patchesPorId.set(existente.id, patch);
           atualizadas.push(item.numeroOS);
           if (item.concluido && existente.status !== "concluido") marcadasConcluidas++;
           continue;
@@ -499,6 +538,12 @@ function NovaParadaForm() {
 
       if (novasLinhas.length) setServicos((prev) => [...prev, ...novasLinhas]);
       if (totalProgramado === undefined) setTotalAtividades((prev) => prev.trim() || String(servicos.length + novasLinhas.length));
+
+      // Planejado x Realizado sempre recalculado a partir do título de cada
+      // OS (existentes + atualizadas + novas) — é isso que o usuário pediu:
+      // puxar da planilha em vez de digitar hora por etapa na mão.
+      const servicosCombinados = servicos.map((s) => (patchesPorId.has(s.id) ? { ...s, ...patchesPorId.get(s.id) } : s)).concat(novasLinhas);
+      setPlanejadoRealizado(calcularPlanejadoRealizado(servicosCombinados));
 
       const partes = [`${novasLinhas.length} serviço${novasLinhas.length === 1 ? "" : "s"} importado${novasLinhas.length === 1 ? "" : "s"}`];
       if (atualizadas.length > 0) partes.push(`${atualizadas.length} já existiam e tiveram responsável/equipe/tempo atualizados`);
