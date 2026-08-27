@@ -878,6 +878,7 @@ function NovaParadaForm() {
                 <input
                   type="number"
                   min={0}
+                  step={0.1}
                   value={etapa.planejado}
                   onChange={(e) => setPlanejadoRealizado((prev) => prev.map((p, idx) => (idx === i ? { ...p, planejado: Number(e.target.value) || 0 } : p)))}
                   placeholder="Planejado (h)"
@@ -886,6 +887,7 @@ function NovaParadaForm() {
                 <input
                   type="number"
                   min={0}
+                  step={0.1}
                   value={etapa.realizado}
                   onChange={(e) => setPlanejadoRealizado((prev) => prev.map((p, idx) => (idx === i ? { ...p, realizado: Number(e.target.value) || 0 } : p)))}
                   placeholder="Realizado (h)"
