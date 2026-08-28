@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Search,
   Unlock,
+  User,
   X,
 } from "lucide-react";
 import type { Equipe, ParadaCompleta, Servico, TimelineEvento } from "@/lib/types";
@@ -473,6 +474,14 @@ function ServicoCapturaCard({
               técnico genérico que não diz nada de cara. */}
           <h3 className="mt-0.5 text-base font-bold leading-snug text-slate-900">{servico.problemaIdentificado}</h3>
           <p className="mt-0.5 text-xs text-slate-400">{servico.equipamento}</p>
+          {/* Nome de quem é responsável, sempre visível — é o que permite ir
+              direto falar com a pessoa certa em vez de só saber a equipe. */}
+          {servico.responsavel && (
+            <p className="mt-1.5 flex items-center gap-1.5 text-sm font-bold text-brand-700">
+              <User size={13} className="flex-none" />
+              {servico.responsavel}
+            </p>
+          )}
         </div>
         <button
           type="button"
@@ -624,7 +633,8 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
         s.numeroOS.toLowerCase().includes(termo) ||
         s.equipamento.toLowerCase().includes(termo) ||
         s.titulo.toLowerCase().includes(termo) ||
-        s.problemaIdentificado.toLowerCase().includes(termo)
+        s.problemaIdentificado.toLowerCase().includes(termo) ||
+        s.responsavel.toLowerCase().includes(termo)
     );
   }, [servicosOrdenados, busca]);
 
@@ -714,7 +724,7 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
             <input
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar por OS ou equipamento"
+              placeholder="Buscar por OS, equipamento ou responsável"
               className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-9 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
             />
             {busca && (
