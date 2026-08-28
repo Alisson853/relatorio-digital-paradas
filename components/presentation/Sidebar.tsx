@@ -63,44 +63,46 @@ export function Sidebar({ sections, activeId, onNavigate, onPresent, titulo, par
             Modo Apresentação
           </button>
           {isEditor && (
-            <Link
-              href={`/parada/${paradaId}/fotos`}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-bold text-brand-700 transition-colors hover:bg-brand-100"
-            >
-              <Camera size={16} />
-              Captura Rápida (Celular)
-            </Link>
+            <>
+              <Link
+                href={`/parada/${paradaId}/fotos`}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-bold text-brand-700 transition-colors hover:bg-brand-100"
+              >
+                <Camera size={16} />
+                Captura Rápida (Celular)
+              </Link>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-2 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  <FileDown size={14} />
+                  PDF
+                </button>
+                <a
+                  href={`/api/export/pptx/${paradaId}`}
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-2 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  <Presentation size={14} />
+                  PPTX
+                </a>
+                <a
+                  href={`/api/export/docx/${paradaId}`}
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-2 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  <FileText size={14} />
+                  DOCX
+                </a>
+                <a
+                  href={`/api/export/rtf/${paradaId}`}
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-2 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  <ScrollText size={14} />
+                  RTF
+                </a>
+              </div>
+            </>
           )}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => window.print()}
-              className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-2 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
-            >
-              <FileDown size={14} />
-              PDF
-            </button>
-            <a
-              href={`/api/export/pptx/${paradaId}`}
-              className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-2 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
-            >
-              <Presentation size={14} />
-              PPTX
-            </a>
-            <a
-              href={`/api/export/docx/${paradaId}`}
-              className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-2 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
-            >
-              <FileText size={14} />
-              DOCX
-            </a>
-            <a
-              href={`/api/export/rtf/${paradaId}`}
-              className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-2 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
-            >
-              <ScrollText size={14} />
-              RTF
-            </a>
-          </div>
         </div>
       </aside>
 
@@ -131,42 +133,44 @@ export function Sidebar({ sections, activeId, onNavigate, onPresent, titulo, par
             Apresentar
           </button>
           {isEditor && (
-            <Link
-              href={`/parada/${paradaId}/fotos`}
-              className="flex flex-none items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-[10px] font-bold text-brand-700"
-            >
-              <Camera size={14} />
-              Captura
-            </Link>
+            <>
+              <Link
+                href={`/parada/${paradaId}/fotos`}
+                className="flex flex-none items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-[10px] font-bold text-brand-700"
+              >
+                <Camera size={14} />
+                Captura
+              </Link>
+              <button
+                onClick={() => window.print()}
+                className="flex flex-none items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-500"
+              >
+                <FileDown size={14} />
+                PDF
+              </button>
+              <a
+                href={`/api/export/pptx/${paradaId}`}
+                className="flex flex-none items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-500"
+              >
+                <Presentation size={14} />
+                PPTX
+              </a>
+              <a
+                href={`/api/export/docx/${paradaId}`}
+                className="flex flex-none items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-500"
+              >
+                <FileText size={14} />
+                DOCX
+              </a>
+              <a
+                href={`/api/export/rtf/${paradaId}`}
+                className="flex flex-none items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-500"
+              >
+                <ScrollText size={14} />
+                RTF
+              </a>
+            </>
           )}
-          <button
-            onClick={() => window.print()}
-            className="flex flex-none items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-500"
-          >
-            <FileDown size={14} />
-            PDF
-          </button>
-          <a
-            href={`/api/export/pptx/${paradaId}`}
-            className="flex flex-none items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-500"
-          >
-            <Presentation size={14} />
-            PPTX
-          </a>
-          <a
-            href={`/api/export/docx/${paradaId}`}
-            className="flex flex-none items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-500"
-          >
-            <FileText size={14} />
-            DOCX
-          </a>
-          <a
-            href={`/api/export/rtf/${paradaId}`}
-            className="flex flex-none items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-500"
-          >
-            <ScrollText size={14} />
-            RTF
-          </a>
         </div>
       </div>
     </>
