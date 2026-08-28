@@ -28,6 +28,14 @@ import { EditorPasswordForm } from "@/components/shared/EditorPasswordForm";
 import { useEditorMode } from "@/lib/useEditorMode";
 import { cn } from "@/lib/utils";
 
+// A coluna "Executante" da planilha às vezes traz lixo em vez de um nome —
+// número de turno, célula com erro de acentuação virando "?????" etc. Usado
+// tanto pra montar os chips de filtro quanto pra decidir se mostra o nome no
+// card, pra não exibir/filtrar por algo que claramente não é uma pessoa.
+function pareceNomeDePessoa(texto: string): boolean {
+  return /[A-Za-zÀ-ÖØ-öø-ÿ]{2,}/.test(texto);
+}
+
 const EQUIPE_OPTIONS: Equipe[] = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil", "Caldeiraria", "Preditiva"];
 const CATEGORIA_OPTIONS = ["Preventiva", "Corretiva", "Preditiva", "Lubrificação", "Melhoria", "Etiqueta Vermelha", "Etiqueta Amarela"];
 
@@ -476,7 +484,7 @@ function ServicoCapturaCard({
           <p className="mt-0.5 text-xs text-slate-400">{servico.equipamento}</p>
           {/* Nome de quem é responsável, sempre visível — é o que permite ir
               direto falar com a pessoa certa em vez de só saber a equipe. */}
-          {servico.responsavel && (
+          {servico.responsavel && pareceNomeDePessoa(servico.responsavel) && (
             <p className="mt-1.5 flex items-center gap-1.5 text-sm font-bold text-brand-700">
               <User size={13} className="flex-none" />
               {servico.responsavel}
@@ -628,12 +636,15 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
   // "responsavel" costuma vir como dupla/trio ("ADELINO + JEBERSON") — quebra
   // em cada pessoa e pega só o primeiro nome, pra virar um chip curto que dá
   // pra tocar direto em vez de digitar. Um nome por pessoa (sem repetir).
+  // A planilha às vezes traz lixo nessa coluna (número de turno, célula com
+  // erro de acentuação virando "?????") — só vira chip o que parece nome de
+  // gente de verdade (letras, pelo menos 2 caracteres).
   const pessoas = useMemo(() => {
     const vistos = new Map<string, string>();
     for (const s of servicosOrdenados) {
       for (const parte of s.responsavel.split(/\s*\+\s*/)) {
         const primeiroNome = parte.trim().split(/\s+/)[0];
-        if (!primeiroNome) continue;
+        if (!primeiroNome || !pareceNomeDePessoa(primeiroNome)) continue;
         const chave = primeiroNome.toLowerCase();
         if (!vistos.has(chave)) vistos.set(chave, primeiroNome);
       }
