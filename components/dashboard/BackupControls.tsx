@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Download, Upload } from "lucide-react";
 import type { ParadaCompleta } from "@/lib/types";
-import { listParadasResumo, getParadaCompleta, saveParada } from "@/lib/actions/paradas";
+import { listParadasResumo, exportarBackupCompleto, saveParada } from "@/lib/actions/paradas";
 import { getEditorSenha } from "@/lib/editor-auth";
 import { triggerJsonDownload } from "@/lib/local-json";
 
@@ -22,9 +22,14 @@ export function BackupControls() {
   const [ocupado, setOcupado] = useState(false);
 
   async function handleExportarTudo() {
-    const resumos = await listParadasResumo();
-    const completas = await Promise.all(resumos.map((r) => getParadaCompleta(r.id)));
-    triggerJsonDownload(`relatorios-santher-backup-${new Date().toISOString().slice(0, 10)}.json`, completas.filter(Boolean));
+    setErro("");
+    const senha = getEditorSenha();
+    const resultado = await exportarBackupCompleto(senha);
+    if (!resultado.ok || !resultado.dados) {
+      setErro(resultado.erro || "Não foi possível exportar o backup.");
+      return;
+    }
+    triggerJsonDownload(`relatorios-santher-backup-${new Date().toISOString().slice(0, 10)}.json`, resultado.dados);
   }
 
   async function handleImport(file: File | undefined) {

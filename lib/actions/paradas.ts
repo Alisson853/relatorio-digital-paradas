@@ -67,6 +67,18 @@ export async function listParadasHistorico(): Promise<ParadaHistoricoItem[]> {
   return rows.map((row) => ({ resumo: rowParaResumo(row), kpis: row.kpis }));
 }
 
+// Exporta TODOS os relatórios de uma vez (fotos, responsáveis, tudo) — bem
+// mais sensível que abrir um relatório específico, então, diferente de
+// listParadasResumo/getParadaCompleta (usadas pras páginas públicas de
+// visualização), essa aqui exige a senha de editor como qualquer escrita.
+export async function exportarBackupCompleto(senha: string): Promise<{ ok: boolean; erro?: string; dados?: ParadaCompleta[] }> {
+  const autorizado = await verifyEditorPassword(senha);
+  if (!autorizado) return { ok: false, erro: "Não autorizado." };
+
+  const rows = await getDb().select().from(paradas).orderBy(asc(paradas.data));
+  return { ok: true, dados: rows.map(rowParaCompleta).reverse() };
+}
+
 export async function getParadaAtualizadaEm(id: string): Promise<number | null> {
   const [row] = await getDb().select({ atualizadoEm: paradas.atualizadoEm }).from(paradas).where(eq(paradas.id, id)).limit(1);
   return row ? row.atualizadoEm.getTime() : null;
