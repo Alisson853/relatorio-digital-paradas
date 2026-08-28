@@ -255,8 +255,14 @@ export interface PendenciaChecklistItem {
 
 // Varre todos os relatórios em busca de serviços com fotos faltando (Antes/Depois)
 // ou status ainda não concluído — uma visão cruzada para saber o que falta
-// documentar antes de fechar cada parada.
-export async function listChecklistPendencias(): Promise<PendenciaChecklistItem[]> {
+// documentar antes de fechar cada parada. Cruza dados de TODOS os relatórios
+// de uma vez (igual ao backup completo), então exige senha de editor — antes
+// a página só escondia isso na tela, mas mandava os dados pra qualquer
+// visitante do jeito mesmo (o componente client só não desenhava na tela).
+export async function listChecklistPendencias(senha: string): Promise<PendenciaChecklistItem[]> {
+  const autorizado = await verifyEditorPassword(senha);
+  if (!autorizado) return [];
+
   const rows = await getDb().select().from(paradas).orderBy(asc(paradas.data));
   const itens: PendenciaChecklistItem[] = [];
 
@@ -290,8 +296,15 @@ export async function uploadFoto(formData: FormData, senha: string): Promise<{ o
 
   const file = formData.get("file");
   if (!(file instanceof File)) return { ok: false, erro: "Arquivo inválido." };
+  // Sem isso, quem tem a senha de editor podia hospedar qualquer arquivo
+  // (executável, HTML) num blob público — só imagem é aceito aqui.
+  if (!file.type.startsWith("image/")) return { ok: false, erro: "Só é permitido enviar imagens." };
 
-  const nomeUnico = `fotos/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${file.name}`;
+  // file.name vem do cliente sem nenhuma garantia — nunca usa ele direto na
+  // chave do blob. Guarda só a extensão (também derivada do nome, então
+  // limitada a caracteres seguros) e gera o resto do nome aleatório.
+  const extensao = file.name.match(/\.[a-zA-Z0-9]{1,5}$/)?.[0] ?? "";
+  const nomeUnico = `fotos/${Date.now()}-${Math.random().toString(36).slice(2, 10)}${extensao}`;
   const blob = await put(nomeUnico, file, { access: "public" });
   return { ok: true, url: blob.url };
 }

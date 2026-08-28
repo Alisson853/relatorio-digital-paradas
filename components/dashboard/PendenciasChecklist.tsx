@@ -1,8 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, ClipboardList } from "lucide-react";
-import type { PendenciaChecklistItem } from "@/lib/actions/paradas";
+import { AlertTriangle, CheckCircle2, ClipboardList, Loader2 } from "lucide-react";
+import { listChecklistPendencias, type PendenciaChecklistItem } from "@/lib/actions/paradas";
+import { getEditorSenha } from "@/lib/editor-auth";
+import { useEditorMode } from "@/lib/useEditorMode";
+import { EditorPasswordForm } from "@/components/shared/EditorPasswordForm";
 import { cn } from "@/lib/utils";
 
 const BADGE_STYLES: Record<string, string> = {
@@ -11,7 +15,34 @@ const BADGE_STYLES: Record<string, string> = {
   "Status pendente": "bg-danger-100 text-danger-600 border-transparent",
 };
 
-export function PendenciasChecklist({ itens }: { itens: PendenciaChecklistItem[] }) {
+export function PendenciasChecklist() {
+  const { ready, isEditor, unlock } = useEditorMode();
+  const [itens, setItens] = useState<PendenciaChecklistItem[] | null>(null);
+
+  useEffect(() => {
+    if (!isEditor) return;
+    listChecklistPendencias(getEditorSenha()).then(setItens);
+  }, [isEditor]);
+
+  if (!ready) return null;
+
+  if (!isEditor) {
+    return (
+      <div className="mx-auto max-w-sm rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <EditorPasswordForm onUnlock={unlock} onSuccess={() => {}} titulo="Acesso Restrito" descricao="Digite a senha para ver as pendências de todos os relatórios." />
+      </div>
+    );
+  }
+
+  if (itens === null) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-20 text-sm font-medium text-slate-400">
+        <Loader2 size={16} className="animate-spin" />
+        Carregando pendências...
+      </div>
+    );
+  }
+
   const porParada = new Map<string, { paradaNome: string; itens: PendenciaChecklistItem[] }>();
   itens.forEach((item) => {
     const grupo = porParada.get(item.paradaId) ?? { paradaNome: item.paradaNome, itens: [] };

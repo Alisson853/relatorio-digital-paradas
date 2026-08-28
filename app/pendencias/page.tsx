@@ -1,15 +1,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { listChecklistPendencias } from "@/lib/actions/paradas";
 import { PendenciasChecklist } from "@/components/dashboard/PendenciasChecklist";
-import { EditorOnly } from "@/components/shared/EditorOnly";
 
 export const dynamic = "force-dynamic";
 
-export default async function PendenciasPage() {
-  const itens = await listChecklistPendencias();
-
+// Não busca os dados aqui: listChecklistPendencias cruza informação de TODOS
+// os relatórios, então só é chamada depois que o PendenciasChecklist (client)
+// confirma que o modo editor está desbloqueado — buscar no servidor e só
+// esconder na tela mandaria os dados pra qualquer visitante mesmo assim.
+export default function PendenciasPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-slate-200 bg-white">
@@ -27,9 +27,7 @@ export default async function PendenciasPage() {
       </header>
 
       <main className="mx-auto max-w-5xl px-6 py-10 sm:px-10">
-        <EditorOnly>
-          <PendenciasChecklist itens={itens} />
-        </EditorOnly>
+        <PendenciasChecklist />
       </main>
     </div>
   );
