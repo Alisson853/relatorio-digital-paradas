@@ -625,6 +625,22 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
   const concluidasCount = data ? data.servicos.filter((s) => s.status === "concluido").length : 0;
   const percConcluido = totalServicos > 0 ? Math.round((concluidasCount / totalServicos) * 100) : 0;
 
+  // "responsavel" costuma vir como dupla/trio ("ADELINO + JEBERSON") — quebra
+  // em cada pessoa e pega só o primeiro nome, pra virar um chip curto que dá
+  // pra tocar direto em vez de digitar. Um nome por pessoa (sem repetir).
+  const pessoas = useMemo(() => {
+    const vistos = new Map<string, string>();
+    for (const s of servicosOrdenados) {
+      for (const parte of s.responsavel.split(/\s*\+\s*/)) {
+        const primeiroNome = parte.trim().split(/\s+/)[0];
+        if (!primeiroNome) continue;
+        const chave = primeiroNome.toLowerCase();
+        if (!vistos.has(chave)) vistos.set(chave, primeiroNome);
+      }
+    }
+    return Array.from(vistos.values()).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [servicosOrdenados]);
+
   const servicosFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();
     if (!termo) return servicosOrdenados;
@@ -737,6 +753,29 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
                 <X size={15} />
               </button>
             )}
+          </div>
+        )}
+
+        {pessoas.length > 0 && (
+          // Um toque no nome já filtra — evita digitar no celular. Toca de
+          // novo no mesmo nome (já selecionado) pra limpar o filtro.
+          <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4">
+            {pessoas.map((nome) => {
+              const ativo = busca.trim().toLowerCase() === nome.toLowerCase();
+              return (
+                <button
+                  key={nome}
+                  type="button"
+                  onClick={() => setBusca(ativo ? "" : nome)}
+                  className={cn(
+                    "flex-none rounded-full border px-3.5 py-1.5 text-xs font-bold transition-colors",
+                    ativo ? "border-brand-600 bg-brand-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  )}
+                >
+                  {nome}
+                </button>
+              );
+            })}
           </div>
         )}
 
