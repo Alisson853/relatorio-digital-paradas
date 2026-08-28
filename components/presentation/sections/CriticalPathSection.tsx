@@ -54,7 +54,7 @@ export function CriticalPathSection({ itens }: { itens: CaminhoCriticoItem[] }) 
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {itens.map((item, i) => (
+                {itens.map((item) => (
                   <tr
                     key={item.id}
                     className={cn(

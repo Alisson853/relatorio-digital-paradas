@@ -577,24 +577,34 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
   const [horaAgora, setHoraAgora] = useState<Date | null>(null);
   const [busca, setBusca] = useState("");
 
-  async function carregar(mostrarSpinner = false) {
-    if (mostrarSpinner) setAtualizando(true);
+  // Sem nenhum setState síncrono no início — assim dá pra chamar direto no
+  // corpo de um efeito (carga inicial, atualização em segundo plano) sem
+  // disparar um render extra fora do fluxo normal do React. Quem precisa
+  // mostrar spinner (o botão de atualizar manual) usa atualizarComSpinner.
+  async function carregar() {
+    const res = await getParadaCompleta(id);
+    if (res) {
+      setData(res);
+      setStatus("found");
+      setUltimaAtualizacao(new Date());
+    } else {
+      setStatus("not-found");
+    }
+  }
+
+  async function atualizarComSpinner() {
+    setAtualizando(true);
     try {
-      const res = await getParadaCompleta(id);
-      if (res) {
-        setData(res);
-        setStatus("found");
-        setUltimaAtualizacao(new Date());
-      } else {
-        setStatus("not-found");
-      }
+      await carregar();
     } finally {
-      if (mostrarSpinner) setAtualizando(false);
+      setAtualizando(false);
     }
   }
 
   useEffect(() => {
-    carregar();
+    void (async () => {
+      await carregar();
+    })();
 
     // O celular pode ficar com essa tela aberta o dia inteiro em campo, enquanto
     // outras OS são criadas no computador — então além da carga inicial, atualiza
@@ -726,7 +736,7 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
         )}
         <button
           type="button"
-          onClick={() => carregar(true)}
+          onClick={() => atualizarComSpinner()}
           disabled={atualizando}
           className="flex w-full items-center justify-center gap-2 border-t border-slate-100 bg-slate-50 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-60"
         >

@@ -276,6 +276,9 @@ function NovaParadaForm() {
 
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("edit");
+    // window.location só existe no navegador — calcular isso durante o
+    // render (em vez de um efeito) quebraria a renderização no servidor.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEditId(id);
     draftKeyRef.current = id ?? "novo";
 
@@ -344,7 +347,6 @@ function NovaParadaForm() {
       }
       setReady(true);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Rascunho automático: salva o estado do formulário enquanto o usuário preenche

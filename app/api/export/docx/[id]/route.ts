@@ -29,7 +29,6 @@ export const dynamic = "force-dynamic";
 
 const NAVY = "0A1E3F";
 const BRAND = "1B4D99";
-const BRAND_PALE = "DCE8F8";
 const SIGNAL = "F2A930";
 const INK = "101828";
 const SLATE = "64749A";

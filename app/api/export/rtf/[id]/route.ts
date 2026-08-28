@@ -6,7 +6,7 @@ import { servicosComFoto } from "@/lib/derive";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { gerarQrCodeBuffer, urlDaParada } from "@/lib/qrcode";
 import { formatDate, statusLabel } from "@/lib/utils";
-import type { ParadaCompleta, Servico } from "@/lib/types";
+import type { ParadaCompleta } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +45,7 @@ function pictBlock(foto: { hex: string; width: number; height: number }): string
 
 // Paleta como índice na tabela de cores do RTF (ordem importa).
 const COLORS = ["auto", "101828", "1B4D99", "64749A", "0F8A5F", "B8760F", "C23A2F", "FFFFFF", "0A1E3F", "F7F9FC", "DBE2EE"] as const;
-const [C_AUTO, C_INK, C_BRAND, C_SLATE, C_SUCCESS, C_WARNING, C_DANGER, C_WHITE, C_NAVY, C_SLATE_LIGHT, C_BORDER] = COLORS.map((_, i) => i);
+const [, C_INK, C_BRAND, C_SLATE, C_SUCCESS, C_WARNING, C_DANGER, C_WHITE, C_NAVY, C_SLATE_LIGHT, C_BORDER] = COLORS.map((_, i) => i);
 
 function esc(texto: string): string {
   return String(texto ?? "")
