@@ -1,9 +1,10 @@
-// Modo editor: a senha agora é validada no servidor (lib/actions/auth.ts) a cada
-// ação de escrita — criar, editar, excluir e enviar fotos. O que fica no navegador
-// é só a senha (para reenviá-la nas próximas ações) e um flag de UI, então isso
-// continua sendo apenas um filtro de visibilidade para quem só precisa visualizar,
-// não uma sessão autenticada — mas a escrita em si não pode mais ser forjada
-// sem conhecer a senha, diferente do esquema anterior 100% client-side.
+// Modo editor: a senha é validada no servidor (lib/actions/auth.ts) a cada ação
+// de escrita — criar, editar, excluir e enviar fotos. O que fica salvo no
+// navegador NÃO é a senha real: é um token assinado pelo servidor, com validade
+// de 24h, devolvido depois de um login correto (veja lib/actions/auth.ts). Quem
+// ler esse localStorage não descobre a senha — só um token que expira sozinho e
+// não serve pra nada fora deste app. O flag de UI continua sendo só um filtro de
+// visibilidade; a escrita em si é sempre revalidada no servidor com o token.
 const SENHA_KEY = "maintops:editor-senha";
 const STORAGE_KEY = "maintops:editor-unlocked";
 

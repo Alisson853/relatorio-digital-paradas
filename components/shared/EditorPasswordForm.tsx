@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Lock, Loader2 } from "lucide-react";
 
 interface Props {
-  onUnlock: (senha: string) => Promise<boolean>;
+  onUnlock: (senha: string) => Promise<boolean | { ok: boolean; erro?: string }>;
   onSuccess: () => void;
   titulo?: string;
   descricao?: string;
@@ -12,19 +12,20 @@ interface Props {
 
 export function EditorPasswordForm({ onUnlock, onSuccess, titulo = "Área do Editor", descricao = "Digite a senha para criar e editar relatórios." }: Props) {
   const [senha, setSenha] = useState("");
-  const [erro, setErro] = useState(false);
+  const [erro, setErro] = useState("");
   const [verificando, setVerificando] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setVerificando(true);
-    const ok = await onUnlock(senha);
+    const resultado = await onUnlock(senha);
     setVerificando(false);
+    const ok = typeof resultado === "boolean" ? resultado : resultado.ok;
     if (ok) {
-      setErro(false);
+      setErro("");
       onSuccess();
     } else {
-      setErro(true);
+      setErro((typeof resultado === "object" && resultado.erro) || "Senha incorreta.");
     }
   }
 
@@ -43,12 +44,12 @@ export function EditorPasswordForm({ onUnlock, onSuccess, titulo = "Área do Edi
         value={senha}
         onChange={(e) => {
           setSenha(e.target.value);
-          setErro(false);
+          setErro("");
         }}
         placeholder="Senha"
         className="w-full max-w-xs rounded-xl border border-slate-200 px-3.5 py-2.5 text-center text-sm text-slate-800 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
       />
-      {erro && <p className="text-xs font-semibold text-danger-600">Senha incorreta.</p>}
+      {erro && <p className="text-xs font-semibold text-danger-600">{erro}</p>}
       <button
         type="submit"
         disabled={verificando}
