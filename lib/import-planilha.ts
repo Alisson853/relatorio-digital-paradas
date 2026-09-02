@@ -101,25 +101,57 @@ function extrairNumeroMaquina(texto: string): string | null {
   return viaNumero ? viaNumero[1].padStart(2, "0") : null;
 }
 
-// Planilhas de programação semanal costumam ter uma aba de "oportunidade"
-// genérica (todas as máquinas misturadas) além de uma aba por parada
-// específica ("PARADA MP11", "PARADA MP09"...) — puxar a primeira aba do
-// arquivo às cegas trazia serviço de máquina/parada errada. Só as abas que
-// começam com "PARADA" contam como candidatas; entre elas, tenta casar pelo
-// número da máquina do relatório antes de simplesmente pegar a primeira.
-function escolherAba(nomesAbas: string[], maquina?: string): { nome: string; infoAba?: string } {
-  const candidatas = nomesAbas.filter((n) => normalizar(n).startsWith("PARADA"));
-  if (candidatas.length === 0) return { nome: nomesAbas[0] };
-  if (candidatas.length === 1) return { nome: candidatas[0] };
-
-  const alvo = maquina ? extrairNumeroMaquina(maquina) : null;
-  if (alvo) {
-    const casada = candidatas.find((n) => extrairNumeroMaquina(n) === alvo);
-    if (casada) return { nome: casada };
+// Conta quantas linhas de serviço uma aba realmente tem (mesma regra do loop
+// principal: para depois de 5 linhas vazias em sequência), sem montar os
+// ServicoImportado inteiros — só pra comparar abas entre si.
+function contarLinhasReais(linhas: unknown[][], idxCabecalho: number, colEquipamento: number): number {
+  let total = 0;
+  let vazias = 0;
+  for (let i = idxCabecalho + 1; i < linhas.length; i++) {
+    const equipamento = String((linhas[i] ?? [])[colEquipamento] ?? "").trim();
+    if (!equipamento) {
+      vazias++;
+      if (vazias > 5) break;
+      continue;
+    }
+    vazias = 0;
+    total++;
   }
+  return total;
+}
+
+// Planilhas de programação semanal costumam ter mais de uma aba com serviço
+// (ex: uma lista geral de oportunidade e/ou uma por máquina) — puxar sempre
+// a primeira aba do arquivo trazia às vezes uma lista bem menor ou de outra
+// máquina do que a real. Em vez de adivinhar pelo nome da aba, conta quantas
+// linhas de serviço cada uma tem de verdade e usa a mais completa — nome de
+// máquina só desempata quando há mais de uma aba com quantidade parecida.
+function escolherAba(workbook: XLSX.WorkBook, maquina?: string): { nome: string; infoAba?: string } {
+  const candidatas = workbook.SheetNames.map((nome) => {
+    const linhas: unknown[][] = XLSX.utils.sheet_to_json(workbook.Sheets[nome], { header: 1, raw: true, defval: null });
+    const idxCabecalho = encontrarLinhaCabecalho(linhas);
+    if (idxCabecalho === -1) return null;
+    const colEquipamento = encontrarColuna(linhas[idxCabecalho].map(normalizar), CABECALHOS.equipamento);
+    const linhasReais = contarLinhasReais(linhas, idxCabecalho, colEquipamento);
+    return linhasReais > 0 ? { nome, linhasReais } : null;
+  }).filter((c): c is { nome: string; linhasReais: number } => c !== null);
+
+  if (candidatas.length === 0) return { nome: workbook.SheetNames[0] };
+  if (candidatas.length === 1) return { nome: candidatas[0].nome };
+
+  const maisCompleta = [...candidatas].sort((a, b) => b.linhasReais - a.linhasReais)[0];
+  const alvo = maquina ? extrairNumeroMaquina(maquina) : null;
+  const casadaPorMaquina = alvo ? candidatas.find((c) => extrairNumeroMaquina(c.nome) === alvo) : undefined;
+  // Só usa a aba que bate pelo nome da máquina se ela tiver uma quantidade
+  // de serviço perto da maior — senão a mais completa claramente é a lista
+  // de verdade dessa parada (ex: aproveitando a parada pra fazer backlog de
+  // outras áreas também), e o nome da aba batendo é coincidência.
+  const escolhida = casadaPorMaquina && casadaPorMaquina.linhasReais >= maisCompleta.linhasReais * 0.5 ? casadaPorMaquina : maisCompleta;
+
+  if (candidatas.length === 1 || escolhida === casadaPorMaquina) return { nome: escolhida.nome };
   return {
-    nome: candidatas[0],
-    infoAba: `Encontrei várias abas de parada nessa planilha (${candidatas.join(", ")}) e não consegui saber qual bate com "${maquina || "essa máquina"}" — usei "${candidatas[0]}". Confira se os serviços são da máquina certa.`,
+    nome: escolhida.nome,
+    infoAba: `Essa planilha tem ${candidatas.length} abas com serviço (${candidatas.map((c) => `${c.nome}: ${c.linhasReais}`).join(", ")}) — usei "${escolhida.nome}" por ter mais linhas. Confira se é a lista certa.`,
   };
 }
 
@@ -224,7 +256,7 @@ export async function parsePlanilhaServicos(file: File, maquina?: string): Promi
   const avisos: string[] = [];
 
   if (workbook.SheetNames.length === 0) return { servicos: [], avisos: ["A planilha não tem nenhuma aba."] };
-  const { nome: nomeAba, infoAba } = escolherAba(workbook.SheetNames, maquina);
+  const { nome: nomeAba, infoAba } = escolherAba(workbook, maquina);
 
   const sheet = workbook.Sheets[nomeAba];
   const linhas: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
