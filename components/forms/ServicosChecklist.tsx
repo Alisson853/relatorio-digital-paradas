@@ -2,7 +2,7 @@
 
 import { CheckCircle2, Circle } from "lucide-react";
 import type { ServicoRow } from "./ServicoRowEditor";
-import { cn } from "@/lib/utils";
+import { cn, pareceNomeDePessoa } from "@/lib/utils";
 
 interface Props {
   servicos: ServicoRow[];
@@ -42,8 +42,15 @@ export function ServicosChecklist({ servicos, onToggle }: Props) {
               <span className="w-16 flex-none truncate font-mono text-xs font-bold text-brand-600">
                 {s.numeroOS === "Oportunidade" ? "—" : s.numeroOS || "—"}
               </span>
-              <span className={cn("min-w-0 flex-1 truncate text-sm", concluido ? "text-slate-400 line-through" : "text-slate-700")}>
-                {s.equipamento || "Sem nome"}
+              <span className="min-w-0 flex-1">
+                <span className={cn("block truncate text-sm", concluido ? "text-slate-400 line-through" : "text-slate-700")}>
+                  {s.equipamento || "Sem nome"}
+                </span>
+                {/* Nome de quem executa, pra revisar o checklist já sabendo com
+                    quem falar em cada OS pendente, sem precisar abrir o card. */}
+                {s.responsavel && pareceNomeDePessoa(s.responsavel) && (
+                  <span className="block truncate text-xs font-semibold text-brand-600">{s.responsavel}</span>
+                )}
               </span>
               <span
                 className={cn(
