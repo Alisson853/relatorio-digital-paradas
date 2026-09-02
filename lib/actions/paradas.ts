@@ -347,11 +347,11 @@ export async function capturarFotoServico(
   url: string,
   senha: string,
   etapaEscolhida?: "Antes" | "Durante" | "Depois"
-): Promise<{ ok: boolean; erro?: string; label?: string; horario?: string }> {
+): Promise<{ ok: boolean; erro?: string; label?: string; horario?: string; statusFechado?: StatusItem }> {
   const autorizado = await verifyEditorPassword(senha);
   if (!autorizado) return { ok: false, erro: "Não autorizado." };
 
-  const [row] = await getDb().select({ servicos: paradas.servicos }).from(paradas).where(eq(paradas.id, paradaId)).limit(1);
+  const [row] = await getDb().select().from(paradas).where(eq(paradas.id, paradaId)).limit(1);
   if (!row) return { ok: false, erro: "Relatório não encontrado." };
 
   const idx = row.servicos.findIndex((s) => s.id === servicoId);
@@ -363,13 +363,52 @@ export async function capturarFotoServico(
   const etapaVazia = etapaEscolhida ? ETAPAS_POR_LABEL[etapaEscolhida] : (ORDEM_CAPTURA.find((e) => etapaEstaVazia(servico, e)) ?? ETAPA_DEPOIS);
 
   const horario = horarioAgora();
-  const servicoAtualizado: Servico = { ...servico, [etapaVazia.campo]: url, [etapaVazia.horarioCampo]: horario };
+  let servicoAtualizado: Servico = { ...servico, [etapaVazia.campo]: url, [etapaVazia.horarioCampo]: horario };
+
+  // Antes e Depois são as duas fotos que realmente fecham o registro (Durante
+  // é opcional) — assim que as duas existem, a OS conclui sozinha, sem
+  // precisar voltar depois só pra tocar em "Concluído" pelo celular.
+  const temAntes = !!servicoAtualizado.fotoAntes && servicoAtualizado.fotoAntes !== NO_PHOTO_PLACEHOLDER;
+  const temDepois = !!servicoAtualizado.fotoDepois && servicoAtualizado.fotoDepois !== NO_PHOTO_PLACEHOLDER;
+  const fechaAutomaticamente = temAntes && temDepois && servicoAtualizado.status !== "concluido";
+  if (fechaAutomaticamente) {
+    servicoAtualizado = {
+      ...servicoAtualizado,
+      status: "concluido",
+      servicoExecutado: servicoAtualizado.servicoExecutado || textoExecutadoPadrao("concluido"),
+      resultado: servicoAtualizado.resultado || textoResultadoPadrao("concluido"),
+    };
+  }
+
   const servicosAtualizados = [...row.servicos];
   servicosAtualizados[idx] = servicoAtualizado;
 
-  await getDb().update(paradas).set({ servicos: servicosAtualizados, atualizadoEm: new Date() }).where(eq(paradas.id, paradaId));
+  if (!fechaAutomaticamente) {
+    await getDb().update(paradas).set({ servicos: servicosAtualizados, atualizadoEm: new Date() }).where(eq(paradas.id, paradaId));
+    return { ok: true, label: etapaVazia.label, horario };
+  }
 
-  return { ok: true, label: etapaVazia.label, horario };
+  // Fechar sozinho muda a contagem de concluídas — recalcula kpis/gráficos na
+  // hora, igual marcarStatusServico já faz pra mudança manual de status.
+  const tetoHoras = parseHoras(row.duracaoRealizada) || parseHoras(row.duracaoPlanejada) || undefined;
+  const kpisAtualizados = deriveKpis(servicosAtualizados, row.kpis.seguranca, { totalPlanejado: row.kpis.osPlanejadas, duracaoMaximaHoras: tetoHoras });
+  const atrasoGeralHoras = Math.max(0, parseHoras(row.duracaoRealizada) - parseHoras(row.duracaoPlanejada));
+  const graficosAtualizados = deriveGraficos(
+    servicosAtualizados,
+    row.caminhoCritico,
+    row.graficos.planejadoRealizado,
+    kpisAtualizados.eficiencia,
+    tetoHoras,
+    atrasoGeralHoras
+  );
+  const resultadoAtualizado = { ...row.resultadoFinal, eficiencia: kpisAtualizados.eficiencia, pendenciasAbertas: kpisAtualizados.pendencias };
+
+  await getDb()
+    .update(paradas)
+    .set({ servicos: servicosAtualizados, kpis: kpisAtualizados, graficos: graficosAtualizados, resultadoFinal: resultadoAtualizado, atualizadoEm: new Date() })
+    .where(eq(paradas.id, paradaId));
+
+  return { ok: true, label: etapaVazia.label, horario, statusFechado: "concluido" };
 }
 
 // Serviços importados de planilha entram como "pendente" e podem ser marcados

@@ -439,8 +439,16 @@ function ServicoCapturaCard({
       setEtapaEscolhida(null);
       const campo = resultado.label === "Antes" ? "fotoAntes" : resultado.label === "Durante" ? "fotoDurante" : "fotoDepois";
       const horarioCampo = resultado.label === "Antes" ? "fotoAntesHorario" : resultado.label === "Durante" ? "fotoDuranteHorario" : "fotoDepoisHorario";
-      onCaptured(servico.id, { [campo]: upload.url, [horarioCampo]: resultado.horario } as Partial<Servico>);
-      setUltimoResultado(`Registrada como "${resultado.label}" às ${resultado.horario}`);
+      onCaptured(servico.id, {
+        [campo]: upload.url,
+        [horarioCampo]: resultado.horario,
+        ...(resultado.statusFechado ? { status: resultado.statusFechado } : {}),
+      } as Partial<Servico>);
+      setUltimoResultado(
+        resultado.statusFechado
+          ? `Registrada como "${resultado.label}" às ${resultado.horario} — OS concluída automaticamente`
+          : `Registrada como "${resultado.label}" às ${resultado.horario}`
+      );
     } catch {
       await onEnfileirar(servico.id, etapa, blob, nome);
       setEtapaEscolhida(null);
@@ -636,7 +644,11 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
           await removerFotoPendente(item.id);
           const campo = resultado.label === "Antes" ? "fotoAntes" : resultado.label === "Durante" ? "fotoDurante" : "fotoDepois";
           const horarioCampo = resultado.label === "Antes" ? "fotoAntesHorario" : resultado.label === "Durante" ? "fotoDuranteHorario" : "fotoDepoisHorario";
-          handleCaptured(item.servicoId, { [campo]: upload.url, [horarioCampo]: resultado.horario } as Partial<Servico>);
+          handleCaptured(item.servicoId, {
+            [campo]: upload.url,
+            [horarioCampo]: resultado.horario,
+            ...(resultado.statusFechado ? { status: resultado.statusFechado } : {}),
+          } as Partial<Servico>);
         } catch {
           restantes.push(item);
         }
