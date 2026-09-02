@@ -10,6 +10,8 @@ import {
   CheckCircle2,
   ChevronDown,
   CloudOff,
+  Eye,
+  EyeOff,
   Flag,
   Loader2,
   Lock,
@@ -570,6 +572,9 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<Date | null>(null);
   const [horaAgora, setHoraAgora] = useState<Date | null>(null);
   const [busca, setBusca] = useState("");
+  // OS concluída fica fora da lista por padrão — com muitas OS na parada,
+  // a lista inteira de "já feito" só atrapalha achar o que ainda falta.
+  const [mostrarConcluidas, setMostrarConcluidas] = useState(false);
   // Fotos tiradas sem internet ficam guardadas no aparelho (IndexedDB) até
   // a conexão voltar — isso é o que sobrevive a fechar o app/trocar de tela,
   // diferente de só guardar em memória do componente.
@@ -738,16 +743,22 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
 
   const servicosFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();
-    if (!termo) return servicosOrdenados;
-    return servicosOrdenados.filter(
-      (s) =>
-        s.numeroOS.toLowerCase().includes(termo) ||
-        s.equipamento.toLowerCase().includes(termo) ||
-        s.titulo.toLowerCase().includes(termo) ||
-        s.problemaIdentificado.toLowerCase().includes(termo) ||
-        s.responsavel.toLowerCase().includes(termo)
-    );
-  }, [servicosOrdenados, busca]);
+    const base = termo
+      ? servicosOrdenados.filter(
+          (s) =>
+            s.numeroOS.toLowerCase().includes(termo) ||
+            s.equipamento.toLowerCase().includes(termo) ||
+            s.titulo.toLowerCase().includes(termo) ||
+            s.problemaIdentificado.toLowerCase().includes(termo) ||
+            s.responsavel.toLowerCase().includes(termo)
+        )
+      : servicosOrdenados;
+    // Uma busca digitada vale mais que o filtro de "esconder concluídas" —
+    // se a pessoa está procurando uma OS específica, ela aparece mesmo já
+    // pronta, senão a busca "falha" sem motivo aparente.
+    if (termo || mostrarConcluidas) return base;
+    return base.filter((s) => s.status !== "concluido");
+  }, [servicosOrdenados, busca, mostrarConcluidas]);
 
   function handleCaptured(servicoId: string, patch: Partial<Servico>) {
     setData((prev) => {
@@ -862,6 +873,17 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
           </div>
         )}
 
+        {concluidasCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setMostrarConcluidas((v) => !v)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-200 bg-white py-2 text-xs font-bold text-slate-500 transition-colors hover:bg-slate-50"
+          >
+            {mostrarConcluidas ? <EyeOff size={13} /> : <Eye size={13} />}
+            {mostrarConcluidas ? `Ocultar ${concluidasCount} concluída${concluidasCount > 1 ? "s" : ""}` : `Mostrar ${concluidasCount} concluída${concluidasCount > 1 ? "s" : ""}`}
+          </button>
+        )}
+
         {pessoas.length > 0 && (
           // Um toque no nome já filtra — evita digitar no celular. Toca de
           // novo no mesmo nome (já selecionado) pra limpar o filtro.
@@ -888,7 +910,15 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
         {data.servicos.length === 0 ? (
           <p className="py-16 text-center text-sm text-slate-400">Nenhuma OS cadastrada ainda neste relatório.</p>
         ) : servicosFiltrados.length === 0 ? (
-          <p className="py-16 text-center text-sm text-slate-400">Nenhuma OS encontrada para &quot;{busca}&quot;.</p>
+          <p className="py-16 text-center text-sm text-slate-400">
+            {busca ? (
+              <>Nenhuma OS encontrada para &quot;{busca}&quot;.</>
+            ) : (
+              <>
+                Todas as OS estão concluídas. Toque em &quot;Mostrar {concluidasCount} concluída{concluidasCount > 1 ? "s" : ""}&quot; acima pra ver.
+              </>
+            )}
+          </p>
         ) : (
           servicosFiltrados.map((servico) => (
             <ServicoCapturaCard
