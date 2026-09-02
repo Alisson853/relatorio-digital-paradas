@@ -26,15 +26,7 @@ import { compressImageFile, NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { getEditorSenha } from "@/lib/editor-auth";
 import { EditorPasswordForm } from "@/components/shared/EditorPasswordForm";
 import { useEditorMode } from "@/lib/useEditorMode";
-import { cn } from "@/lib/utils";
-
-// A coluna "Executante" da planilha às vezes traz lixo em vez de um nome —
-// número de turno, célula com erro de acentuação virando "?????" etc. Usado
-// tanto pra montar os chips de filtro quanto pra decidir se mostra o nome no
-// card, pra não exibir/filtrar por algo que claramente não é uma pessoa.
-function pareceNomeDePessoa(texto: string): boolean {
-  return /[A-Za-zÀ-ÖØ-öø-ÿ]{2,}/.test(texto);
-}
+import { cn, pareceNomeDePessoa } from "@/lib/utils";
 
 const EQUIPE_OPTIONS: Equipe[] = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil", "Caldeiraria", "Preditiva"];
 const CATEGORIA_OPTIONS = ["Preventiva", "Corretiva", "Preditiva", "Lubrificação", "Melhoria", "Etiqueta Vermelha", "Etiqueta Amarela"];

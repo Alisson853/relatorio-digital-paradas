@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import type { Equipe } from "./types";
+import { limparNomeExecutante } from "./utils";
 
 export interface ServicoImportado {
   numeroOS: string;
@@ -221,7 +222,7 @@ export async function parsePlanilhaServicos(file: File): Promise<ResultadoImport
     const descricao = String(linha[col.descricao] ?? "").trim();
     const oficina = String(linha[col.oficina] ?? "").trim();
     const tipo = String(linha[col.tipo] ?? "").trim();
-    const executante = String(linha[col.executante] ?? "").trim();
+    const executante = limparNomeExecutante(String(linha[col.executante] ?? ""));
     const tempoGasto = formatarTempo(linha[col.hh]);
     const concluido = col.executado !== -1 && estaExecutado(linha[col.executado]);
 

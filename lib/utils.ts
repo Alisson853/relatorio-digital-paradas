@@ -46,6 +46,26 @@ export function formatDate(iso: string): string {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 }
 
+// A coluna "Executante" da planilha às vezes traz lixo em vez de nome —
+// número de turno, célula com erro de acentuação virando uma sequência de
+// "?". Usado tanto na importação (pra nem gravar isso como responsável)
+// quanto na Captura Rápida (pra decidir o que virar chip/aparecer no card).
+export function pareceNomeDePessoa(texto: string): boolean {
+  return /[A-Za-zÀ-ÖØ-öø-ÿ]{2,}/.test(texto);
+}
+
+// Recebe o valor bruto da célula "Executante" (pode ter mais de uma pessoa
+// já separada por "+", ou lixo de codificação) e devolve só os nomes que
+// realmente parecem nome — cada um limpo de espaço duplo, unidos de novo
+// por " + ". Se nada sobrar, devolve string vazia (sem responsável).
+export function limparNomeExecutante(bruto: string): string {
+  return bruto
+    .split(/\s*\+\s*/)
+    .map((parte) => parte.trim().replace(/\s+/g, " "))
+    .filter(pareceNomeDePessoa)
+    .join(" + ");
+}
+
 export function slugify(text: string): string {
   return text
     .normalize("NFD")
