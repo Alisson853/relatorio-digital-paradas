@@ -4,7 +4,7 @@ import { del, put } from "@vercel/blob";
 import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { paradas } from "@/lib/db/schema";
-import type { CaminhoCriticoItem, Equipe, Kpis, ParadaCompleta, ParadaResumo, Servico, TimelineEvento } from "@/lib/types";
+import type { CaminhoCriticoItem, Equipe, Kpis, ParadaCompleta, ParadaResumo, Servico, StatusItem, TimelineEvento } from "@/lib/types";
 import { deriveFotoCapa, deriveFotos, deriveGraficos, deriveKpis, parseHoras, textoExecutadoPadrao, textoResultadoPadrao } from "@/lib/derive";
 import { gerarResultadoFinal } from "@/lib/mock-data";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
@@ -378,7 +378,7 @@ export async function capturarFotoServico(
 export async function marcarStatusServico(
   paradaId: string,
   servicoId: string,
-  status: "concluido" | "pendente",
+  status: StatusItem,
   senha: string
 ): Promise<{ ok: boolean; erro?: string }> {
   const autorizado = await verifyEditorPassword(senha);

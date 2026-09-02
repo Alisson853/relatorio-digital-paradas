@@ -22,7 +22,7 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
-import type { Equipe, ParadaCompleta, Servico, TimelineEvento } from "@/lib/types";
+import type { Equipe, ParadaCompleta, Servico, StatusItem, TimelineEvento } from "@/lib/types";
 import { getParadaCompleta, capturarFotoServico, uploadFoto, adicionarServicoRapido, adicionarEventoRapido, marcarStatusServico } from "@/lib/actions/paradas";
 import { compressImageFile, NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { getEditorSenha } from "@/lib/editor-auth";
@@ -30,6 +30,14 @@ import { EditorPasswordForm } from "@/components/shared/EditorPasswordForm";
 import { useEditorMode } from "@/lib/useEditorMode";
 import { cn, pareceNomeDePessoa } from "@/lib/utils";
 import { type FotoPendente, listarFotosPendentes, removerFotoPendente, salvarFotoPendente } from "@/lib/offline-fotos";
+
+// As 3 opções que fazem sentido marcar em campo pelo celular — "Atrasado" é
+// mais um estado de relatório do que algo que alguém marca na hora.
+const STATUS_OPCOES: Array<{ value: StatusItem; label: string; ativoClasse: string }> = [
+  { value: "pendente", label: "Pendente", ativoClasse: "bg-slate-200 text-slate-700" },
+  { value: "em_andamento", label: "Em Andamento", ativoClasse: "bg-brand-100 text-brand-700" },
+  { value: "concluido", label: "Concluído", ativoClasse: "bg-success-100 text-success-700" },
+];
 
 const EQUIPE_OPTIONS: Equipe[] = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil", "Caldeiraria", "Preditiva"];
 const CATEGORIA_OPTIONS = ["Preventiva", "Corretiva", "Preditiva", "Lubrificação", "Melhoria", "Etiqueta Vermelha", "Etiqueta Amarela"];
@@ -454,12 +462,10 @@ function ServicoCapturaCard({
     }
   }
 
-  const concluido = servico.status === "concluido";
-
-  async function handleToggleStatus() {
+  async function handleAlterarStatus(novoStatus: StatusItem) {
+    if (novoStatus === servico.status) return;
     setStatusLoading(true);
     try {
-      const novoStatus = concluido ? "pendente" : "concluido";
       const resultado = await marcarStatusServico(paradaId, servico.id, novoStatus, getEditorSenha());
       if (resultado.ok) onCaptured(servico.id, { status: novoStatus });
     } finally {
@@ -473,37 +479,44 @@ function ServicoCapturaCard({
           foto NA HORA ou escolher uma já tirada antes (útil quando a foto foi
           tirada num momento sem internet e só agora dá pra anexar). */}
       <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-brand-600">
-            OS {servico.numeroOS} · {servico.area}
+      <div className="min-w-0">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-brand-600">
+          OS {servico.numeroOS} · {servico.area}
+        </p>
+        {/* O que precisa ser feito é a informação que realmente diferencia uma
+            OS da outra em campo — o equipamento sozinho costuma ser um código
+            técnico genérico que não diz nada de cara. */}
+        <h3 className="mt-0.5 text-base font-bold leading-snug text-slate-900">{servico.problemaIdentificado}</h3>
+        <p className="mt-0.5 text-xs text-slate-400">{servico.equipamento}</p>
+        {/* Nome de quem é responsável, sempre visível — é o que permite ir
+            direto falar com a pessoa certa em vez de só saber a equipe. */}
+        {servico.responsavel && pareceNomeDePessoa(servico.responsavel) && (
+          <p className="mt-1.5 flex items-center gap-1.5 text-sm font-bold text-brand-700">
+            <User size={13} className="flex-none" />
+            {servico.responsavel}
           </p>
-          {/* O que precisa ser feito é a informação que realmente diferencia uma
-              OS da outra em campo — o equipamento sozinho costuma ser um código
-              técnico genérico que não diz nada de cara. */}
-          <h3 className="mt-0.5 text-base font-bold leading-snug text-slate-900">{servico.problemaIdentificado}</h3>
-          <p className="mt-0.5 text-xs text-slate-400">{servico.equipamento}</p>
-          {/* Nome de quem é responsável, sempre visível — é o que permite ir
-              direto falar com a pessoa certa em vez de só saber a equipe. */}
-          {servico.responsavel && pareceNomeDePessoa(servico.responsavel) && (
-            <p className="mt-1.5 flex items-center gap-1.5 text-sm font-bold text-brand-700">
-              <User size={13} className="flex-none" />
-              {servico.responsavel}
-            </p>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={handleToggleStatus}
-          disabled={statusLoading}
-          className={cn(
-            "flex flex-none items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase transition-colors disabled:opacity-60",
-            concluido ? "bg-success-100 text-success-700" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-          )}
-        >
-          {statusLoading ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-          {concluido ? "Concluído" : "Pendente"}
-        </button>
+        )}
+      </div>
+
+      {/* 3 estados em vez de um toggle liga/desliga — em campo o serviço
+          passa por "Em Andamento" antes de ficar pronto, e isso precisa
+          aparecer, não só "Pendente" vs "Concluído". */}
+      <div className="mt-3 flex gap-1.5">
+        {STATUS_OPCOES.map((opcao) => (
+          <button
+            key={opcao.value}
+            type="button"
+            onClick={() => handleAlterarStatus(opcao.value)}
+            disabled={statusLoading}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-bold uppercase transition-colors disabled:opacity-60",
+              servico.status === opcao.value ? opcao.ativoClasse : "bg-slate-50 text-slate-400 hover:bg-slate-100"
+            )}
+          >
+            {servico.status === opcao.value && <Check size={11} />}
+            {opcao.label}
+          </button>
+        ))}
       </div>
 
       <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-slate-400">Toque para escolher a etapa da foto</p>
