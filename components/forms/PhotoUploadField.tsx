@@ -48,14 +48,9 @@ export function PhotoUploadField({ label, value, onChange, className }: PhotoUpl
   return (
     <div className={className}>
       <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">{label}</span>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={(e) => handleFile(e.target.files?.[0])}
-      />
+      {/* Sem "capture": deixa escolher entre tirar foto na hora ou pegar uma
+          já existente na galeria. */}
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
 
       {value ? (
         <div className="group relative aspect-[4/3] overflow-hidden rounded-xl border-2 border-white shadow-md ring-1 ring-slate-200">

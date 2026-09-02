@@ -9,6 +9,7 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  CloudOff,
   Flag,
   Loader2,
   Lock,
@@ -18,6 +19,7 @@ import {
   Search,
   Unlock,
   User,
+  WifiOff,
   X,
 } from "lucide-react";
 import type { Equipe, ParadaCompleta, Servico, TimelineEvento } from "@/lib/types";
@@ -27,6 +29,7 @@ import { getEditorSenha } from "@/lib/editor-auth";
 import { EditorPasswordForm } from "@/components/shared/EditorPasswordForm";
 import { useEditorMode } from "@/lib/useEditorMode";
 import { cn, pareceNomeDePessoa } from "@/lib/utils";
+import { type FotoPendente, listarFotosPendentes, removerFotoPendente, salvarFotoPendente } from "@/lib/offline-fotos";
 
 const EQUIPE_OPTIONS: Equipe[] = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil", "Caldeiraria", "Preditiva"];
 const CATEGORIA_OPTIONS = ["Preventiva", "Corretiva", "Preditiva", "Lubrificação", "Melhoria", "Etiqueta Vermelha", "Etiqueta Amarela"];
@@ -356,19 +359,19 @@ function ServicoCapturaCard({
   paradaId,
   servico,
   onCaptured,
+  pendentesDoServico,
+  onEnfileirar,
 }: {
   paradaId: string;
   servico: Servico;
   onCaptured: (servicoId: string, patch: Partial<Servico>) => void;
+  pendentesDoServico: FotoPendente[];
+  onEnfileirar: (servicoId: string, etapa: "Antes" | "Durante" | "Depois", blob: Blob, nomeArquivo: string) => Promise<void>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
   const [ultimoResultado, setUltimoResultado] = useState("");
-  // Guardamos a foto já comprimida quando o envio falha (ex: sinal fraco em
-  // campo) para que "Tentar novamente" reenvie o mesmo arquivo sem precisar
-  // reabrir a câmera e tirar a foto de novo.
-  const [pendente, setPendente] = useState<{ blob: Blob; nome: string } | null>(null);
   // Etapa escolhida manualmente pelo usuário — se nulo, usa a próxima vazia
   // (Antes -> Depois -> Durante) como sugestão automática.
   const [etapaEscolhida, setEtapaEscolhida] = useState<"Antes" | "Durante" | "Depois" | null>(null);
@@ -381,50 +384,57 @@ function ServicoCapturaCard({
   const etapaSugerida: "Antes" | "Durante" | "Depois" = !temAntes ? "Antes" : !temDepois ? "Depois" : !temDurante ? "Durante" : "Depois";
   const etapaAtiva = etapaEscolhida ?? etapaSugerida;
 
+  // Sem internet, nem tenta — vai direto pra fila (evita 3 tentativas de
+  // rede fadadas ao erro, que só atrasam e gastam bateria à toa em campo).
   async function enviar(blob: Blob, nome: string, etapa: "Antes" | "Durante" | "Depois", tentativas = 3) {
     setErro("");
     setUltimoResultado("");
     setLoading(true);
     try {
+      if (!navigator.onLine) {
+        await onEnfileirar(servico.id, etapa, blob, nome);
+        setEtapaEscolhida(null);
+        setUltimoResultado("Sem internet — foto guardada no aparelho, envia sozinha quando a conexão voltar.");
+        return;
+      }
+
       const formData = new FormData();
       formData.set("file", blob, nome);
       const senha = getEditorSenha();
 
       let upload: Awaited<ReturnType<typeof uploadFoto>> | null = null;
-      let ultimoErro = "";
       for (let tentativa = 1; tentativa <= tentativas; tentativa++) {
         try {
           upload = await uploadFoto(formData, senha);
           if (upload.ok) break;
-          ultimoErro = upload.erro || "Não foi possível enviar a foto.";
         } catch {
-          ultimoErro = "";
+          upload = null;
         }
         if (tentativa < tentativas) await new Promise((r) => setTimeout(r, 1200 * tentativa));
       }
 
       if (!upload || !upload.ok || !upload.url) {
-        setPendente({ blob, nome });
-        setErro(ultimoErro || "Sinal fraco — não foi possível enviar a foto. Toque em Tentar Novamente.");
+        await onEnfileirar(servico.id, etapa, blob, nome);
+        setEtapaEscolhida(null);
+        setUltimoResultado("Sinal fraco — foto guardada no aparelho, envia sozinha quando a conexão voltar.");
         return;
       }
 
       const resultado = await capturarFotoServico(paradaId, servico.id, upload.url, senha, etapa);
       if (!resultado.ok) {
-        setPendente(null);
         setErro(resultado.erro || "Não foi possível registrar a foto.");
         return;
       }
 
-      setPendente(null);
       setEtapaEscolhida(null);
       const campo = resultado.label === "Antes" ? "fotoAntes" : resultado.label === "Durante" ? "fotoDurante" : "fotoDepois";
       const horarioCampo = resultado.label === "Antes" ? "fotoAntesHorario" : resultado.label === "Durante" ? "fotoDuranteHorario" : "fotoDepoisHorario";
       onCaptured(servico.id, { [campo]: upload.url, [horarioCampo]: resultado.horario } as Partial<Servico>);
       setUltimoResultado(`Registrada como "${resultado.label}" às ${resultado.horario}`);
     } catch {
-      setPendente({ blob, nome });
-      setErro("Sinal fraco — não foi possível enviar a foto. Toque em Tentar Novamente.");
+      await onEnfileirar(servico.id, etapa, blob, nome);
+      setEtapaEscolhida(null);
+      setUltimoResultado("Sem internet — foto guardada no aparelho, envia sozinha quando a conexão voltar.");
     } finally {
       setLoading(false);
     }
@@ -444,10 +454,6 @@ function ServicoCapturaCard({
     }
   }
 
-  function handleTentarNovamente() {
-    if (pendente) enviar(pendente.blob, pendente.nome, etapaAtiva);
-  }
-
   const concluido = servico.status === "concluido";
 
   async function handleToggleStatus() {
@@ -463,7 +469,10 @@ function ServicoCapturaCard({
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <input ref={inputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
+      {/* Sem "capture" de propósito: assim o celular mostra a opção de tirar
+          foto NA HORA ou escolher uma já tirada antes (útil quando a foto foi
+          tirada num momento sem internet e só agora dá pra anexar). */}
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[10px] font-bold uppercase tracking-wide text-brand-600">
@@ -504,41 +513,21 @@ function ServicoCapturaCard({
         <EtapaDot preenchida={temDepois} selecionada={etapaAtiva === "Depois"} horario={servico.fotoDepoisHorario} label="Depois" onClick={() => setEtapaEscolhida("Depois")} />
       </div>
 
-      {pendente ? (
-        <div className="mt-4 flex gap-2">
-          <button
-            type="button"
-            onClick={handleTentarNovamente}
-            disabled={loading}
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-danger-600 px-4 py-3.5 text-sm font-bold text-white transition-colors hover:opacity-90 disabled:opacity-60"
-          >
-            {loading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
-            {loading ? "Reenviando..." : "Tentar Novamente"}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setPendente(null);
-              setErro("");
-              inputRef.current?.click();
-            }}
-            disabled={loading}
-            aria-label="Tirar outra foto"
-            className="flex items-center justify-center rounded-xl border border-slate-200 px-4 py-3.5 text-slate-500 transition-colors hover:bg-slate-50 disabled:opacity-60"
-          >
-            <Camera size={18} />
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={loading}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3.5 text-sm font-bold text-white transition-colors hover:bg-brand-700 disabled:opacity-60"
-        >
-          {loading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
-          {loading ? "Enviando..." : `Tirar Foto — ${etapaAtiva}`}
-        </button>
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={loading}
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3.5 text-sm font-bold text-white transition-colors hover:bg-brand-700 disabled:opacity-60"
+      >
+        {loading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
+        {loading ? "Enviando..." : `Tirar Foto — ${etapaAtiva}`}
+      </button>
+
+      {pendentesDoServico.length > 0 && (
+        <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-warning-700">
+          <WifiOff size={13} className="flex-none" />
+          {pendentesDoServico.length} foto{pendentesDoServico.length > 1 ? "s" : ""} guardada{pendentesDoServico.length > 1 ? "s" : ""} sem internet — envia sozinha quando voltar a conexão
+        </p>
       )}
 
       {ultimoResultado && <p className="mt-2 text-center text-xs font-semibold text-success-600">{ultimoResultado}</p>}
@@ -568,6 +557,11 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<Date | null>(null);
   const [horaAgora, setHoraAgora] = useState<Date | null>(null);
   const [busca, setBusca] = useState("");
+  // Fotos tiradas sem internet ficam guardadas no aparelho (IndexedDB) até
+  // a conexão voltar — isso é o que sobrevive a fechar o app/trocar de tela,
+  // diferente de só guardar em memória do componente.
+  const [filaPendente, setFilaPendente] = useState<FotoPendente[]>([]);
+  const [enviandoFila, setEnviandoFila] = useState(false);
 
   // Sem nenhum setState síncrono no início — assim dá pra chamar direto no
   // corpo de um efeito (carga inicial, atualização em segundo plano) sem
@@ -592,6 +586,81 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
       setAtualizando(false);
     }
   }
+
+  // Tenta enviar tudo que ficou guardado no aparelho por falta de conexão.
+  // Cada foto é tentada de forma independente — uma falhar não impede as
+  // outras de irem, e o que não for enviado continua na fila pra próxima vez.
+  async function tentarEnviarFila() {
+    if (enviandoFila) return;
+    setEnviandoFila(true);
+    try {
+      const itens = await listarFotosPendentes(id);
+      if (itens.length === 0) {
+        setFilaPendente([]);
+        return;
+      }
+      const senha = getEditorSenha();
+      const restantes: FotoPendente[] = [];
+      for (const item of itens) {
+        try {
+          const formData = new FormData();
+          formData.set("file", item.blob, item.nomeArquivo);
+          const upload = await uploadFoto(formData, senha);
+          if (!upload.ok || !upload.url) {
+            restantes.push(item);
+            continue;
+          }
+          const resultado = await capturarFotoServico(id, item.servicoId, upload.url, senha, item.etapa);
+          if (!resultado.ok) {
+            restantes.push(item);
+            continue;
+          }
+          await removerFotoPendente(item.id);
+          const campo = resultado.label === "Antes" ? "fotoAntes" : resultado.label === "Durante" ? "fotoDurante" : "fotoDepois";
+          const horarioCampo = resultado.label === "Antes" ? "fotoAntesHorario" : resultado.label === "Durante" ? "fotoDuranteHorario" : "fotoDepoisHorario";
+          handleCaptured(item.servicoId, { [campo]: upload.url, [horarioCampo]: resultado.horario } as Partial<Servico>);
+        } catch {
+          restantes.push(item);
+        }
+      }
+      setFilaPendente(restantes);
+    } finally {
+      setEnviandoFila(false);
+    }
+  }
+
+  // Chamado pelo card de cada OS quando não dá pra enviar a foto na hora
+  // (sem internet, ou o envio falhou) — guarda no aparelho e some da tela;
+  // essa mesma fila é reprocessada sozinha quando a conexão voltar.
+  async function enfileirarFoto(servicoId: string, etapa: "Antes" | "Durante" | "Depois", blob: Blob, nomeArquivo: string) {
+    const item: FotoPendente = { id: crypto.randomUUID(), paradaId: id, servicoId, etapa, nomeArquivo, blob, criadoEm: Date.now() };
+    await salvarFotoPendente(item);
+    setFilaPendente((prev) => [...prev, item]);
+    if (navigator.onLine) tentarEnviarFila();
+  }
+
+  useEffect(() => {
+    void (async () => {
+      await tentarEnviarFila();
+    })();
+
+    function onOnline() {
+      tentarEnviarFila();
+    }
+    window.addEventListener("online", onOnline);
+    // Além do evento "online" (que alguns celulares disparam com atraso ou
+    // não disparam de forma confiável em wi-fi instável), tenta de novo a
+    // cada 20s enquanto o navegador achar que está conectado.
+    const intervaloFila = setInterval(() => {
+      if (navigator.onLine) tentarEnviarFila();
+    }, 20000);
+
+    return () => {
+      window.removeEventListener("online", onOnline);
+      clearInterval(intervaloFila);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   useEffect(() => {
     void (async () => {
@@ -743,6 +812,17 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
         </button>
       </header>
 
+      {filaPendente.length > 0 && (
+        // Fica visível o tempo todo — é a garantia de que a foto não foi
+        // perdida, só está esperando internet pra subir sozinha.
+        <div className="flex items-center gap-2.5 border-b border-warning-200 bg-warning-50 px-4 py-2.5 text-xs font-bold text-warning-700">
+          {enviandoFila ? <Loader2 size={14} className="flex-none animate-spin" /> : <CloudOff size={14} className="flex-none" />}
+          {enviandoFila
+            ? `Enviando ${filaPendente.length} foto${filaPendente.length > 1 ? "s" : ""} guardada${filaPendente.length > 1 ? "s" : ""}...`
+            : `${filaPendente.length} foto${filaPendente.length > 1 ? "s" : ""} guardada${filaPendente.length > 1 ? "s" : ""} no aparelho, aguardando internet para enviar`}
+        </div>
+      )}
+
       <main className="mx-auto max-w-lg space-y-3 px-4 py-5">
         <NovaOsForm paradaId={id} onCriada={handleOsCriada} />
         <NovoEventoForm paradaId={id} onCriado={handleEventoCriado} />
@@ -797,7 +877,16 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
         ) : servicosFiltrados.length === 0 ? (
           <p className="py-16 text-center text-sm text-slate-400">Nenhuma OS encontrada para &quot;{busca}&quot;.</p>
         ) : (
-          servicosFiltrados.map((servico) => <ServicoCapturaCard key={servico.id} paradaId={id} servico={servico} onCaptured={handleCaptured} />)
+          servicosFiltrados.map((servico) => (
+            <ServicoCapturaCard
+              key={servico.id}
+              paradaId={id}
+              servico={servico}
+              onCaptured={handleCaptured}
+              pendentesDoServico={filaPendente.filter((f) => f.servicoId === servico.id)}
+              onEnfileirar={enfileirarFoto}
+            />
+          ))
         )}
       </main>
     </div>
