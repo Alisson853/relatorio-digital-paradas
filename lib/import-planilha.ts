@@ -19,6 +19,9 @@ export interface ResultadoImportacao {
   totalProgramado?: number;
   etiquetaVermelhaProgramada?: number;
   etiquetaAmarelaProgramada?: number;
+  // Diferente de "avisos" (bloqueia a importação), isso é só informativo —
+  // qual aba foi escolhida quando a planilha tem mais de uma.
+  infoAba?: string;
 }
 
 function normalizar(texto: unknown): string {
@@ -85,6 +88,41 @@ function mapearEquipe(oficina: string): Equipe {
   return encontrada?.equipe ?? "Mecânica";
 }
 
+// Extrai o número da máquina de um texto tipo "PARADA MP11", "Máquina de
+// Papel 11" ou "MP-09", pra casar o nome da aba da planilha com o campo
+// "Máquina" do relatório.
+function extrairNumeroMaquina(texto: string): string | null {
+  const normalizado = normalizar(texto);
+  const viaMp = normalizado.match(/MP\s*-?\s*(\d{1,2})/);
+  if (viaMp) return viaMp[1].padStart(2, "0");
+  const viaPapel = normalizado.match(/PAPEL\s+(\d{1,2})/);
+  if (viaPapel) return viaPapel[1].padStart(2, "0");
+  const viaNumero = normalizado.match(/\b(\d{1,2})\b/);
+  return viaNumero ? viaNumero[1].padStart(2, "0") : null;
+}
+
+// Planilhas de programação semanal costumam ter uma aba de "oportunidade"
+// genérica (todas as máquinas misturadas) além de uma aba por parada
+// específica ("PARADA MP11", "PARADA MP09"...) — puxar a primeira aba do
+// arquivo às cegas trazia serviço de máquina/parada errada. Só as abas que
+// começam com "PARADA" contam como candidatas; entre elas, tenta casar pelo
+// número da máquina do relatório antes de simplesmente pegar a primeira.
+function escolherAba(nomesAbas: string[], maquina?: string): { nome: string; infoAba?: string } {
+  const candidatas = nomesAbas.filter((n) => normalizar(n).startsWith("PARADA"));
+  if (candidatas.length === 0) return { nome: nomesAbas[0] };
+  if (candidatas.length === 1) return { nome: candidatas[0] };
+
+  const alvo = maquina ? extrairNumeroMaquina(maquina) : null;
+  if (alvo) {
+    const casada = candidatas.find((n) => extrairNumeroMaquina(n) === alvo);
+    if (casada) return { nome: casada };
+  }
+  return {
+    nome: candidatas[0],
+    infoAba: `Encontrei várias abas de parada nessa planilha (${candidatas.join(", ")}) e não consegui saber qual bate com "${maquina || "essa máquina"}" — usei "${candidatas[0]}". Confira se os serviços são da máquina certa.`,
+  };
+}
+
 const MAPA_CATEGORIA: Array<{ contem: string; categoria: string }> = [
   { contem: "ETIQUETA VERMELHA", categoria: "Etiqueta Vermelha" },
   { contem: "ETIQUETA AMARELA", categoria: "Etiqueta Amarela" },
@@ -108,8 +146,13 @@ function mapearCategoria(tipo: string): string {
 function formatarNumeroOS(valor: unknown): string {
   const texto = String(valor ?? "").trim();
   if (!texto) return "Oportunidade";
-  if (!/^\d+$/.test(texto)) return texto;
-  return texto.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  if (/^\d+$/.test(texto)) return texto.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  // Placeholder tipo "???????" (OS ainda não definida) não é um número de OS
+  // de verdade — várias linhas diferentes usam o mesmo texto genérico, e
+  // tratar isso como se fosse uma OS real faz elas se misturarem no merge
+  // por número de OS (o serviço de uma vira "dono" do responsável da outra).
+  if (!/[A-Za-zÀ-ÖØ-öø-ÿ0-9]/.test(texto)) return "Oportunidade";
+  return texto;
 }
 
 // A coluna HH vem como fração de dia (0.1667 = 4h) quando o Excel guarda um
@@ -175,13 +218,13 @@ function extrairResumoPainel(linhas: unknown[][], ateLinha: number) {
   return { totalProgramado, etiquetaVermelhaProgramada, etiquetaAmarelaProgramada };
 }
 
-export async function parsePlanilhaServicos(file: File): Promise<ResultadoImportacao> {
+export async function parsePlanilhaServicos(file: File, maquina?: string): Promise<ResultadoImportacao> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
   const avisos: string[] = [];
 
-  const nomeAba = workbook.SheetNames[0];
-  if (!nomeAba) return { servicos: [], avisos: ["A planilha não tem nenhuma aba."] };
+  if (workbook.SheetNames.length === 0) return { servicos: [], avisos: ["A planilha não tem nenhuma aba."] };
+  const { nome: nomeAba, infoAba } = escolherAba(workbook.SheetNames, maquina);
 
   const sheet = workbook.Sheets[nomeAba];
   const linhas: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
@@ -218,9 +261,15 @@ export async function parsePlanilhaServicos(file: File): Promise<ResultadoImport
     }
     linhasVazias = 0;
 
-    const numeroOS = formatarNumeroOS(linha[col.numeroOS]);
     const descricao = String(linha[col.descricao] ?? "").trim();
     const oficina = String(linha[col.oficina] ?? "").trim();
+    // Serviço da equipe Operacional não é trabalho de manutenção — não entra
+    // no relatório, mas a linha ainda conta como "não vazia" pro contador
+    // acima (senão várias linhas Operacional seguidas cortariam a
+    // importação como se a planilha tivesse acabado).
+    if (normalizar(oficina) === "OPERACIONAL") continue;
+
+    const numeroOS = formatarNumeroOS(linha[col.numeroOS]);
     const tipo = String(linha[col.tipo] ?? "").trim();
     const executante = limparNomeExecutante(String(linha[col.executante] ?? ""));
     const tempoGasto = formatarTempo(linha[col.hh]);
@@ -254,5 +303,5 @@ export async function parsePlanilhaServicos(file: File): Promise<ResultadoImport
 
   const resumoPainel = extrairResumoPainel(linhas, idxCabecalho);
 
-  return { servicos, avisos, ...resumoPainel };
+  return { servicos, avisos, infoAba, ...resumoPainel };
 }

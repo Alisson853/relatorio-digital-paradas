@@ -461,7 +461,14 @@ function NovaParadaForm() {
     setImportResultado("");
     setImportando(true);
     try {
-      const { servicos: importados, avisos, totalProgramado, etiquetaVermelhaProgramada, etiquetaAmarelaProgramada } = await parsePlanilhaServicos(file);
+      const {
+        servicos: importados,
+        avisos,
+        infoAba,
+        totalProgramado,
+        etiquetaVermelhaProgramada,
+        etiquetaAmarelaProgramada,
+      } = await parsePlanilhaServicos(file, maquina);
       if (avisos.length) {
         setImportResultado(avisos.join(" "));
         return;
@@ -475,10 +482,15 @@ function NovaParadaForm() {
       if (etiquetaVermelhaProgramada !== undefined) setEtiquetaVermelhaPlan(String(etiquetaVermelhaProgramada));
       if (etiquetaAmarelaProgramada !== undefined) setEtiquetaAmarelaPlan(String(etiquetaAmarelaProgramada));
 
-      // Compara só os dígitos: "53.454" (digitado à mão) e "53454" (vindo puro
-      // da célula) têm que casar mesmo com formatação de milhar diferente. Se
-      // duas linhas caírem na mesma chave (ex: duplicata deixada por uma
-      // reimportação antiga), a que já tem foto sempre vence — é a real.
+      // Cada nova importação passa a REFLETIR a planilha, não só acrescentar:
+      // uma OS que saiu da planilha (renumerada, removida, planilha errada
+      // importada antes) some do relatório também, em vez de ficar pra sempre
+      // acumulando lixo de importações antigas. Só o que não pode ir embora é
+      // trabalho de campo já feito — fotos e status "concluído" de uma OS que
+      // ainda existe na nova planilha são preservados. OS "Oportunidade" (sem
+      // número, geralmente aberta na hora pelo celular) nunca é tocada aqui,
+      // já que não tem como saber se ela veio de uma planilha antiga ou foi
+      // criada manualmente em campo.
       const chaveOS = (numero: string) => numero.replace(/\D/g, "");
       const porOsExistente = new Map<string, ServicoRow>();
       for (const s of servicos) {
@@ -488,69 +500,56 @@ function NovaParadaForm() {
         const atualTemFoto = !!atual && (!!atual.fotoAntes || !!atual.fotoDepois);
         if (!atual || !atualTemFoto) porOsExistente.set(chave, s);
       }
-      const novasLinhas: ServicoRow[] = [];
-      // OS que já existem no relatório (ex: adicionadas antes de a planilha ter
-      // essa linha, ou reimportação depois de alguém corrigir a planilha) têm
-      // responsável/equipe/categoria/tempo atualizados a partir da planilha —
-      // fotos e motivo não são mexidos, pois é trabalho de campo já feito. Status
-      // só é adiantado pra concluído quando a coluna Executado confirma — nunca
-      // volta pra pendente, pra não apagar um "concluído" já marcado no app.
-      const atualizadas: string[] = [];
-      let marcadasConcluidas = 0;
-      // updateRow já dispara o setServicos, mas o state não reflete a mudança
-      // a tempo de recalcular o Planejado x Realizado logo abaixo — guarda os
-      // mesmos patches aqui pra montar a lista final "na mão".
-      const patchesPorId = new Map<string, Partial<ServicoRow>>();
 
-      for (const item of importados) {
+      const preservadas = servicos.filter((s) => !s.numeroOS || s.numeroOS === "Oportunidade");
+      const substituidas = servicos.length - preservadas.length;
+      const servicosDaPlanilha: ServicoRow[] = importados.map((item) => {
         const existente = item.numeroOS !== "Oportunidade" ? porOsExistente.get(chaveOS(item.numeroOS)) : undefined;
-        if (existente) {
-          const patch: Partial<ServicoRow> = {
-            responsavel: item.responsavel || existente.responsavel,
-            equipe: item.equipe,
-            categoria: item.categoria,
-            tempoGasto: item.tempoGasto,
-            status: item.concluido ? "concluido" : existente.status,
-          };
-          updateRow(setServicos, existente.id, patch);
-          patchesPorId.set(existente.id, patch);
-          atualizadas.push(item.numeroOS);
-          if (item.concluido && existente.status !== "concluido") marcadasConcluidas++;
-          continue;
-        }
-        novasLinhas.push({
-          id: crypto.randomUUID(),
+        return {
+          id: existente?.id ?? crypto.randomUUID(),
           numeroOS: item.numeroOS,
           equipamento: item.equipamento,
           // A planilha não tem uma coluna de "local/área física" — usar a
           // mesma máquina pra todo mundo empilhava todas as horas num único
           // setor no gráfico. A equipe (oficina) já vem certa e distingue bem.
           area: item.equipe,
-          responsavel: item.responsavel,
+          responsavel: item.responsavel || existente?.responsavel || "",
           equipe: item.equipe,
           categoria: item.categoria,
-          motivo: item.titulo,
-          status: item.concluido ? "concluido" : "pendente",
+          // Motivo digitado/editado à mão no card não é sobrescrito pela
+          // planilha — só o preenche se ainda estiver vazio.
+          motivo: existente?.motivo || item.titulo,
+          // Status só avança pra concluído quando a coluna Executado confirma
+          // — nunca volta pra pendente, pra não apagar um "concluído" já
+          // marcado em campo antes dessa reimportação.
+          status: item.concluido ? "concluido" : existente?.status ?? "pendente",
           tempoGasto: item.tempoGasto,
-          fotoAntes: "",
-          fotoDurante: "",
-          fotoDepois: "",
-        });
-      }
+          fotoAntes: existente?.fotoAntes ?? "",
+          fotoDurante: existente?.fotoDurante ?? "",
+          fotoDepois: existente?.fotoDepois ?? "",
+        };
+      });
 
-      if (novasLinhas.length) setServicos((prev) => [...prev, ...novasLinhas]);
-      if (totalProgramado === undefined) setTotalAtividades((prev) => prev.trim() || String(servicos.length + novasLinhas.length));
+      const novos = servicosDaPlanilha.filter((s) => !porOsExistente.has(chaveOS(s.numeroOS))).length;
+      const marcadasConcluidas = servicosDaPlanilha.filter((s, i) => {
+        const original = porOsExistente.get(chaveOS(s.numeroOS));
+        return s.status === "concluido" && original && original.status !== "concluido" && importados[i].concluido;
+      }).length;
+
+      const servicosFinal = [...servicosDaPlanilha, ...preservadas];
+      setServicos(servicosFinal);
+      if (totalProgramado === undefined) setTotalAtividades((prev) => prev.trim() || String(servicosFinal.length));
 
       // Planejado x Realizado sempre recalculado a partir do título de cada
-      // OS (existentes + atualizadas + novas) — é isso que o usuário pediu:
-      // puxar da planilha em vez de digitar hora por etapa na mão.
-      const servicosCombinados = servicos.map((s) => (patchesPorId.has(s.id) ? { ...s, ...patchesPorId.get(s.id) } : s)).concat(novasLinhas);
-      setPlanejadoRealizado(calcularPlanejadoRealizado(servicosCombinados));
+      // OS — é isso que o usuário pediu: puxar da planilha em vez de digitar
+      // hora por etapa na mão.
+      setPlanejadoRealizado(calcularPlanejadoRealizado(servicosFinal));
 
-      const partes = [`${novasLinhas.length} serviço${novasLinhas.length === 1 ? "" : "s"} importado${novasLinhas.length === 1 ? "" : "s"}`];
-      if (atualizadas.length > 0) partes.push(`${atualizadas.length} já existiam e tiveram responsável/equipe/tempo atualizados`);
+      const partes = [`${servicosDaPlanilha.length} serviço${servicosDaPlanilha.length === 1 ? "" : "s"} da planilha (${novos} novo${novos === 1 ? "" : "s"})`];
+      if (substituidas > 0) partes.push(`${substituidas} OS antiga${substituidas === 1 ? "" : "s"} que não está${substituidas === 1 ? "" : "ão"} mais na planilha ${substituidas === 1 ? "foi removida" : "foram removidas"}`);
       if (marcadasConcluidas > 0) partes.push(`${marcadasConcluidas} marcadas como concluídas pela coluna Executado`);
-      setImportResultado(`${partes.join(", ")}. Marque como concluído pelo celular (Captura Rápida) conforme forem sendo feitos.`);
+      const resultadoBase = `${partes.join(", ")}. Marque como concluído pelo celular (Captura Rápida) conforme forem sendo feitos.`;
+      setImportResultado(infoAba ? `${infoAba} ${resultadoBase}` : resultadoBase);
     } catch {
       setImportResultado("Não foi possível ler essa planilha. Confira se é o modelo padrão de programação semanal.");
     } finally {
