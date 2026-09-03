@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowLeft, FileSpreadsheet, History, Loader2, Plus, X } from "lucide-react";
 import type { CaminhoCriticoItem, ParadaCompleta, ParadaResumo, Pendencia, Servico, StatusGeral, TimelineEvento } from "@/lib/types";
-import { deriveGraficos, deriveKpis, parseHoras, textoExecutadoPadrao, textoResultadoPadrao } from "@/lib/derive";
+import { deriveGraficos, deriveKpis, gerarDescricaoExecucao, parseHoras, textoResultadoPadrao } from "@/lib/derive";
 import { gerarResultadoFinal } from "@/lib/mock-data";
 import { getParadaAtualizadaEm, getParadaCompleta, saveParada } from "@/lib/actions/paradas";
 import { getEditorSenha } from "@/lib/editor-auth";
@@ -599,26 +599,29 @@ function NovaParadaForm() {
 
     const servicosFinal: Servico[] = servicos
       .filter((s) => s.equipamento.trim())
-      .map((s) => ({
-        id: s.id,
-        numeroOS: s.numeroOS.trim() || "Oportunidade",
-        titulo: `Manutenção em ${s.equipamento.trim()}`,
-        equipamento: s.equipamento,
-        area: s.area,
-        responsavel: s.responsavel,
-        equipe: s.equipe,
-        categoria: s.categoria,
-        horaInicio: "",
-        horaFim: "",
-        tempoGasto: s.tempoGasto.trim() || "1h",
-        problemaIdentificado: s.motivo.trim() || "Necessidade identificada durante a parada.",
-        servicoExecutado: textoExecutadoPadrao(s.status),
-        resultado: textoResultadoPadrao(s.status),
-        status: s.status,
-        fotoAntes: s.fotoAntes || NO_PHOTO_PLACEHOLDER,
-        fotoDurante: s.fotoDurante || undefined,
-        fotoDepois: s.fotoDepois || NO_PHOTO_PLACEHOLDER,
-      }));
+      .map((s) => {
+        const problemaIdentificado = s.motivo.trim() || "Necessidade identificada durante a parada.";
+        return {
+          id: s.id,
+          numeroOS: s.numeroOS.trim() || "Oportunidade",
+          titulo: `Manutenção em ${s.equipamento.trim()}`,
+          equipamento: s.equipamento,
+          area: s.area,
+          responsavel: s.responsavel,
+          equipe: s.equipe,
+          categoria: s.categoria,
+          horaInicio: "",
+          horaFim: "",
+          tempoGasto: s.tempoGasto.trim() || "1h",
+          problemaIdentificado,
+          servicoExecutado: gerarDescricaoExecucao(problemaIdentificado, s.status),
+          resultado: textoResultadoPadrao(s.status),
+          status: s.status,
+          fotoAntes: s.fotoAntes || NO_PHOTO_PLACEHOLDER,
+          fotoDurante: s.fotoDurante || undefined,
+          fotoDepois: s.fotoDepois || NO_PHOTO_PLACEHOLDER,
+        };
+      });
 
     const caminhoCriticoFinal: CaminhoCriticoItem[] = caminhoCritico;
     const pendenciasFinal: Pendencia[] = pendencias.filter((p) => p.item.trim()).map((p) => ({ id: p.id, item: p.item.trim(), motivo: p.motivo.trim() || "Não informado" }));

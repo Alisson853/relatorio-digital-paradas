@@ -5,7 +5,7 @@ import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { paradas } from "@/lib/db/schema";
 import type { CaminhoCriticoItem, Equipe, Kpis, ParadaCompleta, ParadaResumo, Servico, StatusItem, TimelineEvento } from "@/lib/types";
-import { deriveFotoCapa, deriveFotos, deriveGraficos, deriveKpis, parseHoras, textoExecutadoPadrao, textoResultadoPadrao } from "@/lib/derive";
+import { deriveFotoCapa, deriveFotos, deriveGraficos, deriveKpis, gerarDescricaoExecucao, parseHoras, textoResultadoPadrao } from "@/lib/derive";
 import { gerarResultadoFinal } from "@/lib/mock-data";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { verifyEditorPassword } from "./auth";
@@ -167,7 +167,7 @@ export async function clonarParada(idOrigem: string, senha: string): Promise<{ o
     status: "pendente",
     horaInicio: "",
     horaFim: "",
-    servicoExecutado: textoExecutadoPadrao("pendente"),
+    servicoExecutado: gerarDescricaoExecucao(s.problemaIdentificado, "pendente"),
     resultado: textoResultadoPadrao("pendente"),
     fotoAntes: NO_PHOTO_PLACEHOLDER,
     fotoAntesHorario: undefined,
@@ -375,7 +375,7 @@ export async function capturarFotoServico(
     servicoAtualizado = {
       ...servicoAtualizado,
       status: "concluido",
-      servicoExecutado: servicoAtualizado.servicoExecutado || textoExecutadoPadrao("concluido"),
+      servicoExecutado: servicoAtualizado.servicoExecutado || gerarDescricaoExecucao(servicoAtualizado.problemaIdentificado, "concluido"),
       resultado: servicoAtualizado.resultado || textoResultadoPadrao("concluido"),
     };
   }
@@ -433,7 +433,7 @@ export async function marcarStatusServico(
   const servicoAtualizado: Servico = {
     ...servico,
     status,
-    servicoExecutado: servico.servicoExecutado || textoExecutadoPadrao(status),
+    servicoExecutado: servico.servicoExecutado || gerarDescricaoExecucao(servico.problemaIdentificado, status),
     resultado: servico.resultado || textoResultadoPadrao(status),
   };
   const servicosAtualizados = [...row.servicos];
@@ -489,6 +489,7 @@ export async function adicionarServicoRapido(paradaId: string, input: NovaOsInpu
   const [row] = await getDb().select().from(paradas).where(eq(paradas.id, paradaId)).limit(1);
   if (!row) return { ok: false, erro: "Relatório não encontrado." };
 
+  const problemaIdentificado = input.motivo.trim() || "Necessidade identificada durante a parada.";
   const novoServico: Servico = {
     id: crypto.randomUUID(),
     numeroOS: input.numeroOS.trim() || "Oportunidade",
@@ -501,8 +502,8 @@ export async function adicionarServicoRapido(paradaId: string, input: NovaOsInpu
     horaInicio: "",
     horaFim: "",
     tempoGasto: "1h",
-    problemaIdentificado: input.motivo.trim() || "Necessidade identificada durante a parada.",
-    servicoExecutado: textoExecutadoPadrao("concluido"),
+    problemaIdentificado,
+    servicoExecutado: gerarDescricaoExecucao(problemaIdentificado, "concluido"),
     resultado: textoResultadoPadrao("concluido"),
     status: "concluido",
     fotoAntes: NO_PHOTO_PLACEHOLDER,
