@@ -1,10 +1,34 @@
 import type { CaminhoCriticoItem, Equipe, FotoGaleria, GraficosData, Kpis, Servico, StatusItem } from "./types";
 import { NO_PHOTO_PLACEHOLDER } from "./image-utils";
 
-// Tira ruído do início ("FR - ", "SKF - ", código de chamado) e anotação de
-// máquina/posição no final entre parênteses ("( Máq 11 )") — sobra só o
-// núcleo do motivo, pra virar o sujeito de uma frase nova em vez de repetir
-// o "Problema Identificado" palavra por palavra.
+// Reconhece o tipo de problema e infere a ação técnica típica pra resolver
+// ele — igual um mecânico já sabe que vazamento em tubulação é solda, sem
+// precisar que alguém escreva isso. Cada entrada é checada nessa ordem, e a
+// primeira que bater no motivo decide a frase — por isso os casos mais
+// específicos vêm antes dos mais genéricos (ex: "vazamento" numa gaxeta é
+// troca de gaxeta, não solda; só cai em solda quando é vazamento mesmo na
+// tubulação/tubo/cano).
+const PADROES_ACAO: Array<{ regex: RegExp; frase: string }> = [
+  { regex: /gaxet/i, frase: "Gaxeta substituída" },
+  { regex: /vazament\w*.*(tubula|tubo\b|cano\b|linha\b|solda)|(tubula|tubo\b|cano\b|linha\b).*vazament/i, frase: "Reparo por solda realizado no ponto de vazamento" },
+  { regex: /vazament/i, frase: "Vazamento identificado e reparado" },
+  { regex: /rolamento/i, frase: "Rolamento substituído" },
+  { regex: /folga/i, frase: "Folga mecânica ajustada" },
+  { regex: /ru[íi]d|barulho/i, frase: "Origem do ruído identificada e corrigida" },
+  { regex: /vibra/i, frase: "Causa da vibração identificada e corrigida" },
+  { regex: /n[aã]o (est[aá] )?funcion|travad[ao]|parad[ao]\b/i, frase: "Reparo realizado, funcionamento normalizado" },
+  { regex: /inspe[cç]|revis/i, frase: "Inspeção realizada, sem anomalias adicionais" },
+  { regex: /substitu|troc/i, frase: "Componente substituído" },
+  { regex: /instala[çc][ãa]o|instalar/i, frase: "Instalação concluída" },
+  { regex: /limp/i, frase: "Limpeza realizada" },
+  { regex: /calibra/i, frase: "Calibração realizada e equipamento ajustado" },
+];
+
+// Sem IA (só regras) de propósito — não é um modelo de linguagem, é uma
+// lista de padrões técnicos comuns em manutenção industrial. Quando nada
+// bate, cai no núcleo do motivo (sem prefixo de chamado tipo "FR - " nem
+// anotação de máquina entre parênteses) como frase própria, curta — nunca
+// repete o "Problema Identificado" inteiro de novo.
 function nucleoDoMotivo(motivo: string): string {
   return motivo
     .trim()
@@ -14,26 +38,21 @@ function nucleoDoMotivo(motivo: string): string {
     .replace(/[.\s]+$/, "");
 }
 
-// Sem IA (só regras) de propósito. Repetir o motivo inteiro em "O Que Foi
-// Feito" (igual "Problema Identificado" + uma frase colada no fim) ficava
-// redundante — as duas seções mostrando o mesmo texto. Agora tira o núcleo
-// do motivo (sem prefixo de chamado nem anotação de máquina) e monta uma
-// frase própria, curta, no modelo "X realizado com sucesso" — diferente do
-// campo do problema, não uma cópia dele com uma continuação.
 export function gerarDescricaoExecucao(motivo: string, status: StatusItem): string {
-  const nucleo = nucleoDoMotivo(motivo);
-  if (!nucleo) return textoExecutadoPadrao(status);
+  const motivoLimpo = motivo.trim();
+  if (!motivoLimpo) return textoExecutadoPadrao(status);
 
-  switch (status) {
-    case "concluido":
-      return `${nucleo} realizado com sucesso.`;
-    case "em_andamento":
-      return `${nucleo} em execução.`;
-    case "atrasado":
-      return `${nucleo} iniciado, com atraso em relação ao previsto.`;
-    default:
-      return `${nucleo} aguardando início da execução.`;
+  if (status !== "concluido") {
+    const nucleo = nucleoDoMotivo(motivoLimpo) || motivoLimpo;
+    const sufixo = status === "em_andamento" ? "em execução" : status === "atrasado" ? "iniciado, com atraso em relação ao previsto" : "aguardando início da execução";
+    return `${nucleo} — ${sufixo}.`;
   }
+
+  const acao = PADROES_ACAO.find((p) => p.regex.test(motivoLimpo))?.frase;
+  if (acao) return `${acao}.`;
+
+  const nucleo = nucleoDoMotivo(motivoLimpo) || motivoLimpo;
+  return `${nucleo} realizado com sucesso.`;
 }
 
 export function textoExecutadoPadrao(status: StatusItem): string {
