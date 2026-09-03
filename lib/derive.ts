@@ -1,28 +1,38 @@
 import type { CaminhoCriticoItem, Equipe, FotoGaleria, GraficosData, Kpis, Servico, StatusItem } from "./types";
 import { NO_PHOTO_PLACEHOLDER } from "./image-utils";
 
-// Sem IA (só regras) de propósito — o texto genérico "Serviço executado
-// conforme necessidade identificada" se repetia igual em toda OS do
-// relatório. A primeira versão gerava uma frase própria citando o motivo
-// entre aspas ("Realizada a substituição..., referente a: '...substituição
-// do componente'") — ficava redundante e com cara de texto de robô sempre
-// que o motivo já era uma frase completa (o caso mais comum). Agora o
-// motivo relatado é a própria frase — só entra uma continuação curta no
-// fim dizendo o que aconteceu com o status, sem reformular nem repetir o
-// que o motivo já diz.
+// Tira ruído do início ("FR - ", "SKF - ", código de chamado) e anotação de
+// máquina/posição no final entre parênteses ("( Máq 11 )") — sobra só o
+// núcleo do motivo, pra virar o sujeito de uma frase nova em vez de repetir
+// o "Problema Identificado" palavra por palavra.
+function nucleoDoMotivo(motivo: string): string {
+  return motivo
+    .trim()
+    .replace(/^[A-Za-zÀ-ÖØ-öø-ÿ0-9]{1,8}\s*-\s*/, "")
+    .replace(/\s*\([^)]*\)\s*$/, "")
+    .trim()
+    .replace(/[.\s]+$/, "");
+}
+
+// Sem IA (só regras) de propósito. Repetir o motivo inteiro em "O Que Foi
+// Feito" (igual "Problema Identificado" + uma frase colada no fim) ficava
+// redundante — as duas seções mostrando o mesmo texto. Agora tira o núcleo
+// do motivo (sem prefixo de chamado nem anotação de máquina) e monta uma
+// frase própria, curta, no modelo "X realizado com sucesso" — diferente do
+// campo do problema, não uma cópia dele com uma continuação.
 export function gerarDescricaoExecucao(motivo: string, status: StatusItem): string {
-  const motivoLimpo = motivo.trim().replace(/[.\s]+$/, "");
-  if (!motivoLimpo) return textoExecutadoPadrao(status);
+  const nucleo = nucleoDoMotivo(motivo);
+  if (!nucleo) return textoExecutadoPadrao(status);
 
   switch (status) {
     case "concluido":
-      return `${motivoLimpo}. Serviço concluído com sucesso.`;
+      return `${nucleo} realizado com sucesso.`;
     case "em_andamento":
-      return `${motivoLimpo}. Serviço em execução.`;
+      return `${nucleo} em execução.`;
     case "atrasado":
-      return `${motivoLimpo}. Serviço iniciado, com atraso em relação ao previsto.`;
+      return `${nucleo} iniciado, com atraso em relação ao previsto.`;
     default:
-      return `${motivoLimpo}. Aguardando início da execução.`;
+      return `${nucleo} aguardando início da execução.`;
   }
 }
 
