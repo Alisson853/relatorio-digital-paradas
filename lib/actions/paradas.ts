@@ -375,8 +375,8 @@ export async function capturarFotoServico(
     servicoAtualizado = {
       ...servicoAtualizado,
       status: "concluido",
-      servicoExecutado: servicoAtualizado.servicoExecutado || gerarDescricaoExecucao(servicoAtualizado.problemaIdentificado, "concluido"),
-      resultado: servicoAtualizado.resultado || textoResultadoPadrao("concluido"),
+      servicoExecutado: gerarDescricaoExecucao(servicoAtualizado.problemaIdentificado, "concluido"),
+      resultado: textoResultadoPadrao("concluido"),
     };
   }
 
@@ -433,8 +433,8 @@ export async function marcarStatusServico(
   const servicoAtualizado: Servico = {
     ...servico,
     status,
-    servicoExecutado: servico.servicoExecutado || gerarDescricaoExecucao(servico.problemaIdentificado, status),
-    resultado: servico.resultado || textoResultadoPadrao(status),
+    servicoExecutado: gerarDescricaoExecucao(servico.problemaIdentificado, status),
+    resultado: textoResultadoPadrao(status),
   };
   const servicosAtualizados = [...row.servicos];
   servicosAtualizados[idx] = servicoAtualizado;
