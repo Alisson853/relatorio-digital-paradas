@@ -1,45 +1,29 @@
 import type { CaminhoCriticoItem, Equipe, FotoGaleria, GraficosData, Kpis, Servico, StatusItem } from "./types";
 import { NO_PHOTO_PLACEHOLDER } from "./image-utils";
 
-// Padrões de ação reconhecidos no texto do problema relatado — cobrem os
-// termos que mais aparecem nas OS reais (substituição, vazamento, folga,
-// ruído, revisão...). Ordem importa: o primeiro que bater no motivo decide a
-// frase; "substitu"/"troc" vem primeiro porque costuma aparecer junto de
-// outras palavras (ex: "vazamento" numa OS que já foi resolvida trocando a
-// gaxeta) e é a ação mais específica das duas.
-const PADROES_ACAO: Array<{ regex: RegExp; frase: string }> = [
-  { regex: /substitu|troc/i, frase: "Realizada a substituição do item indicado" },
-  { regex: /vazament/i, frase: "Identificado e sanado o vazamento" },
-  { regex: /gaxet/i, frase: "Revisada e ajustada a gaxeta" },
-  { regex: /rolamento/i, frase: "Revisado o rolamento" },
-  { regex: /folga/i, frase: "Corrigida a folga mecânica identificada" },
-  { regex: /ru[íi]d|barulho/i, frase: "Identificada e corrigida a origem do ruído" },
-  { regex: /vibra/i, frase: "Identificada e corrigida a causa da vibração" },
-  { regex: /n[aã]o (est[aá] )?funcion|parad[ao]\b|travad[ao]/i, frase: "Realizado o reparo, restabelecendo o funcionamento" },
-  { regex: /inspe[cç]|revis/i, frase: "Realizada a inspeção/revisão do equipamento" },
-  { regex: /instala[çc][ãa]o|instalar/i, frase: "Realizada a instalação necessária" },
-  { regex: /limp/i, frase: "Realizada a limpeza do equipamento" },
-  { regex: /calibra/i, frase: "Realizada a calibração do equipamento" },
-];
-
 // Sem IA (só regras) de propósito — o texto genérico "Serviço executado
 // conforme necessidade identificada" se repetia igual em toda OS do
-// relatório. Agora puxa o motivo relatado pra descrição ficar específica de
-// cada serviço, mesmo sendo uma frase gerada, não digitada à mão.
+// relatório. A primeira versão gerava uma frase própria citando o motivo
+// entre aspas ("Realizada a substituição..., referente a: '...substituição
+// do componente'") — ficava redundante e com cara de texto de robô sempre
+// que o motivo já era uma frase completa (o caso mais comum). Agora o
+// motivo relatado é a própria frase — só entra uma continuação curta no
+// fim dizendo o que aconteceu com o status, sem reformular nem repetir o
+// que o motivo já diz.
 export function gerarDescricaoExecucao(motivo: string, status: StatusItem): string {
   const motivoLimpo = motivo.trim().replace(/[.\s]+$/, "");
   if (!motivoLimpo) return textoExecutadoPadrao(status);
 
-  if (status !== "concluido") {
-    // Ainda não terminou — não faz sentido descrever "o que foi feito" no
-    // passado, só reaproveita o motivo pra deixar claro em que a equipe
-    // está trabalhando.
-    const prefixo = status === "em_andamento" ? "Em execução" : status === "atrasado" ? "Iniciado, com atraso" : "Aguardando início";
-    return `${prefixo} — referente a: "${motivoLimpo}".`;
+  switch (status) {
+    case "concluido":
+      return `${motivoLimpo}. Serviço concluído com sucesso.`;
+    case "em_andamento":
+      return `${motivoLimpo}. Serviço em execução.`;
+    case "atrasado":
+      return `${motivoLimpo}. Serviço iniciado, com atraso em relação ao previsto.`;
+    default:
+      return `${motivoLimpo}. Aguardando início da execução.`;
   }
-
-  const acao = PADROES_ACAO.find((p) => p.regex.test(motivoLimpo))?.frase ?? "Serviço executado";
-  return `${acao}, referente a: "${motivoLimpo}".`;
 }
 
 export function textoExecutadoPadrao(status: StatusItem): string {
