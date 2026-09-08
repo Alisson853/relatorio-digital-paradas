@@ -106,8 +106,19 @@ export function Sidebar({ sections, activeId, onNavigate, onPresent, titulo, par
         </div>
       </aside>
 
+      {/* Barra de navegacao do celular. Ela carrega doze itens — seis secoes,
+          apresentacao, captura e quatro formatos de export — numa fila que rola
+          na horizontal. Numa tela estreita, metade fica fora do campo de visao,
+          e como a fila usa no-scrollbar nao havia nada dizendo que existe mais
+          coisa a direita: os botoes simplesmente nao existiam pra quem olha.
+
+          O esmaecimento na borda direita resolve isso do jeito mais barato
+          possivel. A mascara e fixa na borda do elemento, nao acompanha o
+          scroll — entao o padding da direita tem a mesma largura dela: quando a
+          fila chega ao fim, quem esta sob o esmaecimento e o espaco vazio, e
+          nao o ultimo botao. */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden">
-        <div className="no-scrollbar flex items-center gap-1 overflow-x-auto px-3 py-2.5">
+        <div className="no-scrollbar flex items-center gap-1 overflow-x-auto py-2.5 pl-3 pr-8 [mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)]">
           {sections.map((section) => {
             const Icon = section.icon;
             const active = section.id === activeId;

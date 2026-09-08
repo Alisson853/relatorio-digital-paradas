@@ -93,9 +93,31 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Cada seção ocupa uma tela inteira e prende no topo ao rolar — o relatório é
+ * feito para ser apresentado, e essa é a mecânica de um slide.
+ *
+ * Só que isso é uma ideia de tela grande, e no celular ela se volta contra o
+ * conteúdo de duas formas:
+ *
+ * 1. Seções curtas (Resumo, Resultado) ganham uma tela inteira de vazio, e o
+ *    relatório fica com o dobro do comprimento sem nenhuma informação a mais.
+ * 2. Seções altas ficam MUITO mais altas: Fotos passa de três mil pixels num
+ *    aparelho estreito. Aí o scroll-snap trabalha contra quem lê — a pessoa
+ *    rola por dentro da seção e o navegador tenta prender de volta no começo
+ *    dela. É essa briga que faz a rolagem parecer quebrada.
+ *
+ * Então a mecânica de slide vale a partir de lg (1024px), que é onde a seção
+ * de fato cabe numa tela. Abaixo disso o relatório é uma página comum, que
+ * rola do jeito que todo mundo espera e ocupa a altura do que tem dentro. */
 .section-screen {
-  min-height: 100dvh;
-  scroll-snap-align: start;
+  scroll-snap-align: none;
+}
+
+@media (min-width: 1024px) {
+  .section-screen {
+    min-height: 100dvh;
+    scroll-snap-align: start;
+  }
 }
 
 /* Modo apresentação: mede a altura real do conteúdo (sem forçar 100dvh) para que o
@@ -116,7 +138,13 @@ body {
 }
 
 .presentation-scroll {
-  scroll-snap-type: y proximity;
+  scroll-snap-type: none;
+}
+
+@media (min-width: 1024px) {
+  .presentation-scroll {
+    scroll-snap-type: y proximity;
+  }
 }
 
 .no-scrollbar::-webkit-scrollbar {
