@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import sharp from "sharp";
 import imageSize from "image-size";
 import { getParadaCompleta } from "@/lib/actions/paradas";
+import { ehEditor } from "@/lib/auth/session";
+import { sanearId } from "@/lib/validation";
 import { servicosComFoto } from "@/lib/derive";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { gerarQrCodeBuffer, urlDaParada } from "@/lib/qrcode";
@@ -415,11 +417,34 @@ async function buildRtf(data: ParadaCompleta, origin: string): Promise<string> {
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const data = await getParadaCompleta(id);
+
+  // O proxy.ts ja barra /api/export sem sessao, mas a autorizacao de verdade
+  // mora aqui: o proxy e uma checagem otimista de borda (a propria doc do Next
+  // desaconselha trata-lo como camada de autorizacao), e uma rota que so
+  // depende dele fica desprotegida a qualquer mudanca no matcher.
+  //
+  // Ver o relatorio na tela continua publico — e o que faz o QR code da capa
+  // funcionar. Baixar o arquivo nao: o export leva o relatorio inteiro, com
+  // todas as fotos e nomes dos responsaveis, num arquivo que sai do controle
+  // do app assim que e salvo.
+  if (!(await ehEditor())) {
+    return new Response("Nao autorizado.", { status: 401 });
+  }
+
+  // Id vem da URL: passa pelo mesmo saneamento das actions antes de virar
+  // consulta. Id fora do formato e simplesmente um relatorio que nao existe.
+  let idLimpo: string;
+  try {
+    idLimpo = sanearId(id);
+  } catch {
+    return new Response("Relatório não encontrado", { status: 404 });
+  }
+
+  const data = await getParadaCompleta(idLimpo);
   if (!data) return new Response("Relatório não encontrado.", { status: 404 });
 
   const rtf = await buildRtf(data, req.nextUrl.origin);
-  const nomeArquivo = `relatorio-${id}.rtf`;
+  const nomeArquivo = `relatorio-${idLimpo}.rtf`;
 
   return new Response(rtf, {
     headers: {

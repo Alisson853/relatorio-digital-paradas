@@ -1,4 +1,4 @@
-import { boolean, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import type { CaminhoCriticoItem, GraficosData, Kpis, Pendencia, ResultadoFinal, Servico, TimelineEvento } from "@/lib/types";
 
 export const paradas = pgTable("paradas", {
@@ -29,3 +29,13 @@ export const paradas = pgTable("paradas", {
 
 export type ParadaRow = typeof paradas.$inferSelect;
 export type NovaParadaRow = typeof paradas.$inferInsert;
+
+// Contador de rate limit compartilhado. Estava em memória do processo antes —
+// o que em serverless não segura nada: cada instância tinha o próprio contador
+// e um cold start zerava tudo, então bastava insistir pra cair numa instância
+// "limpa". No banco o limite vale de verdade pra todas as instâncias juntas.
+export const rateLimits = pgTable("rate_limits", {
+  chave: text("chave").primaryKey(),
+  contagem: integer("contagem").notNull().default(0),
+  janelaInicio: timestamp("janela_inicio", { withTimezone: true }).notNull().defaultNow(),
+});

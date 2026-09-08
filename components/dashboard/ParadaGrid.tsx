@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Search, SearchX } from "lucide-react";
 import type { ParadaResumo, StatusGeral } from "@/lib/types";
 import { clonarParada, deleteParada, getParadaCompleta } from "@/lib/actions/paradas";
-import { getEditorSenha } from "@/lib/editor-auth";
 import { triggerJsonDownload } from "@/lib/local-json";
 import { cn } from "@/lib/utils";
 import { ParadaCard } from "./ParadaCard";
@@ -24,7 +23,7 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Excluir este relatório? Essa ação não pode ser desfeita.")) return;
-    const resultado = await deleteParada(id, getEditorSenha());
+    const resultado = await deleteParada(id);
     if (!resultado.ok) {
       window.alert(resultado.erro || "Não foi possível excluir.");
       return;
@@ -39,7 +38,7 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
 
   const handleClone = async (id: string) => {
     if (!window.confirm("Clonar este relatório como modelo para uma nova parada? Fotos e status serão zerados.")) return;
-    const resultado = await clonarParada(id, getEditorSenha());
+    const resultado = await clonarParada(id);
     if (!resultado.ok || !resultado.novoId) {
       window.alert(resultado.erro || "Não foi possível clonar.");
       return;

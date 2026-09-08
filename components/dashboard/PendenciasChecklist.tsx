@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, ClipboardList, Loader2 } from "lucide-react";
 import { listChecklistPendencias, type PendenciaChecklistItem } from "@/lib/actions/paradas";
-import { getEditorSenha } from "@/lib/editor-auth";
 import { useEditorMode } from "@/lib/useEditorMode";
 import { EditorPasswordForm } from "@/components/shared/EditorPasswordForm";
 import { cn } from "@/lib/utils";
@@ -21,7 +20,7 @@ export function PendenciasChecklist() {
 
   useEffect(() => {
     if (!isEditor) return;
-    listChecklistPendencias(getEditorSenha()).then(setItens);
+    listChecklistPendencias().then(setItens);
   }, [isEditor]);
 
   if (!ready) return null;

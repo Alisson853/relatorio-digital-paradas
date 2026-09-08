@@ -74,3 +74,24 @@ export function slugify(text: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 }
+
+// Sufixo aleatorio pro id do relatorio.
+//
+// O id vira a URL publica que o QR code da capa abre, e abrir essa URL nao pede
+// senha — e assim de proposito. Mas o id anterior era "<nome>-<timestamp em
+// base36>": as duas metades sao adivinhaveis. O nome da parada e conhecido de
+// quem trabalha na fabrica, e o timestamp e o momento da criacao, que cabe numa
+// faixa pequena o bastante pra ser varrida. Ou seja, quem conhecesse o padrao
+// chegava a relatorios cujo link nunca recebeu.
+//
+// Com 8 caracteres aleatorios (32 bits do gerador criptografico do navegador,
+// ~1 bilhao de combinacoes por nome), varrer deixa de ser pratico: o link vira
+// de fato a credencial que ele sempre foi na intencao. Nao e controle de
+// acesso — quem tem o link entra, como antes — e sim tirar o link do alcance
+// de quem so chuta.
+export function sufixoAleatorio(tamanho = 8): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(tamanho));
+  // base36 sem 0/O/1/l seria mais legivel, mas o id raramente e digitado a mao;
+  // o que importa aqui e o alfabeto ser seguro numa URL.
+  return Array.from(bytes, (b) => (b % 36).toString(36)).join("");
+}

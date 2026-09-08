@@ -27,7 +27,6 @@ import {
 import type { Equipe, ParadaCompleta, Servico, StatusItem, TimelineEvento } from "@/lib/types";
 import { getParadaCompleta, capturarFotoServico, uploadFoto, adicionarServicoRapido, adicionarEventoRapido, marcarStatusServico } from "@/lib/actions/paradas";
 import { compressImageFile, NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
-import { getEditorSenha } from "@/lib/editor-auth";
 import { EditorPasswordForm } from "@/components/shared/EditorPasswordForm";
 import { useEditorMode } from "@/lib/useEditorMode";
 import { cn, pareceNomeDePessoa } from "@/lib/utils";
@@ -64,8 +63,7 @@ function NovaOsForm({ paradaId, onCriada }: { paradaId: string; onCriada: (servi
     try {
       const resultado = await adicionarServicoRapido(
         paradaId,
-        { numeroOS, equipamento, area: "", responsavel: "", equipe, categoria, motivo },
-        getEditorSenha()
+        { numeroOS, equipamento, area: "", responsavel: "", equipe, categoria, motivo }
       );
       if (!resultado.ok || !resultado.servico) {
         setErro(resultado.erro || "Não foi possível criar a OS.");
@@ -256,7 +254,7 @@ function NovoEventoForm({ paradaId, onCriado }: { paradaId: string; onCriado: (e
     setErro("");
     setLoading(true);
     try {
-      const resultado = await adicionarEventoRapido(paradaId, { titulo, responsavel, descricao, icone }, getEditorSenha());
+      const resultado = await adicionarEventoRapido(paradaId, { titulo, responsavel, descricao, icone });
       if (!resultado.ok || !resultado.evento) {
         setErro(resultado.erro || "Não foi possível marcar o evento.");
         return;
@@ -410,12 +408,11 @@ function ServicoCapturaCard({
 
       const formData = new FormData();
       formData.set("file", blob, nome);
-      const senha = getEditorSenha();
 
       let upload: Awaited<ReturnType<typeof uploadFoto>> | null = null;
       for (let tentativa = 1; tentativa <= tentativas; tentativa++) {
         try {
-          upload = await uploadFoto(formData, senha);
+          upload = await uploadFoto(formData);
           if (upload.ok) break;
         } catch {
           upload = null;
@@ -430,7 +427,7 @@ function ServicoCapturaCard({
         return;
       }
 
-      const resultado = await capturarFotoServico(paradaId, servico.id, upload.url, senha, etapa);
+      const resultado = await capturarFotoServico(paradaId, servico.id, upload.url, etapa);
       if (!resultado.ok) {
         setErro(resultado.erro || "Não foi possível registrar a foto.");
         return;
@@ -476,7 +473,7 @@ function ServicoCapturaCard({
     if (novoStatus === servico.status) return;
     setStatusLoading(true);
     try {
-      const resultado = await marcarStatusServico(paradaId, servico.id, novoStatus, getEditorSenha());
+      const resultado = await marcarStatusServico(paradaId, servico.id, novoStatus);
       if (resultado.ok) onCaptured(servico.id, { status: novoStatus });
     } finally {
       setStatusLoading(false);
@@ -625,18 +622,17 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
         setFilaPendente([]);
         return;
       }
-      const senha = getEditorSenha();
       const restantes: FotoPendente[] = [];
       for (const item of itens) {
         try {
           const formData = new FormData();
           formData.set("file", item.blob, item.nomeArquivo);
-          const upload = await uploadFoto(formData, senha);
+          const upload = await uploadFoto(formData);
           if (!upload.ok || !upload.url) {
             restantes.push(item);
             continue;
           }
-          const resultado = await capturarFotoServico(id, item.servicoId, upload.url, senha, item.etapa);
+          const resultado = await capturarFotoServico(id, item.servicoId, upload.url, item.etapa);
           if (!resultado.ok) {
             restantes.push(item);
             continue;

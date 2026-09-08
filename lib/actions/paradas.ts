@@ -3,14 +3,65 @@
 import { del, put } from "@vercel/blob";
 import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
+import { sufixoAleatorio } from "@/lib/utils";
 import { paradas } from "@/lib/db/schema";
 import type { CaminhoCriticoItem, Equipe, Kpis, ParadaCompleta, ParadaResumo, Servico, StatusItem, TimelineEvento } from "@/lib/types";
 import { deriveFotoCapa, deriveFotos, deriveGraficos, deriveKpis, gerarDescricaoExecucao, parseHoras, textoResultadoPadrao } from "@/lib/derive";
 import { gerarResultadoFinal } from "@/lib/mock-data";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
-import { verifyEditorPassword } from "./auth";
+import { ehEditor } from "@/lib/auth/session";
+import { consumirLimite, identificarRequisitante, limiteExcedidoMsg } from "@/lib/rate-limit";
+import {
+  DadosInvalidosError,
+  sanearEquipe,
+  sanearIcone,
+  sanearId,
+  sanearParadaCompleta,
+  sanearStatusItem,
+  sanearTexto,
+  urlDeFotoValida,
+  detectarImagem,
+} from "@/lib/validation";
 
-function rowParaResumo(row: typeof paradas.$inferSelect): ParadaResumo {
+// Versao "silenciosa" do sanearId, pras leituras publicas: em vez de lancar
+// (o que virava um erro 500 numa URL digitada errada), devolve null e o chamador
+// responde "nao encontrado", que e a resposta correta e nao conta ao visitante
+// se o id existe, se e invalido ou se ele nao tem acesso.
+function idSeguro(bruto: unknown): string | null {
+  try {
+    return sanearId(bruto);
+  } catch {
+    return null;
+  }
+}
+
+// As telas de lista (home e historico) nunca mostram timeline, caminho critico,
+// pendencias, graficos nem resultado final — mas o `select()` sem argumentos
+// trazia tudo isso, um jsonb grande por relatorio, em toda visita. Dizer
+// exatamente quais colunas interessam faz o banco mandar menos, o servidor
+// segurar menos na memoria e reduz o estrago de qualquer descuido futuro que
+// devolva a linha inteira ao cliente por engano.
+//
+// `servicos` continua na lista porque rowParaResumo depende dele pra escolher a
+// foto de capa quando fotosMaquina esta vazio (deriveFotoCapa).
+const COLUNAS_RESUMO = {
+  id: paradas.id,
+  nome: paradas.nome,
+  maquina: paradas.maquina,
+  area: paradas.area,
+  data: paradas.data,
+  duracaoPlanejada: paradas.duracaoPlanejada,
+  duracaoRealizada: paradas.duracaoRealizada,
+  status: paradas.status,
+  responsavel: paradas.responsavel,
+  imagem: paradas.imagem,
+  fotosMaquina: paradas.fotosMaquina,
+  servicos: paradas.servicos,
+} as const;
+
+type LinhaResumo = Pick<typeof paradas.$inferSelect, keyof typeof COLUNAS_RESUMO>;
+
+function rowParaResumo(row: LinhaResumo): ParadaResumo {
   const fotosMaquina = row.fotosMaquina?.length ? row.fotosMaquina : [deriveFotoCapa(row.servicos)].filter((v): v is string => !!v);
   return {
     id: row.id,
@@ -45,11 +96,19 @@ function rowParaCompleta(row: typeof paradas.$inferSelect): ParadaCompleta {
 }
 
 export async function listParadasResumo(): Promise<ParadaResumo[]> {
-  const rows = await getDb().select().from(paradas).orderBy(asc(paradas.data));
+  const rows = await getDb().select(COLUNAS_RESUMO).from(paradas).orderBy(asc(paradas.data));
   return rows.map(rowParaResumo).reverse();
 }
 
-export async function getParadaCompleta(id: string): Promise<ParadaCompleta | null> {
+export async function getParadaCompleta(idBruto: string): Promise<ParadaCompleta | null> {
+  // Leitura publica, mas nem por isso o id entra cru na consulta. O Drizzle ja
+  // manda o valor como parametro (nao ha concatenacao de SQL em lugar nenhum
+  // deste app), entao o ganho aqui nao e contra injecao: e recusar de vez o
+  // que nunca poderia ser um id — id inexistente e id malformado passam a dar
+  // a mesma resposta, "nao encontrado", em vez de o malformado chegar ao banco.
+  const id = idSeguro(idBruto);
+  if (!id) return null;
+
   const [row] = await getDb().select().from(paradas).where(eq(paradas.id, id)).limit(1);
   return row ? rowParaCompleta(row) : null;
 }
@@ -63,7 +122,16 @@ export interface ParadaHistoricoItem {
 // evita carregar servicos/fotos/graficos inteiros de cada parada só pra
 // comparar KPIs entre elas.
 export async function listParadasHistorico(): Promise<ParadaHistoricoItem[]> {
-  const rows = await getDb().select().from(paradas).orderBy(asc(paradas.data));
+  // Cruza indicadores de TODOS os relatorios — mesma sensibilidade do backup
+  // completo e do checklist de pendencias, e a mesma regra: exige sessao.
+  // Ver UM relatorio continua publico (e o que o QR code da capa abre); somar
+  // todos numa serie historica, nao.
+  if (!(await ehEditor())) return [];
+
+  const rows = await getDb()
+    .select({ ...COLUNAS_RESUMO, kpis: paradas.kpis })
+    .from(paradas)
+    .orderBy(asc(paradas.data));
   return rows.map((row) => ({ resumo: rowParaResumo(row), kpis: row.kpis }));
 }
 
@@ -71,22 +139,39 @@ export async function listParadasHistorico(): Promise<ParadaHistoricoItem[]> {
 // mais sensível que abrir um relatório específico, então, diferente de
 // listParadasResumo/getParadaCompleta (usadas pras páginas públicas de
 // visualização), essa aqui exige a senha de editor como qualquer escrita.
-export async function exportarBackupCompleto(senha: string): Promise<{ ok: boolean; erro?: string; dados?: ParadaCompleta[] }> {
-  const autorizado = await verifyEditorPassword(senha);
+export async function exportarBackupCompleto(): Promise<{ ok: boolean; erro?: string; dados?: ParadaCompleta[] }> {
+  const autorizado = await ehEditor();
   if (!autorizado) return { ok: false, erro: "Não autorizado." };
 
   const rows = await getDb().select().from(paradas).orderBy(asc(paradas.data));
   return { ok: true, dados: rows.map(rowParaCompleta).reverse() };
 }
 
-export async function getParadaAtualizadaEm(id: string): Promise<number | null> {
+export async function getParadaAtualizadaEm(idBruto: string): Promise<number | null> {
+  const id = idSeguro(idBruto);
+  if (!id) return null;
+
   const [row] = await getDb().select({ atualizadoEm: paradas.atualizadoEm }).from(paradas).where(eq(paradas.id, id)).limit(1);
   return row ? row.atualizadoEm.getTime() : null;
 }
 
-export async function saveParada(data: ParadaCompleta, senha: string): Promise<{ ok: boolean; erro?: string }> {
-  const autorizado = await verifyEditorPassword(senha);
+export async function saveParada(dataBruta: unknown): Promise<{ ok: boolean; erro?: string }> {
+  const autorizado = await ehEditor();
   if (!autorizado) return { ok: false, erro: "Não autorizado." };
+
+  const limite = await consumirLimite(`escrita:${await identificarRequisitante()}`, 60, 60);
+  if (!limite.permitido) return { ok: false, erro: limiteExcedidoMsg() };
+
+  // O relatorio inteiro e reconstruido campo a campo antes de ir pro banco.
+  // Aqui esta o coracao da defesa contra mass assignment: o que o cliente
+  // mandou nunca chega ao insert; o que chega e o objeto que sanearParadaCompleta
+  // montou a partir dele, com enums, tetos de tamanho e URLs conferidos.
+  let data: ParadaCompleta;
+  try {
+    data = sanearParadaCompleta(dataBruta);
+  } catch (erro) {
+    return { ok: false, erro: erro instanceof DadosInvalidosError ? erro.message : "Relatorio invalido." };
+  }
 
   const { resumo } = data;
   await getDb()
@@ -139,9 +224,18 @@ export async function saveParada(data: ParadaCompleta, senha: string): Promise<{
   return { ok: true };
 }
 
-export async function deleteParada(id: string, senha: string): Promise<{ ok: boolean; erro?: string }> {
-  const autorizado = await verifyEditorPassword(senha);
+export async function deleteParada(idBruto: string): Promise<{ ok: boolean; erro?: string }> {
+  const autorizado = await ehEditor();
   if (!autorizado) return { ok: false, erro: "Não autorizado." };
+
+  // sanearId lanca em id invalido; aqui a acao devolve {ok,erro} como as
+  // outras, entao converte em vez de estourar uma excecao no cliente.
+  let id: string;
+  try {
+    id = sanearId(idBruto);
+  } catch {
+    return { ok: false, erro: "Identificador inválido." };
+  }
 
   await getDb().delete(paradas).where(eq(paradas.id, id));
   return { ok: true };
@@ -151,14 +245,21 @@ export async function deleteParada(id: string, senha: string): Promise<{ ok: boo
 // mesmo equipamento: mantém a estrutura (serviços, timeline, caminho crítico)
 // como modelo, mas zera o progresso (fotos, status, horários, pendências) e
 // recalcula kpis/gráficos/resultado do zero, já que nada foi executado ainda.
-export async function clonarParada(idOrigem: string, senha: string): Promise<{ ok: boolean; erro?: string; novoId?: string }> {
-  const autorizado = await verifyEditorPassword(senha);
+export async function clonarParada(idOrigemBruto: string): Promise<{ ok: boolean; erro?: string; novoId?: string }> {
+  const autorizado = await ehEditor();
   if (!autorizado) return { ok: false, erro: "Não autorizado." };
+
+  let idOrigem: string;
+  try {
+    idOrigem = sanearId(idOrigemBruto);
+  } catch {
+    return { ok: false, erro: "Identificador inválido." };
+  }
 
   const [row] = await getDb().select().from(paradas).where(eq(paradas.id, idOrigem)).limit(1);
   if (!row) return { ok: false, erro: "Relatório não encontrado." };
 
-  const novoId = `${row.id}-copia-${Date.now().toString(36)}`;
+  const novoId = `${row.id}-copia-${Date.now().toString(36)}-${sufixoAleatorio()}`;
   const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
 
   const servicosClonados: Servico[] = row.servicos.map((s) => ({
@@ -259,11 +360,17 @@ export interface PendenciaChecklistItem {
 // de uma vez (igual ao backup completo), então exige senha de editor — antes
 // a página só escondia isso na tela, mas mandava os dados pra qualquer
 // visitante do jeito mesmo (o componente client só não desenhava na tela).
-export async function listChecklistPendencias(senha: string): Promise<PendenciaChecklistItem[]> {
-  const autorizado = await verifyEditorPassword(senha);
+export async function listChecklistPendencias(): Promise<PendenciaChecklistItem[]> {
+  const autorizado = await ehEditor();
   if (!autorizado) return [];
 
-  const rows = await getDb().select().from(paradas).orderBy(asc(paradas.data));
+  // So id, nome e servicos entram na conta do checklist — nao ha por que
+  // carregar graficos, timeline e resultado de todos os relatorios pra listar
+  // o que falta fotografar.
+  const rows = await getDb()
+    .select({ id: paradas.id, nome: paradas.nome, servicos: paradas.servicos })
+    .from(paradas)
+    .orderBy(asc(paradas.data));
   const itens: PendenciaChecklistItem[] = [];
 
   for (const row of rows) {
@@ -290,22 +397,41 @@ export async function listChecklistPendencias(senha: string): Promise<PendenciaC
   return itens;
 }
 
-export async function uploadFoto(formData: FormData, senha: string): Promise<{ ok: boolean; url?: string; erro?: string }> {
-  const autorizado = await verifyEditorPassword(senha);
+export async function uploadFoto(formData: FormData): Promise<{ ok: boolean; url?: string; erro?: string }> {
+  const autorizado = await ehEditor();
   if (!autorizado) return { ok: false, erro: "Não autorizado." };
+
+  // Upload e a acao mais cara do app (rede + Blob) e a mais atraente pra abusar:
+  // 40 fotos por minuto ja e mais do que qualquer equipe tira em campo.
+  const limiteUpload = await consumirLimite(`upload:${await identificarRequisitante()}`, 40, 60);
+  if (!limiteUpload.permitido) return { ok: false, erro: limiteExcedidoMsg() };
 
   const file = formData.get("file");
   if (!(file instanceof File)) return { ok: false, erro: "Arquivo inválido." };
-  // Sem isso, quem tem a senha de editor podia hospedar qualquer arquivo
-  // (executável, HTML) num blob público — só imagem é aceito aqui.
-  if (!file.type.startsWith("image/")) return { ok: false, erro: "Só é permitido enviar imagens." };
+  // O bodySizeLimit de 10mb do next.config so limita o corpo inteiro da Server
+  // Action; sem um teto aqui, nada impede encher o Blob (que e cobrado por GB)
+  // com arquivos no limite, um atras do outro. O tamanho e conferido ANTES de
+  // ler qualquer byte do arquivo, pra nao gastar memoria com o que ja esta
+  // reprovado.
+  const LIMITE_BYTES = 12 * 1024 * 1024;
+  if (file.size > LIMITE_BYTES) return { ok: false, erro: "Imagem muito grande (máximo 12 MB)." };
+  if (file.size === 0) return { ok: false, erro: "Arquivo vazio." };
+
+  // Quem manda no tipo sao os primeiros bytes do arquivo, nao o file.type que
+  // o cliente declarou — ver detectarImagem(). Sem isso, quem tem a senha de
+  // editor podia hospedar HTML, SVG com script ou um executavel num blob
+  // publico, rotulado como imagem.
+  const imagem = await detectarImagem(file);
+  if (!imagem) return { ok: false, erro: "Só é permitido enviar imagens JPEG, PNG ou WebP." };
 
   // file.name vem do cliente sem nenhuma garantia — nunca usa ele direto na
-  // chave do blob. Guarda só a extensão (também derivada do nome, então
-  // limitada a caracteres seguros) e gera o resto do nome aleatório.
-  const extensao = file.name.match(/\.[a-zA-Z0-9]{1,5}$/)?.[0] ?? "";
-  const nomeUnico = `fotos/${Date.now()}-${Math.random().toString(36).slice(2, 10)}${extensao}`;
-  const blob = await put(nomeUnico, file, { access: "public" });
+  // chave do blob. A extensao agora sai do formato detectado, e o resto do
+  // nome e aleatorio.
+  const nomeUnico = `fotos/${Date.now()}-${Math.random().toString(36).slice(2, 10)}${imagem.extensao}`;
+  // contentType explicito: sem ele o Blob adota o tipo declarado pelo cliente,
+  // e o arquivo voltaria a ser servido com o rotulo que o cliente escolheu —
+  // desfazendo, na entrega, a checagem que acabou de ser feita na entrada.
+  const blob = await put(nomeUnico, file, { access: "public", contentType: imagem.tipo });
   return { ok: true, url: blob.url };
 }
 
@@ -342,14 +468,28 @@ const ETAPAS_POR_LABEL: Record<"Antes" | "Durante" | "Depois", Etapa> = {
 };
 
 export async function capturarFotoServico(
-  paradaId: string,
-  servicoId: string,
-  url: string,
-  senha: string,
-  etapaEscolhida?: "Antes" | "Durante" | "Depois"
+  paradaIdBruto: string,
+  servicoIdBruto: string,
+  urlBruta: string,
+  etapaEscolhidaBruta?: "Antes" | "Durante" | "Depois"
 ): Promise<{ ok: boolean; erro?: string; label?: string; horario?: string; statusFechado?: StatusItem }> {
-  const autorizado = await verifyEditorPassword(senha);
+  const autorizado = await ehEditor();
   if (!autorizado) return { ok: false, erro: "Não autorizado." };
+
+  let paradaId: string;
+  try {
+    paradaId = sanearId(paradaIdBruto);
+  } catch {
+    return { ok: false, erro: "Identificador inválido." };
+  }
+  const servicoId = sanearTexto(servicoIdBruto, 80);
+  // A URL da foto e escolhida pelo cliente. Sem esta checagem daria pra gravar
+  // no relatorio um endereco de terceiros — e cada pessoa que abrisse a
+  // apresentacao entregaria IP e horario pra esse servidor de fora.
+  const url = urlDeFotoValida(urlBruta);
+  if (!url) return { ok: false, erro: "URL de foto inválida." };
+  const etapaEscolhida =
+    etapaEscolhidaBruta === "Antes" || etapaEscolhidaBruta === "Durante" || etapaEscolhidaBruta === "Depois" ? etapaEscolhidaBruta : undefined;
 
   const [row] = await getDb().select().from(paradas).where(eq(paradas.id, paradaId)).limit(1);
   if (!row) return { ok: false, erro: "Relatório não encontrado." };
@@ -415,13 +555,26 @@ export async function capturarFotoServico(
 // concluídos direto do celular, mesmo sem foto — mexe só no campo status, com
 // o mesmo cuidado de update pontual das outras ações de captura em campo.
 export async function marcarStatusServico(
-  paradaId: string,
-  servicoId: string,
-  status: StatusItem,
-  senha: string
+  paradaIdBruto: string,
+  servicoIdBruto: string,
+  statusBruto: StatusItem
 ): Promise<{ ok: boolean; erro?: string }> {
-  const autorizado = await verifyEditorPassword(senha);
+  const autorizado = await ehEditor();
   if (!autorizado) return { ok: false, erro: "Não autorizado." };
+
+  let paradaId: string;
+  try {
+    paradaId = sanearId(paradaIdBruto);
+  } catch {
+    return { ok: false, erro: "Identificador inválido." };
+  }
+  const servicoId = sanearTexto(servicoIdBruto, 80);
+  let status: StatusItem;
+  try {
+    status = sanearStatusItem(statusBruto);
+  } catch {
+    return { ok: false, erro: "Status inválido." };
+  }
 
   const [row] = await getDb().select().from(paradas).where(eq(paradas.id, paradaId)).limit(1);
   if (!row) return { ok: false, erro: "Relatório não encontrado." };
@@ -479,9 +632,27 @@ interface NovaOsInput {
 // formulário completo. Recalcula kpis/gráficos a partir do array atualizado
 // de serviços, mas só grava as colunas servicos/kpis/graficos — o resto do
 // relatório (capa, linha do tempo, pendências etc.) fica intocado.
-export async function adicionarServicoRapido(paradaId: string, input: NovaOsInput, senha: string): Promise<{ ok: boolean; erro?: string; servico?: Servico }> {
-  const autorizado = await verifyEditorPassword(senha);
+export async function adicionarServicoRapido(paradaIdBruto: string, inputBruto: NovaOsInput): Promise<{ ok: boolean; erro?: string; servico?: Servico }> {
+  const autorizado = await ehEditor();
   if (!autorizado) return { ok: false, erro: "Não autorizado." };
+
+  let paradaId: string;
+  try {
+    paradaId = sanearId(paradaIdBruto);
+  } catch {
+    return { ok: false, erro: "Identificador inválido." };
+  }
+  // Reconstroi o input em vez de confiar no objeto recebido: campo extra que
+  // venha junto simplesmente nao existe daqui pra frente.
+  const input = {
+    numeroOS: sanearTexto(inputBruto?.numeroOS, 80),
+    equipamento: sanearTexto(inputBruto?.equipamento, 200),
+    area: sanearTexto(inputBruto?.area, 200),
+    responsavel: sanearTexto(inputBruto?.responsavel, 200),
+    equipe: sanearEquipe(inputBruto?.equipe),
+    categoria: sanearTexto(inputBruto?.categoria, 200),
+    motivo: sanearTexto(inputBruto?.motivo, 5000),
+  };
 
   const equipamento = input.equipamento.trim();
   if (!equipamento) return { ok: false, erro: "Informe o equipamento." };
@@ -549,9 +720,22 @@ interface NovoEventoInput {
 // Marca um evento da linha do tempo (bloqueio, liberação, partida...) direto
 // do celular, com horário automático — sem isso, só dava pra registrar esses
 // marcos depois, no formulário do computador, longe do momento real.
-export async function adicionarEventoRapido(paradaId: string, input: NovoEventoInput, senha: string): Promise<{ ok: boolean; erro?: string; evento?: TimelineEvento }> {
-  const autorizado = await verifyEditorPassword(senha);
+export async function adicionarEventoRapido(paradaIdBruto: string, inputBruto: NovoEventoInput): Promise<{ ok: boolean; erro?: string; evento?: TimelineEvento }> {
+  const autorizado = await ehEditor();
   if (!autorizado) return { ok: false, erro: "Não autorizado." };
+
+  let paradaId: string;
+  try {
+    paradaId = sanearId(paradaIdBruto);
+  } catch {
+    return { ok: false, erro: "Identificador inválido." };
+  }
+  const input = {
+    titulo: sanearTexto(inputBruto?.titulo, 200),
+    responsavel: sanearTexto(inputBruto?.responsavel, 200),
+    descricao: sanearTexto(inputBruto?.descricao, 5000),
+    icone: sanearIcone(inputBruto?.icone),
+  };
 
   const titulo = input.titulo.trim();
   if (!titulo) return { ok: false, erro: "Informe o evento." };
@@ -575,9 +759,17 @@ export async function adicionarEventoRapido(paradaId: string, input: NovoEventoI
   return { ok: true, evento: novoEvento };
 }
 
-export async function excluirFoto(url: string, senha: string): Promise<void> {
-  const autorizado = await verifyEditorPassword(senha);
-  if (!autorizado || !url.includes("blob.vercel-storage.com")) return;
+export async function excluirFoto(urlBruta: string): Promise<void> {
+  const autorizado = await ehEditor();
+  if (!autorizado) return;
+
+  // A checagem anterior era url.includes("blob.vercel-storage.com") — uma
+  // busca por trecho, que "https://exemplo.com/?x=blob.vercel-storage.com"
+  // satisfaz sem ser um blob nosso. urlDeFotoValida compara o HOSTNAME da URL
+  // ja interpretada, entao so passa o que realmente esta no nosso Blob.
+  const url = urlDeFotoValida(urlBruta);
+  if (!url) return;
+
   try {
     await del(url);
   } catch {

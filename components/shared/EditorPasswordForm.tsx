@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Lock, Loader2 } from "lucide-react";
 
 interface Props {
-  onUnlock: (senha: string) => Promise<boolean | { ok: boolean; erro?: string }>;
+  onUnlock: (senha: string, armadilha?: string) => Promise<boolean | { ok: boolean; erro?: string }>;
   onSuccess: () => void;
   titulo?: string;
   descricao?: string;
@@ -12,13 +12,18 @@ interface Props {
 
 export function EditorPasswordForm({ onUnlock, onSuccess, titulo = "Área do Editor", descricao = "Digite a senha para criar e editar relatórios." }: Props) {
   const [senha, setSenha] = useState("");
+  // Campo-armadilha (honeypot): fica escondido, sem rótulo visível e fora da
+  // ordem de tabulação, então uma pessoa nunca chega nele. Bot que varre o
+  // formulário e preenche todo <input> preenche — e o servidor recusa o login
+  // sem nem consultar a senha.
+  const [armadilha, setArmadilha] = useState("");
   const [erro, setErro] = useState("");
   const [verificando, setVerificando] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setVerificando(true);
-    const resultado = await onUnlock(senha);
+    const resultado = await onUnlock(senha, armadilha);
     setVerificando(false);
     const ok = typeof resultado === "boolean" ? resultado : resultado.ok;
     if (ok) {
@@ -38,6 +43,18 @@ export function EditorPasswordForm({ onUnlock, onSuccess, titulo = "Área do Edi
         <h2 className="text-base font-bold text-slate-900">{titulo}</h2>
         <p className="mt-1 text-sm text-slate-500">{descricao}</p>
       </div>
+      <input
+        type="text"
+        name="empresa"
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+        value={armadilha}
+        onChange={(e) => setArmadilha(e.target.value)}
+        // Fora da tela em vez de display:none — alguns bots pulam campo
+        // escondido por display, mas preenchem o que continua no layout.
+        style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }}
+      />
       <input
         type="password"
         autoFocus

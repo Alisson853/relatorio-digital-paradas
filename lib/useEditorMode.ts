@@ -1,15 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
-import { login, verifyEditorPassword } from "./actions/auth";
-import { getEditorSenha, isEditorUnlocked, lockEditor, persistEditorUnlock } from "./editor-auth";
+import { login, logout, sessaoAtiva } from "./actions/auth";
+import { isEditorUnlocked, limparDicaEditor } from "./editor-auth";
 
-// isEditorUnlocked() lê o localStorage — um dado externo ao React — então em
-// vez de copiar esse valor pra um useState via efeito (o que gera um
-// primeiro render "errado" seguido de uma correção), useSyncExternalStore
-// já resolve isso do jeito certo: usa getServerSnapshot no servidor e na
-// primeira passada do cliente (sem mismatch de hidratação), e resincroniza
-// sozinho sempre que o evento abaixo dispara.
+// isEditorUnlocked() lê um cookie — um dado externo ao React — então em vez de
+// copiar esse valor pra um useState via efeito (o que gera um primeiro render
+// "errado" seguido de uma correção), useSyncExternalStore já resolve isso do
+// jeito certo: usa getServerSnapshot no servidor e na primeira passada do
+// cliente (sem mismatch de hidratação), e resincroniza sozinho quando o evento
+// abaixo dispara.
 const EVENTO_MUDANCA = "maintops:editor-mode-changed";
 
 function notificarMudanca(): void {
@@ -17,8 +17,8 @@ function notificarMudanca(): void {
 }
 
 function subscribe(callback: () => void): () => void {
-  // "storage" avisa outras abas quando o localStorage muda; o evento próprio
-  // é pra esta mesma aba, já que "storage" não dispara pra quem fez a mudança.
+  // O evento próprio é pra esta aba; "storage" continua ouvido porque outras
+  // abas do mesmo app disparam a mudança de sessão e a tela deve acompanhar.
   window.addEventListener(EVENTO_MUDANCA, callback);
   window.addEventListener("storage", callback);
   return () => {
@@ -34,38 +34,34 @@ function getServerSnapshot(): boolean {
 export function useEditorMode() {
   const isEditor = useSyncExternalStore(subscribe, isEditorUnlocked, getServerSnapshot);
 
-  // Sessões guardadas antes da mudança pra token assinado (ou já vencidas,
-  // passadas as 24h) precisam ser descartadas — sem isso, a tela continua
-  // mostrando modo editor, mas toda ação de escrita falha silenciosamente
-  // com "Não autorizado". Não mexe em estado do React diretamente: só grava
-  // no localStorage e dispara o evento, que o useSyncExternalStore acima já
-  // está ouvindo pra se ressincronizar sozinho.
+  // O cookie de UI é só uma dica: ele pode estar de pé enquanto a sessão de
+  // verdade (o cookie httpOnly assinado) já venceu ou foi revogada. Sem esta
+  // confirmação no servidor, a tela seguiria mostrando os controles de edição
+  // e toda ação falharia com "Não autorizado" sem explicação.
   useEffect(() => {
     if (!isEditor) return;
-    verifyEditorPassword(getEditorSenha()).then((valida) => {
+    sessaoAtiva().then((valida) => {
       if (!valida) {
-        lockEditor();
+        limparDicaEditor();
         notificarMudanca();
       }
     });
   }, [isEditor]);
 
-  // A senha digitada só viaja até o servidor uma vez, aqui — o que fica
-  // salvo pras próximas ações é o token assinado que a troca devolve, não a
-  // senha em si.
-  const unlock = useCallback(async (senha: string) => {
-    const resultado = await login(senha);
-    if (resultado.ok && resultado.token) {
-      persistEditorUnlock(resultado.token);
-      notificarMudanca();
-    }
-    return { ok: resultado.ok, erro: resultado.erro };
+  // A senha viaja até o servidor uma única vez, aqui. A partir daí quem
+  // autentica é o cookie httpOnly que o login abriu — o cliente não guarda
+  // nem reenvia nada.
+  const unlock = useCallback(async (senha: string, armadilha?: string) => {
+    const resultado = await login(senha, armadilha);
+    if (resultado.ok) notificarMudanca();
+    return resultado;
   }, []);
 
-  const lock = useCallback(() => {
-    lockEditor();
+  const lock = useCallback(async () => {
+    limparDicaEditor();
     notificarMudanca();
+    await logout();
   }, []);
 
-  return { ready: true, isEditor, unlock, lock, getSenha: getEditorSenha };
+  return { ready: true, isEditor, unlock, lock };
 }

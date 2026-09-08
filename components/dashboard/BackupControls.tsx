@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Download, Upload } from "lucide-react";
 import type { ParadaCompleta } from "@/lib/types";
 import { listParadasResumo, exportarBackupCompleto, saveParada } from "@/lib/actions/paradas";
-import { getEditorSenha } from "@/lib/editor-auth";
 import { triggerJsonDownload } from "@/lib/local-json";
 
 function isValidParadaCompleta(value: unknown): value is ParadaCompleta {
@@ -23,8 +22,7 @@ export function BackupControls() {
 
   async function handleExportarTudo() {
     setErro("");
-    const senha = getEditorSenha();
-    const resultado = await exportarBackupCompleto(senha);
+    const resultado = await exportarBackupCompleto();
     if (!resultado.ok || !resultado.dados) {
       setErro(resultado.erro || "Não foi possível exportar o backup.");
       return;
@@ -64,11 +62,10 @@ export function BackupControls() {
 
       let importados = 0;
       let ignorados = 0;
-      const senha = getEditorSenha();
 
       for (const candidato of candidatos) {
         if (isValidParadaCompleta(candidato)) {
-          const resultado = await saveParada(candidato, senha);
+          const resultado = await saveParada(candidato);
           if (resultado.ok) importados++;
           else ignorados++;
         } else {

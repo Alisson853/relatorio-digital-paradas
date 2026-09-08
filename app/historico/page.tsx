@@ -2,12 +2,17 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { listParadasHistorico } from "@/lib/actions/paradas";
+import { ehEditor } from "@/lib/auth/session";
 import { HistoricoCharts } from "@/components/dashboard/HistoricoCharts";
+import { PortaoEditor } from "@/components/shared/PortaoEditor";
 
 export const dynamic = "force-dynamic";
 
 export default async function HistoricoPage() {
-  const itens = await listParadasHistorico();
+  // A decisao acontece antes da consulta: sem sessao, o banco nem e tocado e
+  // nenhum numero de nenhum relatorio entra no HTML enviado ao navegador.
+  const autorizado = await ehEditor();
+  const itens = autorizado ? await listParadasHistorico() : [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -26,7 +31,11 @@ export default async function HistoricoPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-10 sm:px-10">
-        <HistoricoCharts itens={itens} />
+        {autorizado ? (
+          <HistoricoCharts itens={itens} />
+        ) : (
+          <PortaoEditor titulo="Acesso Restrito" descricao="Digite a senha para comparar os indicadores entre paradas." />
+        )}
       </main>
     </div>
   );

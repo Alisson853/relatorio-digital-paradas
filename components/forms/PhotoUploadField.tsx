@@ -5,7 +5,6 @@ import Image from "next/image";
 import { ImagePlus, Loader2, X } from "lucide-react";
 import { compressImageFile } from "@/lib/image-utils";
 import { uploadFoto } from "@/lib/actions/paradas";
-import { getEditorSenha } from "@/lib/editor-auth";
 import { cn } from "@/lib/utils";
 
 interface PhotoUploadFieldProps {
@@ -32,7 +31,7 @@ export function PhotoUploadField({ label, value, onChange, className }: PhotoUpl
       const comprimido = await compressImageFile(file);
       const formData = new FormData();
       formData.set("file", comprimido, file.name);
-      const resultado = await uploadFoto(formData, getEditorSenha());
+      const resultado = await uploadFoto(formData);
       if (!resultado.ok || !resultado.url) {
         setError(resultado.erro || "Não foi possível enviar essa imagem.");
         return;

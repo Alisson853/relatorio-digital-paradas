@@ -9,8 +9,7 @@ import type { CaminhoCriticoItem, ParadaCompleta, ParadaResumo, Pendencia, Servi
 import { deriveGraficos, deriveKpis, gerarDescricaoExecucao, parseHoras, textoResultadoPadrao } from "@/lib/derive";
 import { gerarResultadoFinal } from "@/lib/mock-data";
 import { getParadaAtualizadaEm, getParadaCompleta, saveParada } from "@/lib/actions/paradas";
-import { getEditorSenha } from "@/lib/editor-auth";
-import { slugify } from "@/lib/utils";
+import { slugify, sufixoAleatorio } from "@/lib/utils";
 import { clearDraft, getDraft, saveDraft } from "@/lib/draft-store";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { parsePlanilhaServicos } from "@/lib/import-planilha";
@@ -458,6 +457,19 @@ function NovaParadaForm() {
 
   async function handleImportarPlanilha(file: File | undefined) {
     if (!file) return;
+    // A leitura da planilha acontece aqui no navegador, e o parser (SheetJS)
+    // trabalha com o arquivo inteiro na memória da aba. Sem teto, uma planilha
+    // de centenas de MB — ou um arquivo qualquer renomeado pra .xlsx — trava a
+    // aba antes de chegar a qualquer mensagem de erro.
+    const LIMITE_PLANILHA = 15 * 1024 * 1024;
+    if (file.size > LIMITE_PLANILHA) {
+      setImportResultado("Planilha muito grande (máximo 15 MB).");
+      return;
+    }
+    if (!/\.(xlsx|xlsm|xls)$/i.test(file.name)) {
+      setImportResultado("Selecione um arquivo .xlsx ou .xls.");
+      return;
+    }
     setImportResultado("");
     setImportando(true);
     try {
@@ -581,7 +593,10 @@ function NovaParadaForm() {
     }
     setErro("");
 
-    const id = editId || `${slugify(nome) || "parada"}-${Date.now().toString(36)}`;
+    // Id novo leva sufixo aleatorio (ver sufixoAleatorio). editId preserva o id
+    // de quem ja existe: mudar o id de um relatorio publicado invalidaria os QR
+    // codes ja impressos e colados no equipamento.
+    const id = editId || `${slugify(nome) || "parada"}-${Date.now().toString(36)}-${sufixoAleatorio()}`;
 
     const resumo: ParadaResumo = {
       id,
@@ -653,7 +668,7 @@ function NovaParadaForm() {
       resultadoFinal,
     };
 
-    const resultado = await saveParada(parada, getEditorSenha());
+    const resultado = await saveParada(parada);
     if (!resultado.ok) {
       setErro(resultado.erro || "Não foi possível salvar o relatório.");
       window.scrollTo({ top: 0, behavior: "smooth" });
