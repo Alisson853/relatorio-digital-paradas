@@ -17,9 +17,20 @@ import * as schema from "./schema";
 // O fallback pra DATABASE_URL fica por seguranca operacional: um ambiente que
 // ainda nao tenha a variavel nova continua subindo, em vez de quebrar tudo por
 // causa de uma variavel faltando.
+// Limpa a string antes de usar. Nao e paranoia: a variavel foi parar na Vercel
+// com um BOM (U+FEFF) na frente, porque o PowerShell marca a codificacao ao
+// mandar texto por pipe. O caractere e invisivel em qualquer painel ou editor,
+// e o driver do Neon so diz "not a valid URL" — o valor na tela parece
+// perfeito. Uma linha de limpeza custa menos que a proxima meia hora de
+// diagnostico.
+function limparUrl(valor: string | undefined): string | undefined {
+  return valor?.replace(/^\uFEFF/, "").trim() || undefined;
+}
+
 function createDb() {
-  const sql = neon(process.env.APP_DATABASE_URL || process.env.DATABASE_URL!);
-  return drizzle(sql, { schema });
+  const url = limparUrl(process.env.APP_DATABASE_URL) ?? limparUrl(process.env.DATABASE_URL);
+  if (!url) throw new Error("Nenhuma conexão de banco configurada (APP_DATABASE_URL ou DATABASE_URL).");
+  return drizzle(neon(url), { schema });
 }
 
 let _db: ReturnType<typeof createDb> | null = null;
