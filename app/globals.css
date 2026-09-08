@@ -136,6 +136,56 @@ body {
   }
 }
 
+/* Revelação de entrada da capa, em CSS e não em JavaScript.
+ *
+ * A capa usava framer-motion com initial={{ opacity: 0 }}. O detalhe que isso
+ * esconde: o HTML que sai do servidor já vem com opacity:0 no estilo inline, e
+ * quem devolve a opacidade é o JavaScript, depois de baixar e hidratar. Numa
+ * rede boa é um piscar; no 4G da fábrica, que é onde o técnico abre o QR code,
+ * a primeira coisa que ele vê é um retângulo azul vazio.
+ *
+ * Animação em CSS não depende de JS: começa na primeira pintura e termina
+ * sozinha. O resultado na tela é o mesmo, e o pior caso deixa de existir.
+ */
+@keyframes revelar {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.revelar {
+  animation: revelar 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes revelar-foto {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.revelar-foto {
+  animation: revelar-foto 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Quem pediu menos movimento no sistema recebe o conteúdo direto, sem
+ * deslocamento — e, principalmente, sem nunca passar por opacity:0. */
+@media (prefers-reduced-motion: reduce) {
+  .revelar,
+  .revelar-foto {
+    animation: none;
+  }
+}
+
 /* Exportação em PDF: cada .print-page vira uma página, cores/gradientes preservados. */
 @media print {
   @page {

@@ -1,24 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { motion, type Variants } from "framer-motion";
 import type { ParadaResumo } from "@/lib/types";
 import { MachineIllustration } from "@/components/ui/MachineIllustration";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { cn, formatDate } from "@/lib/utils";
-
-const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 24 },
-  show: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.6, delay: 0.15 * i, ease: [0.16, 1, 0.3, 1] as const },
-  }),
-};
+import { cn, formatDateCompact } from "@/lib/utils";
 
 export function CoverSection({ resumo }: { resumo: ParadaResumo }) {
   const campos = [
-    { label: "Data da Parada", value: formatDate(resumo.data) },
+    { label: "Data da Parada", value: formatDateCompact(resumo.data) },
     { label: "Tempo Planejado", value: resumo.duracaoPlanejada },
     { label: "Tempo Realizado", value: resumo.duracaoRealizada },
     { label: "Responsável", value: resumo.responsavel },
@@ -53,20 +43,25 @@ export function CoverSection({ resumo }: { resumo: ParadaResumo }) {
 
       <div className="relative mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-8 lg:grid-cols-[1.15fr_1fr] lg:gap-16">
         <div>
-          <motion.div initial="hidden" animate="show" custom={0} variants={fadeUp} className="mb-6 flex flex-wrap items-center gap-3">
+          <div className="revelar mb-6 flex flex-wrap items-center gap-3">
             <StatusBadge
               status={resumo.status}
               className="rounded-sm border border-white/25 bg-white/[0.06] font-mono text-[11px] tracking-[0.08em] text-white [&>span]:bg-current"
             />
+            {/* O id ganhou sufixo aleatorio e ficou longo demais pra caber
+                aqui inteiro. Cortar no meio ("parada-mp11-util…") nao serve
+                nem pra conferir nem pra ler; o que identifica de fato e o
+                final, entao a etiqueta mostra so ele. O id completo continua
+                no title, pra quem precisar. */}
             <span
-              className="max-w-[220px] truncate rounded-sm border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-brand-300"
+              className="rounded-sm border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-brand-300"
               title={resumo.id}
             >
-              Nº Registro {resumo.id}
+              Nº Registro {resumo.id.slice(-8)}
             </span>
-          </motion.div>
+          </div>
 
-          <motion.div initial="hidden" animate="show" custom={1} variants={fadeUp} className="flex items-stretch gap-4">
+          <div className="revelar flex items-stretch gap-4" style={{ animationDelay: "0.15s" }}>
             <span className="mt-1 w-[3px] flex-none rounded-full bg-signal-500" />
             <div className="min-w-0">
               <p className="mb-2 font-mono text-[11px] font-medium uppercase tracking-[0.32em] text-brand-300">
@@ -77,39 +72,38 @@ export function CoverSection({ resumo }: { resumo: ParadaResumo }) {
               </h1>
               <p className="mt-4 text-lg font-medium text-brand-200">{resumo.maquina}</p>
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial="hidden"
-            animate="show"
-            custom={2}
-            variants={fadeUp}
-            className="mt-10 grid grid-cols-2 overflow-hidden rounded-md border border-white/15 bg-white/[0.03] sm:grid-cols-4"
+          <div
+            className="revelar mt-10 grid grid-cols-2 overflow-hidden rounded-md border border-white/15 bg-white/[0.03] sm:grid-cols-4"
+            style={{ animationDelay: "0.3s" }}
           >
             {campos.map(({ label, value }, i) => (
               <div
                 key={label}
                 className={cn(
-                  "min-w-0 border-white/10 px-4 py-3.5",
+                  "min-w-0 border-white/10 px-4 py-3.5 align-top",
                   i % 2 === 1 && "max-sm:border-l",
                   i >= 2 && "max-sm:border-t",
                   i > 0 && "sm:border-l"
                 )}
               >
                 <p className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-brand-300">{label}</p>
-                <p className="mt-1 truncate font-mono text-sm font-semibold text-white" title={value}>
+                {/* Quebra em vez de truncar: um nome cortado ("Madson Ferna…")
+                    nao informa nada, e a faixa tem altura de sobra pra duas
+                    linhas. As celulas se alinham pelo topo, entao uma que
+                    quebre nao desalinha as vizinhas. */}
+                <p className="mt-1 font-mono text-sm font-semibold leading-snug text-white [overflow-wrap:anywhere]">
                   {value}
                 </p>
               </div>
             ))}
-          </motion.div>
+          </div>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, scale: 0.92, y: 16 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
-          className="relative mx-auto aspect-square w-full max-w-[220px] -order-1 sm:max-w-xs lg:order-none lg:max-w-md"
+        <div
+          className="revelar-foto relative mx-auto aspect-square w-full max-w-[220px] -order-1 sm:max-w-xs lg:order-none lg:max-w-md"
+          style={{ animationDelay: "0.3s" }}
         >
           {resumo.fotosMaquina?.length ? (
             <div className="relative h-full w-full">
@@ -133,7 +127,7 @@ export function CoverSection({ resumo }: { resumo: ParadaResumo }) {
               <MachineIllustration variant={resumo.imagem} className="h-full w-full" />
             </div>
           )}
-        </motion.div>
+        </div>
       </div>
     </section>
   );

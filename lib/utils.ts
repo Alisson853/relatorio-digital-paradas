@@ -46,6 +46,22 @@ export function formatDate(iso: string): string {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 }
 
+// Data curta pra grades estreitas: "02 SET 2026".
+//
+// Existe por um motivo concreto. Na capa, a data dividia uma faixa de quatro
+// colunas com tempo planejado, realizado e responsavel; "02 de setembro de
+// 2026" nao cabia e aparecia como "02 de setemb…". Truncar uma data e o pior
+// dos dois mundos — ocupa a largura toda e ainda esconde o ano, que e
+// justamente o que alguem procura ali.
+//
+// O formato curto cabe inteiro e, em caixa alta e fonte mono, conversa com o
+// resto dos rotulos tecnicos da capa em vez de destoar.
+export function formatDateCompact(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  const mes = d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "").toUpperCase();
+  return `${String(d.getDate()).padStart(2, "0")} ${mes} ${d.getFullYear()}`;
+}
+
 // A coluna "Executante" da planilha às vezes traz lixo em vez de nome —
 // número de turno, célula com erro de acentuação virando uma sequência de
 // "?". Usado tanto na importação (pra nem gravar isso como responsável)

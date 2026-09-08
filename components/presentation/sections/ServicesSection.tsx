@@ -41,7 +41,17 @@ function CategoriaBadge({ categoria }: { categoria?: string }) {
 function ServiceSlide({ servico }: { servico: Servico }) {
   return (
     <div className="grid grid-rows-[minmax(0,1fr)] flex-1 grid-cols-1 gap-8 overflow-hidden lg:grid-cols-[1fr_1.05fr] lg:gap-10">
-      <div className="min-h-0 overflow-y-auto pr-1">
+      {/* O painel tem altura fixa pra secao caber na tela, entao o texto do
+          servico rola por dentro. Sem sinal nenhum isso lia como conteudo
+          cortado (o titulo "Problema Identificado" aparecia partido na borda).
+          A mascara desvanece as ultimas linhas, que e como o olho reconhece
+          "tem mais abaixo".
+
+          O padding de baixo e igual a altura do desvanecimento de proposito:
+          assim, quando o texto chega ao fim, quem esta sob a mascara e o
+          espaco vazio, nao a ultima frase. Sem isso a solucao do corte criaria
+          outro problema — a linha final permanentemente apagada. */}
+      <div className="min-h-0 overflow-y-auto pb-10 pr-1 [mask-image:linear-gradient(to_bottom,black_calc(100%-2.5rem),transparent)]">
         <div className="mb-4 flex items-center justify-between gap-3">
           <span className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-brand-600">
             Serviços Executados
@@ -133,8 +143,20 @@ function ServiceSlide({ servico }: { servico: Servico }) {
                 fotosDisponiveis.length === 1 ? "grid-cols-1" : "grid-cols-2"
               )}
             >
-              {fotosDisponiveis.map((foto) => (
-                <div key={foto.key} className="relative overflow-hidden rounded-2xl border-2 border-white bg-slate-100 shadow-md">
+              {fotosDisponiveis.map((foto, i) => (
+                <div
+                  key={foto.key}
+                  className={cn(
+                    "relative overflow-hidden rounded-2xl border-2 border-white bg-slate-100 shadow-md",
+                    // Com tres fotos, a grade de duas colunas deixava a quarta
+                    // celula vazia — um buraco no canto, bem no painel que a
+                    // reuniao fica olhando. A ultima passa a ocupar a linha
+                    // inteira: fecha o vazio e, como a ordem e Antes/Durante/
+                    // Depois, quem ganha a faixa larga e justamente o Depois,
+                    // que e o resultado do servico.
+                    fotosDisponiveis.length === 3 && i === 2 && "col-span-2"
+                  )}
+                >
                   <Image
                     src={foto.url}
                     alt={servico.equipamento}
@@ -209,7 +231,14 @@ export function ServicesSection({ servicos: todosServicos }: { servicos: Servico
         <div className="relative flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_4px_24px_rgba(16,24,40,0.06)] sm:p-10 lg:h-[90vh]">
           <div className="absolute inset-y-0 left-0 w-1.5 bg-brand-600" />
 
-          <AnimatePresence mode="wait">
+          {/* initial={false} desliga a animacao de entrada do PRIMEIRO cartao.
+              A troca entre servicos continua deslizando; o que deixa de existir
+              e o estado inicial invisivel na montagem — que estava travando o
+              cartao em opacity:0 e deixando a secao inteira em branco, com so a
+              moldura e o "1/16" aparecendo. Mesmo se a animacao voltasse a
+              funcionar, animar a entrada do primeiro item so atrasa a leitura:
+              ninguem viu de onde ele veio. */}
+          <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={atual.id}
               initial={{ opacity: 0, x: 24 }}
