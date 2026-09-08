@@ -1,6 +1,7 @@
 # Varredura de dependências
 
-Rodada em 2026-09-08 com `npm audit`. Resultado: **7 alertas — 3 altos, 4 moderados.**
+Rodada em 2026-09-08 com `npm audit`. Resultado inicial: **7 alertas — 3 altos, 4
+moderados.** Depois da correção do `xlsx`: **6 — 2 altos, 4 moderados.**
 
 Nenhum deles se resolve subindo de versão, e isso não é preguiça de quem
 escreveu: em dois casos a versão corrigida não existe no npm, e no terceiro o
@@ -13,7 +14,7 @@ Pra repetir a varredura:
 
 ---
 
-## 1. xlsx — ALTO — prototype pollution + ReDoS
+## 1. xlsx — ALTO — prototype pollution + ReDoS — RESOLVIDO
 
 **Onde entra:** `lib/import-planilha.ts`, na importação de planilha da tela
 `/novo`. `XLSX.read()` recebe o arquivo que a pessoa escolheu.
@@ -27,17 +28,23 @@ escrita. Isso reduz muito a gravidade, mas não zera: prototype pollution na aba
 **Por que o npm não resolve:** a SheetJS saiu do npm. A versão publicada lá
 parou em `0.18.5`, que é a vulnerável; as correções só existem no CDN próprio.
 
-**Correção (pendente — precisa ser rodada à mão):**
+**Correção aplicada:**
 
     npm i https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
 
-A API é a mesma (`XLSX.read`, `XLSX.utils.sheet_to_json`); não há mudança de
-código a fazer. Depois de instalar, rode `npm audit` de novo e confirme que
-`xlsx` sumiu da lista, e importe uma planilha de verdade pra conferir.
+É por isso que o `package.json` traz uma URL no lugar de um número de versão
+nesta dependência — não é descuido, é o único lugar onde a versão corrigida
+existe. Quem for atualizar no futuro precisa trocar a URL, não o intervalo de
+versão; um `^0.20.3` faria o npm voltar pro pacote abandonado e vulnerável.
 
-**Mitigação já aplicada enquanto isso:** a tela recusa arquivo acima de 15 MB e
-qualquer coisa que não termine em `.xlsx/.xlsm/.xls` antes de entregar ao
-parser (`handleImportarPlanilha`).
+A API não mudou (`XLSX.read`, `XLSX.utils.sheet_to_json`), então não houve
+mudança de código. Conferido gerando uma planilha com os cabeçalhos que
+`parsePlanilhaServicos` espera e importando: 2 serviços lidos, equipe e
+executante corretos, "TRABALHOS PROGRAMADOS" e "ETIQUETA VERMELHA" extraídos.
+
+**Defesa que continua valendo:** a tela recusa arquivo acima de 15 MB e qualquer
+coisa que não termine em `.xlsx/.xlsm/.xls` antes de entregar ao parser
+(`handleImportarPlanilha`).
 
 ---
 
