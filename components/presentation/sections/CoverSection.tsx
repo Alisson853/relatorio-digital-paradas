@@ -102,7 +102,13 @@ export function CoverSection({ resumo }: { resumo: ParadaResumo }) {
         </div>
 
         <div
-          className="revelar-foto relative mx-auto aspect-square w-full max-w-[220px] -order-1 sm:max-w-xs lg:order-none lg:max-w-md"
+          // A foto vinha ANTES do titulo no celular (-order-1). O efeito era
+          // que quem abre o QR code no aparelho recebia uma foto ocupando a
+          // tela inteira e precisava rolar pra descobrir de que relatorio se
+          // trata — medido: o titulo comecava em 507px. Numa capa, o nome vem
+          // primeiro; a foto ilustra o que o nome ja disse. Em telas largas as
+          // duas colunas aparecem lado a lado e a ordem nao muda nada.
+          className="revelar-foto relative mx-auto aspect-square w-full max-w-[220px] sm:max-w-xs lg:max-w-md"
           style={{ animationDelay: "0.3s" }}
         >
           {resumo.fotosMaquina?.length ? (
