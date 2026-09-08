@@ -86,8 +86,18 @@ export function GallerySection({ fotos }: { fotos: FotoGaleria[] }) {
                 loading="eager"
                 unoptimized={foto.url.startsWith("data:")}
               />
-              <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/60 via-black/0 to-black/0 p-2.5 opacity-0 transition-opacity group-hover:opacity-100">
-                <p className="truncate text-[11px] font-semibold text-white">{foto.servico}</p>
+              {/* A legenda so aparecia no hover. Em celular nao existe hover:
+                  a foto ficava sem identificacao nenhuma, e quem abre o
+                  relatorio no aparelho ve uma parede de imagens sem saber a
+                  qual servico cada uma pertence. No estreito ela fica sempre
+                  visivel; do lg pra cima volta a surgir no hover, que ali
+                  funciona e deixa a grade mais limpa.
+
+                  E line-clamp-2 no lugar de truncate porque o titulo do servico
+                  precisa de 345px numa faixa de 195: numa linha so, "Manutencao
+                  em 001-0126 - Rol…" nao diz de que equipamento se trata. */}
+              <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/70 via-black/10 to-black/0 p-2.5 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
+                <p className="line-clamp-2 text-[11px] font-semibold leading-snug text-white">{foto.servico}</p>
               </div>
               {contagemPorServico[foto.servico] > 1 && (
                 <span

@@ -115,7 +115,7 @@ function ServiceSlide({ servico }: { servico: Servico }) {
         </div>
       </div>
 
-      <div className="flex h-full flex-col gap-4 rounded-3xl border-2 border-brand-100 bg-brand-50/40 p-3 sm:p-4">
+      <div className="flex flex-col gap-4 rounded-3xl border-2 border-brand-100 bg-brand-50/40 p-3 sm:p-4 lg:h-full">
         {(() => {
           const fotosDisponiveis = [
             ...(servico.fotoAntes && servico.fotoAntes !== NO_PHOTO_PLACEHOLDER
@@ -139,7 +139,14 @@ function ServiceSlide({ servico }: { servico: Servico }) {
             // então fica grande e sem cortar demais em nenhum sentido.
             <div
               className={cn(
-                "grid h-full auto-rows-fr gap-3",
+                // A altura vem de h-full, que so existe porque o cartao tem
+                // lg:h-[90vh] no desktop. No celular nao ha altura nenhuma pra
+                // herdar: o grid colapsa, e como as imagens usam fill, elas
+                // somem junto — o painel de fotos vira uma capsula vazia no meio
+                // do cartao. Uma altura propria no estreito devolve as fotos e
+                // mantem o resto do calculo (auto-rows-fr dividindo o espaco)
+                // exatamente como estava.
+                "grid h-[46vh] auto-rows-fr gap-3 lg:h-full",
                 fotosDisponiveis.length === 1 ? "grid-cols-1" : "grid-cols-2"
               )}
             >

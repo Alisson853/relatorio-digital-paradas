@@ -64,7 +64,11 @@ export function CoverSection({ resumo }: { resumo: ParadaResumo }) {
           <div className="revelar flex items-stretch gap-4" style={{ animationDelay: "0.15s" }}>
             <span className="mt-1 w-[3px] flex-none rounded-full bg-signal-500" />
             <div className="min-w-0">
-              <p className="mb-2 font-mono text-[11px] font-medium uppercase tracking-[0.32em] text-brand-300">
+              {/* O espacamento entre letras de 0.32em e o que da o ar de
+                  prancha tecnica, mas no celular ele estica a linha a ponto de
+                  ela quebrar deixando "DIGITAL" sozinho embaixo. Menos
+                  espacamento no estreito mantem a intencao sem a quebra feia. */}
+              <p className="mb-2 font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-brand-300 sm:tracking-[0.32em]">
                 {resumo.area} · Relatório Digital
               </p>
               <h1 className="font-display text-4xl font-semibold uppercase leading-[0.98] tracking-tight text-white sm:text-5xl lg:text-[3.4rem]">
@@ -108,7 +112,20 @@ export function CoverSection({ resumo }: { resumo: ParadaResumo }) {
           // trata — medido: o titulo comecava em 507px. Numa capa, o nome vem
           // primeiro; a foto ilustra o que o nome ja disse. Em telas largas as
           // duas colunas aparecem lado a lado e a ordem nao muda nada.
-          className="revelar-foto relative mx-auto aspect-square w-full max-w-[220px] sm:max-w-xs lg:max-w-md"
+          // No celular a foto ocupa a largura toda, alinhada com o titulo e com
+          // a faixa de campos acima dela. Antes era mx-auto com teto de 320px:
+          // uma caixa estreita centralizada, enquanto TODO o resto da capa
+          // encosta a esquerda. O desencontro entre um bloco centralizado e
+          // tudo o mais alinhado a esquerda e o que faz a capa parecer torta.
+          //
+          // Em telas largas ela volta a ser um quadrado centralizado na propria
+          // coluna, porque ali a capa tem duas colunas lado a lado e o
+          // enquadramento quadrado equilibra o bloco de texto.
+          //
+          // A proporcao tambem muda: 4/3 no estreito em vez de quadrado, senao
+          // uma foto de largura total viraria um bloco altissimo e empurraria o
+          // resto da capa pra fora da tela.
+          className="revelar-foto relative aspect-[4/3] w-full lg:mx-auto lg:aspect-square lg:max-w-md"
           style={{ animationDelay: "0.3s" }}
         >
           {resumo.fotosMaquina?.length ? (
