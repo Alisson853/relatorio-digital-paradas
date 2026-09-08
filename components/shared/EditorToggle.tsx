@@ -16,7 +16,10 @@ export function EditorToggle() {
       <button
         type="button"
         onClick={lock}
-        className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 transition-colors hover:text-slate-700"
+        // O botao tinha a altura do proprio texto: 16px de alvo, num app
+        // que se usa de celular. O padding leva a area clicavel a 36px; as
+        // margens negativas devolvem o espaco, entao nada em volta se mexe.
+        className="-mx-2 -my-2.5 flex items-center gap-1.5 px-2 py-2.5 text-xs font-semibold text-slate-400 transition-colors hover:text-slate-700"
       >
         <LockKeyholeOpen size={13} />
         Sair do Modo Editor
@@ -29,7 +32,7 @@ export function EditorToggle() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 transition-colors hover:text-slate-700"
+        className="-mx-2 -my-2.5 flex items-center gap-1.5 px-2 py-2.5 text-xs font-semibold text-slate-400 transition-colors hover:text-slate-700"
       >
         <LockKeyhole size={13} />
         Área do Editor
@@ -41,7 +44,7 @@ export function EditorToggle() {
             <button
               onClick={() => setOpen(false)}
               aria-label="Fechar"
-              className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"
+              className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"
             >
               <X size={14} />
             </button>

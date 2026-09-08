@@ -73,7 +73,12 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
               key={f.value}
               onClick={() => setStatusFiltro(f.value)}
               className={cn(
-                "flex-none rounded-lg px-3 py-1.5 text-xs font-bold transition-colors",
+                // Leva o chip de 28px para 36px de altura. A diretriz de toque
+                // pede 44px, mas o chip vive numa fila horizontal de quatro:
+                // 44 empurraria os ultimos para fora da tela do celular. 36 e
+                // o maior que cabe sem quebrar a fila, e ja tira o alvo da
+                // faixa em que o dedo erra.
+                "flex-none rounded-lg px-3.5 py-2.5 text-xs font-bold transition-colors",
                 statusFiltro === f.value ? "bg-brand-600 text-white" : "text-slate-500 hover:bg-slate-100"
               )}
             >
