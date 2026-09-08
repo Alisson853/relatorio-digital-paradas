@@ -46,3 +46,11 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# Fotos de campo usadas como material de trabalho (WhatsApp, fotos das máquinas).
+# Não são fonte do site: as imagens que o app serve vivem no Blob da Vercel, e
+# as do repositório ficam em /public. Versionar estas aqui só engorda o
+# histórico com alguns MB por parada, sem nada a ganhar.
+/FOTOS/
+/*.jpeg
+/*.jpg
