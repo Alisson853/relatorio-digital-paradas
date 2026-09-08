@@ -194,38 +194,63 @@ function NovaOsForm({ paradaId, onCriada }: { paradaId: string; onCriada: (servi
   );
 }
 
+// Uma das tres etapas da foto (Antes / Durante / Depois).
+//
+// O desenho anterior misturava duas informacoes diferentes no mesmo lugar e da
+// mesma forma: "esta etapa ja tem foto" pintava o fundo de verde-claro, e
+// "e nesta que a proxima foto vai entrar" pintava de azul-claro. Dois fundos
+// pastel lado a lado, com a mesma forca visual, para dois significados que nao
+// tem nada a ver um com o outro — em campo, no sol, isso vira ruido.
+//
+// Agora "tem foto" e um estado do conteudo (o visto verde e o horario), e
+// "selecionada" e um estado da acao (borda azul cheia). Um nao mascara o
+// outro: da pra ver uma etapa que ja tem foto E esta selecionada, que e
+// justamente o caso de substituir uma foto ruim, antes impossivel de perceber.
 function EtapaDot({
   preenchida,
   selecionada,
   horario,
   label,
+  opcional,
   onClick,
 }: {
   preenchida: boolean;
   selecionada: boolean;
   horario?: string;
   label: string;
+  opcional?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={selecionada}
       className={cn(
-        "flex flex-1 flex-col items-center gap-1 rounded-lg py-2 transition-colors",
-        selecionada ? "bg-brand-100 ring-2 ring-brand-400" : preenchida ? "bg-success-100" : "bg-slate-100 hover:bg-slate-200"
+        "flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg border-2 py-2 transition-colors",
+        selecionada ? "border-brand-600 bg-brand-50" : "border-transparent bg-slate-100 hover:bg-slate-200"
       )}
     >
-      <div
-        className={cn(
-          "flex h-6 w-6 items-center justify-center rounded-full",
-          selecionada ? "bg-brand-600 text-white" : preenchida ? "bg-success-600 text-white" : "bg-slate-300 text-slate-500"
+      <div className="flex items-center gap-1">
+        {preenchida ? (
+          <Check size={13} className="text-success-600" />
+        ) : (
+          <span className={cn("h-1.5 w-1.5 rounded-full", selecionada ? "bg-brand-600" : "bg-slate-300")} />
         )}
-      >
-        {preenchida ? <Check size={13} /> : <span className="text-[10px] font-bold">·</span>}
+        <p className={cn("text-[10px] font-bold uppercase", selecionada ? "text-brand-700" : preenchida ? "text-success-700" : "text-slate-500")}>
+          {label}
+        </p>
       </div>
-      <p className={cn("text-[10px] font-bold uppercase", selecionada ? "text-brand-700" : preenchida ? "text-success-700" : "text-slate-400")}>{label}</p>
-      {horario && <p className="text-[10px] font-mono font-semibold text-success-600">{horario}</p>}
+      {horario ? (
+        <p className="font-mono text-[10px] font-semibold text-success-600">{horario}</p>
+      ) : opcional ? (
+        // Sem isto, a etapa do meio parece uma lacuna a preencher, e o pulo
+        // automatico de "Antes" direto pra "Depois" parece defeito. Dizer que
+        // ela e opcional explica o pulo antes de ele acontecer.
+        <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">opcional</p>
+      ) : (
+        <p className="text-[10px] text-slate-400">—</p>
+      )}
     </button>
   );
 }
@@ -391,6 +416,10 @@ function ServicoCapturaCard({
 
   const etapaSugerida: "Antes" | "Durante" | "Depois" = !temAntes ? "Antes" : !temDepois ? "Depois" : !temDurante ? "Durante" : "Depois";
   const etapaAtiva = etapaEscolhida ?? etapaSugerida;
+  // Se a etapa que esta valendo ja tem foto, a proxima captura sobrescreve.
+  // Isso precisa estar dito ANTES do toque, nao descoberto depois.
+  const jaTemFotoNaEtapaAtiva =
+    etapaAtiva === "Antes" ? temAntes : etapaAtiva === "Durante" ? temDurante : temDepois;
 
   // Sem internet, nem tenta — vai direto pra fila (evita 3 tentativas de
   // rede fadadas ao erro, que só atrasam e gastam bateria à toa em campo).
@@ -516,7 +545,11 @@ function ServicoCapturaCard({
             onClick={() => handleAlterarStatus(opcao.value)}
             disabled={statusLoading}
             className={cn(
-              "flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-bold uppercase transition-colors disabled:opacity-60",
+              // min-h-11 = 44px, a altura de toque recomendada. Os tres
+              // dividem a linha com flex-1, entao crescer em altura nao tira
+              // espaco de ninguem — era so o padding que os deixava em 28px,
+              // que e pouco pra um dedo com luva marcando status em campo.
+              "flex min-h-11 flex-1 items-center justify-center gap-1 rounded-lg px-2 text-[10px] font-bold uppercase transition-colors disabled:opacity-60",
               servico.status === opcao.value ? opcao.ativoClasse : "bg-slate-50 text-slate-400 hover:bg-slate-100"
             )}
           >
@@ -526,10 +559,18 @@ function ServicoCapturaCard({
         ))}
       </div>
 
-      <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-slate-400">Toque para escolher a etapa da foto</p>
+      {/* O rotulo antigo era "Toque para escolher a etapa da foto" — uma
+          instrucao, quando o que falta e uma resposta. A etapa ja vem escolhida
+          sozinha (etapaSugerida), entao a pergunta de quem olha nao e "o que eu
+          faco aqui", e sim "onde e que essa foto vai parar". O texto agora diz
+          isso, e diz por extenso qual etapa esta valendo. */}
+      <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+        A próxima foto entra em <span className="text-brand-700">{etapaAtiva}</span>
+        {jaTemFotoNaEtapaAtiva && <span className="text-warning-700"> · vai substituir a atual</span>}
+      </p>
       <div className="mt-1.5 flex gap-2">
         <EtapaDot preenchida={temAntes} selecionada={etapaAtiva === "Antes"} horario={servico.fotoAntesHorario} label="Antes" onClick={() => setEtapaEscolhida("Antes")} />
-        <EtapaDot preenchida={temDurante} selecionada={etapaAtiva === "Durante"} horario={servico.fotoDuranteHorario} label="Durante" onClick={() => setEtapaEscolhida("Durante")} />
+        <EtapaDot preenchida={temDurante} selecionada={etapaAtiva === "Durante"} horario={servico.fotoDuranteHorario} label="Durante" opcional onClick={() => setEtapaEscolhida("Durante")} />
         <EtapaDot preenchida={temDepois} selecionada={etapaAtiva === "Depois"} horario={servico.fotoDepoisHorario} label="Depois" onClick={() => setEtapaEscolhida("Depois")} />
       </div>
 
@@ -540,7 +581,7 @@ function ServicoCapturaCard({
         className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3.5 text-sm font-bold text-white transition-colors hover:bg-brand-700 disabled:opacity-60"
       >
         {loading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
-        {loading ? "Enviando..." : `Tirar Foto — ${etapaAtiva}`}
+        {loading ? "Enviando..." : jaTemFotoNaEtapaAtiva ? `Substituir foto de ${etapaAtiva}` : `Tirar foto de ${etapaAtiva}`}
       </button>
 
       {pendentesDoServico.length > 0 && (
@@ -831,7 +872,7 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
           type="button"
           onClick={() => atualizarComSpinner()}
           disabled={atualizando}
-          className="flex w-full items-center justify-center gap-2 border-t border-slate-100 bg-slate-50 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-60"
+          className="flex min-h-11 w-full items-center justify-center gap-2 border-t border-slate-100 bg-slate-50 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-60"
         >
           <RefreshCw size={14} className={atualizando ? "animate-spin" : undefined} />
           {atualizando
@@ -885,7 +926,7 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
           <button
             type="button"
             onClick={() => setMostrarConcluidas((v) => !v)}
-            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-200 bg-white py-2 text-xs font-bold text-slate-500 transition-colors hover:bg-slate-50"
+            className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-200 bg-white text-xs font-bold text-slate-500 transition-colors hover:bg-slate-50"
           >
             {mostrarConcluidas ? <EyeOff size={13} /> : <Eye size={13} />}
             {mostrarConcluidas ? `Ocultar ${concluidasCount} concluída${concluidasCount > 1 ? "s" : ""}` : `Mostrar ${concluidasCount} concluída${concluidasCount > 1 ? "s" : ""}`}
@@ -904,7 +945,11 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
                   type="button"
                   onClick={() => setBusca(ativo ? "" : nome)}
                   className={cn(
-                    "flex-none rounded-full border px-3.5 py-1.5 text-xs font-bold transition-colors",
+                    // A fila rola na horizontal em vez de quebrar linha, entao
+                    // subir de 30px pra 44px nao empurra chip nenhum pra fora:
+                    // continua cabendo a mesma quantidade na tela, so que agora
+                    // cada um da pra acertar sem mirar.
+                    "flex min-h-11 flex-none items-center rounded-full border px-3.5 text-xs font-bold transition-colors",
                     ativo ? "border-brand-600 bg-brand-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                   )}
                 >

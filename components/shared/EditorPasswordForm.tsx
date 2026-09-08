@@ -1,7 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Lock, Loader2 } from "lucide-react";
+
+// A "assinatura" de um valor que nunca muda depois da hidratacao: nao ha nada
+// pra escutar, entao devolve uma funcao de limpeza vazia.
+function inscreverNada(): () => void {
+  return () => {};
+}
 
 interface Props {
   onUnlock: (senha: string, armadilha?: string) => Promise<boolean | { ok: boolean; erro?: string }>;
@@ -19,9 +25,26 @@ export function EditorPasswordForm({ onUnlock, onSuccess, titulo = "Área do Edi
   const [armadilha, setArmadilha] = useState("");
   const [erro, setErro] = useState("");
   const [verificando, setVerificando] = useState(false);
+  // Enquanto o JavaScript nao terminou de hidratar, o onSubmit do React ainda
+  // nao esta ligado no <form> — e um <form> sem action, submetido, faz o que o
+  // HTML manda: recarrega a propria URL por GET. O sintoma e cruel porque nao
+  // parece erro: a pessoa digita a senha, aperta Entrar, a pagina pisca e volta
+  // igual, sem mensagem nenhuma. Da pra ver acontecendo na barra de endereco,
+  // que ganha um "?empresa=" (o campo-armadilha, o unico com name no
+  // formulario).
+  //
+  // Ninguem nota isso numa maquina de desenvolvimento com o cache quente. Nota
+  // quem abre o link no 4G da fabrica e digita rapido.
+  //
+  // A deteccao usa useSyncExternalStore em vez de um estado ligado num efeito:
+  // getServerSnapshot devolve false (e o HTML sai do servidor com o botao
+  // desligado), getSnapshot devolve true (e a hidratacao liga). Sem estado
+  // extra e sem setState dentro de efeito.
+  const pronto = useSyncExternalStore(inscreverNada, () => true, () => false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!pronto) return;
     setVerificando(true);
     const resultado = await onUnlock(senha, armadilha);
     setVerificando(false);
@@ -69,11 +92,11 @@ export function EditorPasswordForm({ onUnlock, onSuccess, titulo = "Área do Edi
       {erro && <p className="text-xs font-semibold text-danger-600">{erro}</p>}
       <button
         type="submit"
-        disabled={verificando}
+        disabled={verificando || !pronto}
         className="flex w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60"
       >
-        {verificando && <Loader2 size={14} className="animate-spin" />}
-        Entrar
+        {(verificando || !pronto) && <Loader2 size={14} className="animate-spin" />}
+        {pronto ? "Entrar" : "Carregando..."}
       </button>
     </form>
   );
