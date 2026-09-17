@@ -32,7 +32,7 @@ const LIMITE_ITENS = 500;
 
 const STATUS_GERAL: StatusGeral[] = ["concluida", "ressalvas", "em_andamento"];
 const STATUS_ITEM: StatusItem[] = ["concluido", "atrasado", "pendente", "em_andamento"];
-const EQUIPES: Equipe[] = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil", "Caldeiraria", "Preditiva"];
+const EQUIPES: Equipe[] = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil", "Caldeiraria", "Preditiva", "Lubrificação"];
 const ICONES: TimelineEvento["icone"][] = ["flag", "lock", "wrench", "swap", "search", "check-circle", "play", "unlock"];
 
 // Caracteres de controle ASCII (0x00–0x1F e 0x7F). O \0 no meio de uma string

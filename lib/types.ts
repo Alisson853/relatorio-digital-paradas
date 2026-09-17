@@ -1,6 +1,6 @@
 export type StatusGeral = "concluida" | "ressalvas" | "em_andamento";
 export type StatusItem = "concluido" | "atrasado" | "pendente" | "em_andamento";
-export type Equipe = "Elétrica" | "Mecânica" | "Instrumentação" | "Operação" | "Segurança" | "Civil" | "Caldeiraria" | "Preditiva";
+export type Equipe = "Elétrica" | "Mecânica" | "Instrumentação" | "Operação" | "Segurança" | "Civil" | "Caldeiraria" | "Preditiva" | "Lubrificação";
 
 export interface ParadaResumo {
   id: string;

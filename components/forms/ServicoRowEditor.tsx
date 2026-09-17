@@ -21,7 +21,7 @@ export interface ServicoRow {
   fotoDepois: string;
 }
 
-const EQUIPE_OPTIONS = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil", "Caldeiraria", "Preditiva"].map((e) => ({ value: e, label: e }));
+const EQUIPE_OPTIONS = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil", "Caldeiraria", "Preditiva", "Lubrificação"].map((e) => ({ value: e, label: e }));
 const CATEGORIA_OPTIONS = ["Preventiva", "Corretiva", "Preditiva", "Lubrificação", "Melhoria", "Etiqueta Vermelha", "Etiqueta Amarela"].map((c) => ({
   value: c,
   label: c,

@@ -78,6 +78,7 @@ const MAPA_EQUIPE: Array<{ contem: string; equipe: Equipe }> = [
   { contem: "CALDEIRARIA", equipe: "Caldeiraria" },
   { contem: "CIVIL", equipe: "Civil" },
   { contem: "PREDITIVA", equipe: "Preditiva" },
+  { contem: "LUBRIFIC", equipe: "Lubrificação" },
   { contem: "SEGURANCA", equipe: "Segurança" },
   { contem: "OPERACAO", equipe: "Operação" },
 ];
