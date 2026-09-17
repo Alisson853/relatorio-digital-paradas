@@ -351,7 +351,10 @@ export interface PendenciaChecklistItem {
   numeroOS: string;
   equipamento: string;
   titulo: string;
+  equipe: string;
+  responsavel: string;
   faltando: string[];
+  justificativaNaoFeito?: string;
 }
 
 // Varre todos os relatórios em busca de serviços com fotos faltando (Antes/Depois)
@@ -379,6 +382,7 @@ export async function listChecklistPendencias(): Promise<PendenciaChecklistItem[
       if (!s.fotoAntes || s.fotoAntes === NO_PHOTO_PLACEHOLDER) faltando.push("Foto Antes");
       if (!s.fotoDepois || s.fotoDepois === NO_PHOTO_PLACEHOLDER) faltando.push("Foto Depois");
       if (s.status !== "concluido") faltando.push("Status pendente");
+      if (s.justificativaNaoFeito) faltando.push("Não será feito");
 
       if (faltando.length > 0) {
         itens.push({
@@ -388,7 +392,10 @@ export async function listChecklistPendencias(): Promise<PendenciaChecklistItem[
           numeroOS: s.numeroOS,
           equipamento: s.equipamento,
           titulo: s.titulo,
+          equipe: s.equipe,
+          responsavel: s.responsavel,
           faltando,
+          justificativaNaoFeito: s.justificativaNaoFeito,
         });
       }
     }
@@ -614,6 +621,41 @@ export async function marcarStatusServico(
     .update(paradas)
     .set({ servicos: servicosAtualizados, kpis: kpisAtualizados, graficos: graficosAtualizados, resultadoFinal: resultadoAtualizado, atualizadoEm: new Date() })
     .where(eq(paradas.id, paradaId));
+
+  return { ok: true };
+}
+
+// Justificativa que o técnico escreve em campo quando um serviço não vai ser
+// feito (ex: peça não chegou). Não mexe no status nem nos KPIs — é só um
+// texto que passa a aparecer pro editor no checklist de pendências de todos
+// os relatórios. Texto vazio apaga a justificativa (desmarcar o quadradinho).
+export async function definirJustificativaNaoFeito(
+  paradaIdBruto: string,
+  servicoIdBruto: string,
+  justificativaBruta: string
+): Promise<{ ok: boolean; erro?: string }> {
+  const autorizado = await ehEditor();
+  if (!autorizado) return { ok: false, erro: "Não autorizado." };
+
+  let paradaId: string;
+  try {
+    paradaId = sanearId(paradaIdBruto);
+  } catch {
+    return { ok: false, erro: "Identificador inválido." };
+  }
+  const servicoId = sanearTexto(servicoIdBruto, 80);
+  const justificativa = sanearTexto(justificativaBruta, 5000);
+
+  const [row] = await getDb().select().from(paradas).where(eq(paradas.id, paradaId)).limit(1);
+  if (!row) return { ok: false, erro: "Relatório não encontrado." };
+
+  const idx = row.servicos.findIndex((s) => s.id === servicoId);
+  if (idx === -1) return { ok: false, erro: "Serviço não encontrado." };
+
+  const servicosAtualizados = [...row.servicos];
+  servicosAtualizados[idx] = { ...servicosAtualizados[idx], justificativaNaoFeito: justificativa || undefined };
+
+  await getDb().update(paradas).set({ servicos: servicosAtualizados, atualizadoEm: new Date() }).where(eq(paradas.id, paradaId));
 
   return { ok: true };
 }

@@ -19,13 +19,23 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Square,
+  CheckSquare,
   Unlock,
   User,
   WifiOff,
   X,
 } from "lucide-react";
 import type { Equipe, ParadaCompleta, Servico, StatusItem, TimelineEvento } from "@/lib/types";
-import { getParadaCompleta, capturarFotoServico, uploadFoto, adicionarServicoRapido, adicionarEventoRapido, marcarStatusServico } from "@/lib/actions/paradas";
+import {
+  getParadaCompleta,
+  capturarFotoServico,
+  uploadFoto,
+  adicionarServicoRapido,
+  adicionarEventoRapido,
+  marcarStatusServico,
+  definirJustificativaNaoFeito,
+} from "@/lib/actions/paradas";
 import { compressImageFile, NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { EditorPasswordForm } from "@/components/shared/EditorPasswordForm";
 import { useEditorMode } from "@/lib/useEditorMode";
@@ -409,6 +419,9 @@ function ServicoCapturaCard({
   // (Antes -> Depois -> Durante) como sugestão automática.
   const [etapaEscolhida, setEtapaEscolhida] = useState<"Antes" | "Durante" | "Depois" | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
+  const [naoFeitoAberto, setNaoFeitoAberto] = useState(!!servico.justificativaNaoFeito);
+  const [justificativa, setJustificativa] = useState(servico.justificativaNaoFeito ?? "");
+  const [salvandoJustificativa, setSalvandoJustificativa] = useState(false);
 
   const temAntes = !!servico.fotoAntes && servico.fotoAntes !== NO_PHOTO_PLACEHOLDER;
   const temDurante = !!servico.fotoDurante;
@@ -509,6 +522,22 @@ function ServicoCapturaCard({
     }
   }
 
+  async function salvarJustificativa(texto: string) {
+    setSalvandoJustificativa(true);
+    try {
+      const resultado = await definirJustificativaNaoFeito(paradaId, servico.id, texto);
+      if (resultado.ok) onCaptured(servico.id, { justificativaNaoFeito: texto || undefined });
+    } finally {
+      setSalvandoJustificativa(false);
+    }
+  }
+
+  function handleDesmarcarNaoFeito() {
+    setNaoFeitoAberto(false);
+    setJustificativa("");
+    if (servico.justificativaNaoFeito) void salvarJustificativa("");
+  }
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       {/* Sem "capture" de propósito: assim o celular mostra a opção de tirar
@@ -558,6 +587,36 @@ function ServicoCapturaCard({
           </button>
         ))}
       </div>
+
+      {/* Quadradinho separado dos 3 status: "não será feito" não é um estado
+          transitório do serviço (como Pendente/Em Andamento), é uma decisão
+          definitiva que precisa de explicação — por isso abre um campo de
+          texto em vez de só marcar um status. Só o editor (quem está nessa
+          tela) vê e escreve isso; aparece pro admin no checklist de
+          pendências da tela principal, não na apresentação. */}
+      <button
+        type="button"
+        onClick={() => (naoFeitoAberto ? handleDesmarcarNaoFeito() : setNaoFeitoAberto(true))}
+        className="mt-2 flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-danger-600"
+      >
+        {naoFeitoAberto ? <CheckSquare size={15} className="text-danger-600" /> : <Square size={15} />}
+        Não será feito
+      </button>
+      {naoFeitoAberto && (
+        <div className="mt-1.5">
+          <textarea
+            value={justificativa}
+            onChange={(e) => setJustificativa(e.target.value)}
+            onBlur={() => {
+              if (justificativa.trim() !== (servico.justificativaNaoFeito ?? "")) void salvarJustificativa(justificativa.trim());
+            }}
+            placeholder="Por que esse serviço não vai ser feito?"
+            rows={2}
+            className="w-full rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-xs text-slate-700 outline-none placeholder:text-danger-400 focus:border-danger-400"
+          />
+          {salvandoJustificativa && <p className="mt-1 text-[10px] font-bold text-slate-400">Salvando...</p>}
+        </div>
+      )}
 
       {/* O rotulo antigo era "Toque para escolher a etapa da foto" — uma
           instrucao, quando o que falta e uma resposta. A etapa ja vem escolhida

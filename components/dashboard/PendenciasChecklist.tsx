@@ -12,6 +12,7 @@ const BADGE_STYLES: Record<string, string> = {
   "Foto Antes": "bg-warning-100 text-warning-600 border-transparent",
   "Foto Depois": "bg-warning-100 text-warning-600 border-transparent",
   "Status pendente": "bg-danger-100 text-danger-600 border-transparent",
+  "Não será feito": "bg-danger-100 text-danger-700 border-transparent",
 };
 
 export function PendenciasChecklist() {
@@ -79,28 +80,39 @@ export function PendenciasChecklist() {
           </div>
           <div className="divide-y divide-slate-100">
             {grupo.itens.map((item) => (
-              <div key={item.servicoId} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-800">
-                    {item.numeroOS !== "Oportunidade" ? `OS ${item.numeroOS} — ` : ""}
-                    {item.titulo || item.equipamento}
+              <div key={item.servicoId} className="px-5 py-3.5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-800">
+                      {item.numeroOS !== "Oportunidade" ? `OS ${item.numeroOS} — ` : ""}
+                      {item.titulo || item.equipamento}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      {item.equipamento} · {item.equipe}
+                      {item.responsavel ? ` · ${item.responsavel}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {item.faltando.map((f) => (
+                      <span
+                        key={f}
+                        className={cn(
+                          "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold",
+                          BADGE_STYLES[f] ?? "border-slate-200 bg-slate-50 text-slate-600"
+                        )}
+                      >
+                        <AlertTriangle size={11} />
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                {item.justificativaNaoFeito && (
+                  <p className="mt-2 rounded-lg bg-danger-50 px-3 py-2 text-xs text-danger-700">
+                    <span className="font-bold">Motivo: </span>
+                    {item.justificativaNaoFeito}
                   </p>
-                  <p className="text-xs text-slate-400">{item.equipamento}</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {item.faltando.map((f) => (
-                    <span
-                      key={f}
-                      className={cn(
-                        "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold",
-                        BADGE_STYLES[f] ?? "border-slate-200 bg-slate-50 text-slate-600"
-                      )}
-                    >
-                      <AlertTriangle size={11} />
-                      {f}
-                    </span>
-                  ))}
-                </div>
+                )}
               </div>
             ))}
           </div>

@@ -62,6 +62,10 @@ export interface Servico {
   fotoDepois: string;
   fotoDepoisHorario?: string;
   categoria?: string;
+  // Preenchido pelo técnico em campo quando o serviço não vai ser feito (ex:
+  // peça não chegou, precisa de outro recurso). Só aparece pro editor, num
+  // painel à parte na tela principal — não é mostrado na apresentação.
+  justificativaNaoFeito?: string;
 }
 
 export interface FotoGaleria {

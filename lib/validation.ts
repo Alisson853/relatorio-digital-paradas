@@ -161,6 +161,7 @@ export function sanearServico(bruto: unknown): Servico {
     fotoDepois: urlDeImagem(s.fotoDepois),
     fotoDepoisHorario: texto(s.fotoDepoisHorario, 20) || undefined,
     categoria: texto(s.categoria) || undefined,
+    justificativaNaoFeito: texto(s.justificativaNaoFeito, LIMITE_TEXTO_LONGO) || undefined,
   };
 }
 
