@@ -492,8 +492,8 @@ function ServicoCapturaCard({
     try {
       const comprimido = await compressImageFile(file);
       await enviar(comprimido, file.name, etapaAtiva);
-    } catch {
-      setErro("Não foi possível processar a foto. Tente novamente.");
+    } catch (err) {
+      setErro(err instanceof Error && err.message ? err.message : "Não foi possível processar a foto. Tente novamente.");
       setLoading(false);
     }
   }

@@ -1,5 +1,22 @@
+// HEIC/HEIF (formato padrão de foto do iPhone) não é decodificado pelo
+// <canvas> de nenhum navegador — img.onerror dispara sem detalhe nenhum,
+// e sem essa checagem o usuário só via "Não foi possível enviar essa
+// imagem", sem saber o que fazer a respeito.
+function pareceHeic(file: File): boolean {
+  const alvo = `${file.name} ${file.type}`.toLowerCase();
+  return /heic|heif/.test(alvo);
+}
+
 export function compressImageFile(file: File, maxWidth = 1600, quality = 0.8): Promise<Blob> {
   return new Promise((resolve, reject) => {
+    if (pareceHeic(file)) {
+      reject(
+        new Error(
+          'Essa foto está em formato HEIC (padrão do iPhone) e não dá pra abrir aqui. No iPhone, vá em Ajustes > Câmera > Formatos e escolha "Mais Compatível", ou envie a foto por WhatsApp/Fotos pra você mesmo antes (costuma converter pra JPEG).'
+        )
+      );
+      return;
+    }
     const reader = new FileReader();
     reader.onerror = () => reject(reader.error);
     reader.onload = () => {

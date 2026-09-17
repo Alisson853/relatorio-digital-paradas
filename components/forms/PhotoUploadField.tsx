@@ -37,8 +37,8 @@ export function PhotoUploadField({ label, value, onChange, className }: PhotoUpl
         return;
       }
       onChange(resultado.url);
-    } catch {
-      setError("Não foi possível enviar essa imagem.");
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : "Não foi possível enviar essa imagem.");
     } finally {
       setLoading(false);
     }
