@@ -106,12 +106,18 @@ export interface DeriveKpisOpcoes {
 
 export function deriveKpis(servicos: Servico[], seguranca: number, opcoes: DeriveKpisOpcoes = {}): Kpis {
   const { totalPlanejado, totalExecutadas, duracaoMaximaHoras, totalEtiquetaVermelha, totalEtiquetaAmarela } = opcoes;
-  // OS Programadas e OS Executadas são números informados à parte — nem toda
-  // atividade real vira uma OS detalhada no formulário (só as que têm foto e
-  // valem a pena documentar como "principais"). Só cai na contagem de OS com
-  // status concluído registradas se nada for informado (relatórios antigos).
-  const osConcluidas = totalExecutadas && totalExecutadas > 0 ? totalExecutadas : servicos.filter((s) => s.status === "concluido").length;
-  const osPlanejadas = totalPlanejado && totalPlanejado > 0 ? totalPlanejado : servicos.length;
+  // OS Programadas e OS Executadas podem vir de um número informado à parte
+  // (nem toda atividade real virava uma OS detalhada no formulário, só as que
+  // tinham foto e valiam a pena documentar como "principais") — mas hoje a
+  // importação cria um Servico pra cada linha real da planilha, então a lista
+  // já É a contagem verdadeira. Usar só o número informado deixava esse total
+  // preso no valor de quando a parada foi criada (ex: painel da planilha
+  // dizia 33) mesmo depois de mais serviços entrarem por OS avulsa ou Captura
+  // Rápida (ex: 35 reais) — a apresentação ficava atrasada em relação ao que
+  // a Captura Rápida já mostrava ao vivo. O maior dos dois nunca subconta o
+  // que já está de fato documentado.
+  const osConcluidas = Math.max(totalExecutadas ?? 0, servicos.filter((s) => s.status === "concluido").length);
+  const osPlanejadas = Math.max(totalPlanejado ?? 0, servicos.length);
   const eficiencia = osPlanejadas > 0 ? Math.round((osConcluidas / osPlanejadas) * 1000) / 10 : 0;
   // Mesma lógica do gráfico Horas por Setor: somar o tempo de cada OS sem
   // limite ultrapassa a duração real da parada quando várias rodam em
