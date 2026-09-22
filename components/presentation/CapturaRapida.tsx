@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowLeft,
   Camera,
   Check,
@@ -35,12 +36,21 @@ import {
   adicionarEventoRapido,
   marcarStatusServico,
   definirJustificativaNaoFeito,
+  listHistoricoNaoFeito,
 } from "@/lib/actions/paradas";
 import { compressImageFile, NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { EditorPasswordForm } from "@/components/shared/EditorPasswordForm";
 import { useEditorMode } from "@/lib/useEditorMode";
-import { cn, pareceNomeDePessoa } from "@/lib/utils";
+import { cn, formatDateCompact, pareceNomeDePessoa } from "@/lib/utils";
 import { type FotoPendente, listarFotosPendentes, removerFotoPendente, salvarFotoPendente } from "@/lib/offline-fotos";
+import { encontrarUltimoNaoFeito, type HistoricoNaoFeitoItem } from "@/lib/historico-nao-feito";
+
+// Texto salvo quando o técnico marca "Não será feito" e sai sem escrever o
+// motivo — o clique na caixinha já É a decisão; o texto é só o detalhe.
+// Sem um valor não-vazio aqui, marcar e sair sem digitar nada não salvava
+// nada (o campo vazio significa "desmarcado" em todo o resto do código),
+// então a marcação simplesmente sumia na próxima vez que a tela carregasse.
+const MOTIVO_NAO_INFORMADO = "Motivo não informado ainda.";
 
 // As 3 opções que fazem sentido marcar em campo pelo celular — "Atrasado" é
 // mais um estado de relatório do que algo que alguém marca na hora.
@@ -404,12 +414,14 @@ function ServicoCapturaCard({
   onCaptured,
   pendentesDoServico,
   onEnfileirar,
+  historicoNaoFeito,
 }: {
   paradaId: string;
   servico: Servico;
   onCaptured: (servicoId: string, patch: Partial<Servico>) => void;
   pendentesDoServico: FotoPendente[];
   onEnfileirar: (servicoId: string, etapa: "Antes" | "Durante" | "Depois", blob: Blob, nomeArquivo: string) => Promise<void>;
+  historicoNaoFeito: HistoricoNaoFeitoItem | null;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
@@ -422,6 +434,13 @@ function ServicoCapturaCard({
   const [naoFeitoAberto, setNaoFeitoAberto] = useState(!!servico.justificativaNaoFeito);
   const [justificativa, setJustificativa] = useState(servico.justificativaNaoFeito ?? "");
   const [salvandoJustificativa, setSalvandoJustificativa] = useState(false);
+  // O que já foi confirmado salvo no banco — não usa servico.justificativaNaoFeito
+  // direto porque esse prop só reflete a gravação depois que o round-trip do
+  // servidor volta e o pai atualiza o estado; entre um salvamento otimista
+  // (marcar a caixinha) e essa volta, comparar contra o prop faria o efeito
+  // de auto-save de baixo achar que ainda há mudança pendente e disparar uma
+  // segunda gravação redundante.
+  const lastSavedJustificativaRef = useRef(servico.justificativaNaoFeito ?? "");
 
   const temAntes = !!servico.fotoAntes && servico.fotoAntes !== NO_PHOTO_PLACEHOLDER;
   const temDurante = !!servico.fotoDurante;
@@ -526,16 +545,56 @@ function ServicoCapturaCard({
     setSalvandoJustificativa(true);
     try {
       const resultado = await definirJustificativaNaoFeito(paradaId, servico.id, texto);
-      if (resultado.ok) onCaptured(servico.id, { justificativaNaoFeito: texto || undefined });
+      if (resultado.ok) {
+        lastSavedJustificativaRef.current = texto;
+        onCaptured(servico.id, { justificativaNaoFeito: texto || undefined });
+      }
     } finally {
       setSalvandoJustificativa(false);
     }
   }
 
+  // Salva sozinho ~800ms depois de parar de digitar — depender só do onBlur
+  // (tocar fora do campo) perdia o motivo sempre que o técnico saía da tela
+  // antes disso: voltar pro celular, trocar de app, a lista atualizando
+  // sozinha a cada 8s. O quadradinho ficava marcado na tela, mas nada tinha
+  // ido pro banco — na próxima visita, a marcação sumia.
+  useEffect(() => {
+    if (!naoFeitoAberto) return;
+    if (justificativa.trim() === lastSavedJustificativaRef.current) return;
+    const timer = setTimeout(() => {
+      void salvarJustificativa(justificativa.trim());
+    }, 800);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [justificativa]);
+
   function handleDesmarcarNaoFeito() {
     setNaoFeitoAberto(false);
     setJustificativa("");
-    if (servico.justificativaNaoFeito) void salvarJustificativa("");
+    if (lastSavedJustificativaRef.current) void salvarJustificativa("");
+  }
+
+  // Marcar a caixinha já salva na hora, com um texto padrão — não fica
+  // esperando o técnico digitar e sair do campo (é exatamente esse o
+  // caminho que perdia a marcação, só que pelo clique em vez do texto). Se
+  // ele digitar o motivo de verdade depois, o auto-save de cima substitui
+  // esse texto padrão sozinho.
+  //
+  // Essa chamada não marca lastSavedJustificativaRef antes do resultado
+  // voltar de propósito: se falhar (ex: sem internet), o efeito de auto-save
+  // de cima ainda vê "justificativa" diferente do que foi realmente
+  // confirmado salvo e tenta de novo sozinho ~800ms depois — uma segunda
+  // chance de graça, em vez de a marcação parecer salva na tela e não estar.
+  function handleMarcarNaoFeito() {
+    setNaoFeitoAberto(true);
+    if (!justificativa.trim()) {
+      // Mostra no campo exatamente o que vai ser salvo — senão o textarea
+      // fica vazio na tela enquanto o texto padrão já está sendo gravado, e
+      // o técnico acha que precisa digitar algo antes de poder sair.
+      setJustificativa(MOTIVO_NAO_INFORMADO);
+      void salvarJustificativa(MOTIVO_NAO_INFORMADO);
+    }
   }
 
   return (
@@ -562,6 +621,22 @@ function ServicoCapturaCard({
           </p>
         )}
       </div>
+
+      {/* Alerta de histórico: essa mesma OS (ou equipamento) já ficou marcada
+          "não será feito" numa parada anterior. Aparece antes dos botões de
+          status de propósito — é o que muda a decisão de priorizar ou não
+          esse serviço, então precisa ser visto antes de qualquer toque. */}
+      {historicoNaoFeito && (
+        <div className="mt-3 flex items-start gap-2 rounded-xl border border-warning-200 bg-warning-50 px-3 py-2.5">
+          <AlertTriangle size={15} className="mt-0.5 flex-none text-warning-600" />
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-warning-800">
+              Não foi feito na parada &quot;{historicoNaoFeito.paradaNome}&quot; ({formatDateCompact(historicoNaoFeito.paradaData)})
+            </p>
+            <p className="mt-0.5 text-xs text-warning-700">{historicoNaoFeito.justificativa}</p>
+          </div>
+        </div>
+      )}
 
       {/* 3 estados em vez de um toggle liga/desliga — em campo o serviço
           passa por "Em Andamento" antes de ficar pronto, e isso precisa
@@ -596,7 +671,7 @@ function ServicoCapturaCard({
           pendências da tela principal, não na apresentação. */}
       <button
         type="button"
-        onClick={() => (naoFeitoAberto ? handleDesmarcarNaoFeito() : setNaoFeitoAberto(true))}
+        onClick={() => (naoFeitoAberto ? handleDesmarcarNaoFeito() : handleMarcarNaoFeito())}
         className="mt-2 flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-danger-600"
       >
         {naoFeitoAberto ? <CheckSquare size={15} className="text-danger-600" /> : <Square size={15} />}
@@ -607,8 +682,13 @@ function ServicoCapturaCard({
           <textarea
             value={justificativa}
             onChange={(e) => setJustificativa(e.target.value)}
+            // Seleciona tudo ao focar: se o valor ainda é o texto padrão
+            // (marcou a caixinha e não escreveu nada), a primeira letra
+            // digitada já substitui em vez de o técnico ter que apagar
+            // "Motivo não informado ainda." na mão primeiro.
+            onFocus={(e) => e.target.select()}
             onBlur={() => {
-              if (justificativa.trim() !== (servico.justificativaNaoFeito ?? "")) void salvarJustificativa(justificativa.trim());
+              if (justificativa.trim() !== lastSavedJustificativaRef.current) void salvarJustificativa(justificativa.trim());
             }}
             placeholder="Por que esse serviço não vai ser feito?"
             rows={2}
@@ -685,6 +765,10 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
   // diferente de só guardar em memória do componente.
   const [filaPendente, setFilaPendente] = useState<FotoPendente[]>([]);
   const [enviandoFila, setEnviandoFila] = useState(false);
+  // Histórico de "não será feito" de todos os relatórios — carregado uma vez
+  // (não muda a cada 8s como o resto da tela) e cruzado localmente contra
+  // cada serviço pra decidir se mostra o alerta.
+  const [historico, setHistorico] = useState<HistoricoNaoFeitoItem[]>([]);
 
   // Sem nenhum setState síncrono no início — assim dá pra chamar direto no
   // corpo de um efeito (carga inicial, atualização em segundo plano) sem
@@ -792,6 +876,7 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
     void (async () => {
       await carregar();
     })();
+    listHistoricoNaoFeito().then(setHistorico);
 
     // O celular pode ficar com essa tela aberta o dia inteiro em campo, enquanto
     // outras OS são criadas no computador — então além da carga inicial, atualiza
@@ -1040,6 +1125,7 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
               onCaptured={handleCaptured}
               pendentesDoServico={filaPendente.filter((f) => f.servicoId === servico.id)}
               onEnfileirar={enfileirarFoto}
+              historicoNaoFeito={encontrarUltimoNaoFeito(servico, id, historico)}
             />
           ))
         )}

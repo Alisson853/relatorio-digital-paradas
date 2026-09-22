@@ -1,7 +1,9 @@
 "use client";
 
-import { Copy, Trash2 } from "lucide-react";
+import { AlertTriangle, Copy, Trash2 } from "lucide-react";
 import type { Equipe, StatusItem } from "@/lib/types";
+import { formatDateCompact } from "@/lib/utils";
+import type { HistoricoNaoFeitoItem } from "@/lib/historico-nao-feito";
 import { SelectField, TextField } from "./FormControls";
 import { PhotoUploadField } from "./PhotoUploadField";
 
@@ -39,9 +41,12 @@ interface Props {
   onChange: (patch: Partial<ServicoRow>) => void;
   onRemove: () => void;
   onDuplicate: () => void;
+  // Última vez que essa mesma OS (ou equipamento) ficou marcada "não será
+  // feito" em outro relatório — null quando não há histórico.
+  historicoNaoFeito?: HistoricoNaoFeitoItem | null;
 }
 
-export function ServicoRowEditor({ item, index, onChange, onRemove, onDuplicate }: Props) {
+export function ServicoRowEditor({ item, index, onChange, onRemove, onDuplicate, historicoNaoFeito }: Props) {
   return (
     <div className="relative rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
       <div className="absolute right-3 top-3 flex items-center gap-1">
@@ -63,6 +68,22 @@ export function ServicoRowEditor({ item, index, onChange, onRemove, onDuplicate 
         </button>
       </div>
       <p className="mb-3 text-xs font-bold text-brand-600">OS {index + 1}</p>
+
+      {/* Mesmo alerta da Captura Rápida, aqui no formulário de montagem do
+          relatório — é aqui que dá tempo de resolver (pedir material,
+          remanejar equipe) antes da parada começar, não só constatar em
+          campo que de novo não foi feito. */}
+      {historicoNaoFeito && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-warning-200 bg-warning-50 px-3 py-2.5">
+          <AlertTriangle size={15} className="mt-0.5 flex-none text-warning-600" />
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-warning-800">
+              Não foi feito na parada &quot;{historicoNaoFeito.paradaNome}&quot; ({formatDateCompact(historicoNaoFeito.paradaData)})
+            </p>
+            <p className="mt-0.5 text-xs text-warning-700">{historicoNaoFeito.justificativa}</p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <PhotoUploadField label="Foto Antes" value={item.fotoAntes} onChange={(v) => onChange({ fotoAntes: v })} />

@@ -8,11 +8,12 @@ import { AlertCircle, ArrowLeft, FileSpreadsheet, History, Loader2, Plus, X } fr
 import type { CaminhoCriticoItem, ParadaCompleta, ParadaResumo, Pendencia, Servico, StatusGeral, TimelineEvento } from "@/lib/types";
 import { deriveGraficos, deriveKpis, gerarDescricaoExecucao, parseHoras, textoResultadoPadrao } from "@/lib/derive";
 import { gerarResultadoFinal } from "@/lib/mock-data";
-import { getParadaAtualizadaEm, getParadaCompleta, saveParada } from "@/lib/actions/paradas";
+import { getParadaAtualizadaEm, getParadaCompleta, listHistoricoNaoFeito, saveParada } from "@/lib/actions/paradas";
 import { slugify, sufixoAleatorio } from "@/lib/utils";
 import { clearDraft, getDraft, saveDraft } from "@/lib/draft-store";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { parsePlanilhaServicos } from "@/lib/import-planilha";
+import { encontrarUltimoNaoFeito, type HistoricoNaoFeitoItem } from "@/lib/historico-nao-feito";
 import { SelectField, TextAreaField, TextField } from "@/components/forms/FormControls";
 import { CollapsibleSection } from "@/components/forms/CollapsibleSection";
 import { TimelineRowEditor, type TimelineRow } from "@/components/forms/TimelineRowEditor";
@@ -272,6 +273,15 @@ function NovaParadaForm() {
   const [importando, setImportando] = useState(false);
   const [importResultado, setImportResultado] = useState("");
   const planilhaInputRef = useRef<HTMLInputElement>(null);
+
+  // Histórico de "não será feito" de todos os relatórios — carregado uma vez
+  // e cruzado localmente (por número de OS ou equipamento) contra cada linha
+  // do formulário, pra avisar antes mesmo da parada começar.
+  const [historicoNaoFeito, setHistoricoNaoFeito] = useState<HistoricoNaoFeitoItem[]>([]);
+
+  useEffect(() => {
+    listHistoricoNaoFeito().then(setHistoricoNaoFeito);
+  }, []);
 
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("edit");
@@ -810,6 +820,7 @@ function NovaParadaForm() {
                 key={item.id}
                 item={item}
                 index={i}
+                historicoNaoFeito={encontrarUltimoNaoFeito(item, editId, historicoNaoFeito)}
                 onChange={(patch) => updateRow(setServicos, item.id, patch)}
                 onRemove={() => setServicos((prev) => prev.filter((r) => r.id !== item.id))}
                 onDuplicate={() =>

@@ -6,6 +6,7 @@ import { getDb } from "@/lib/db";
 import { sufixoAleatorio } from "@/lib/utils";
 import { paradas } from "@/lib/db/schema";
 import type { CaminhoCriticoItem, Equipe, Kpis, ParadaCompleta, ParadaResumo, Servico, StatusItem, TimelineEvento } from "@/lib/types";
+import type { HistoricoNaoFeitoItem } from "@/lib/historico-nao-feito";
 import { deriveFotoCapa, deriveFotos, deriveGraficos, deriveKpis, gerarDescricaoExecucao, parseHoras, textoResultadoPadrao } from "@/lib/derive";
 import { gerarResultadoFinal } from "@/lib/mock-data";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
@@ -401,6 +402,39 @@ export async function listChecklistPendencias(): Promise<PendenciaChecklistItem[
     }
   }
 
+  return itens;
+}
+
+// Varre todos os relatórios em busca de serviços marcados "não será feito",
+// pra alertar (na Captura Rápida e no formulário /novo) quando a mesma OS ou
+// o mesmo equipamento reaparece numa parada nova — quem está montando ou
+// executando o relatório já sabe, antes de começar, que da última vez faltou
+// material/tempo/recurso, e o motivo exato. Cruza dados de TODOS os
+// relatórios de uma vez (igual ao checklist de pendências), então exige
+// senha de editor.
+export async function listHistoricoNaoFeito(): Promise<HistoricoNaoFeitoItem[]> {
+  const autorizado = await ehEditor();
+  if (!autorizado) return [];
+
+  const rows = await getDb()
+    .select({ id: paradas.id, nome: paradas.nome, data: paradas.data, servicos: paradas.servicos })
+    .from(paradas)
+    .orderBy(asc(paradas.data));
+
+  const itens: HistoricoNaoFeitoItem[] = [];
+  for (const row of rows) {
+    for (const s of row.servicos) {
+      if (!s.justificativaNaoFeito) continue;
+      itens.push({
+        paradaId: row.id,
+        paradaNome: row.nome,
+        paradaData: row.data,
+        numeroOS: s.numeroOS,
+        equipamento: s.equipamento,
+        justificativa: s.justificativaNaoFeito,
+      });
+    }
+  }
   return itens;
 }
 
