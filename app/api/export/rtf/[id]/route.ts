@@ -173,7 +173,14 @@ async function buildCapa(data: ParadaCompleta): Promise<string> {
   let out = "";
 
   const url = urlDaParada(resumo.id);
-  const qr = await gerarQrCodeBuffer(url, 180).catch(() => null);
+  // gerarQrCodeBuffer devolve PNG (padrão da lib qrcode), mas pictBlock()
+  // sempre marca o bloco como \jpegblip — um leitor de RTF rígido (like o
+  // Mantec, que já descarta as fotos no paste) recebe bytes PNG rotulados de
+  // JPEG nesse primeiro \pict do documento e trava ali, derrubando junto as
+  // imagens seguintes que são JPEG de verdade. Reconverte pro mesmo formato
+  // que o \pict promete, igual já é feito com as fotos dos serviços.
+  const qrPng = await gerarQrCodeBuffer(url, 180).catch(() => null);
+  const qr = qrPng ? await sharp(qrPng).flatten({ background: "#ffffff" }).jpeg({ quality: 92 }).toBuffer() : null;
   if (qr) {
     const dims = imageSize(qr);
     if (dims.width && dims.height) {
