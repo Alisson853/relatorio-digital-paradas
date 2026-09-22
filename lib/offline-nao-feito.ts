@@ -1,0 +1,74 @@
+"use client";
+
+// Fila de "não será feito" pendente de salvar, guardada no IndexedDB do
+// aparelho — mesma ideia da fila de fotos (lib/offline-fotos.ts): sobrevive a
+// fechar a aba/app, e é o que permite marcar em campo sem internet. Diferença
+// pro caso das fotos: aqui cada serviço tem no máximo UMA pendência (a chave
+// é `${paradaId}:${servicoId}`) — é sempre o estado final que importa, não
+// uma lista de eventos, então uma escrita nova substitui a anterior ainda não
+// enviada em vez de empilhar.
+const DB_NOME = "maintops-naofeito-pendente";
+const DB_VERSAO = 1;
+const STORE = "fila";
+
+export interface NaoFeitoPendente {
+  id: string;
+  paradaId: string;
+  servicoId: string;
+  // "" = desmarcado (limpa categoria e justificativa no servidor)
+  categoria: string;
+  justificativa: string;
+  criadoEm: number;
+}
+
+function chaveNaoFeito(paradaId: string, servicoId: string): string {
+  return `${paradaId}:${servicoId}`;
+}
+
+function abrirDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NOME, DB_VERSAO);
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains(STORE)) {
+        req.result.createObjectStore(STORE, { keyPath: "id" });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function salvarNaoFeitoPendente(paradaId: string, servicoId: string, categoria: string, justificativa: string): Promise<void> {
+  const item: NaoFeitoPendente = { id: chaveNaoFeito(paradaId, servicoId), paradaId, servicoId, categoria, justificativa, criadoEm: Date.now() };
+  const db = await abrirDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).put(item);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+
+export async function listarNaoFeitoPendente(paradaId?: string): Promise<NaoFeitoPendente[]> {
+  const db = await abrirDb();
+  const itens = await new Promise<NaoFeitoPendente[]>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readonly");
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = () => resolve(req.result as NaoFeitoPendente[]);
+    req.onerror = () => reject(req.error);
+  });
+  db.close();
+  return paradaId ? itens.filter((i) => i.paradaId === paradaId) : itens;
+}
+
+export async function removerNaoFeitoPendente(id: string): Promise<void> {
+  const db = await abrirDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}

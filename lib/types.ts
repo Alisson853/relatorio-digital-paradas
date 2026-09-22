@@ -2,6 +2,13 @@ export type StatusGeral = "concluida" | "ressalvas" | "em_andamento";
 export type StatusItem = "concluido" | "atrasado" | "pendente" | "em_andamento";
 export type Equipe = "Elétrica" | "Mecânica" | "Instrumentação" | "Operação" | "Segurança" | "Civil" | "Caldeiraria" | "Preditiva" | "Lubrificação";
 
+// Categorias fechadas pro motivo de "não será feito" — texto livre não dava
+// pra agrupar (cada técnico escreve diferente pra dizer a mesma coisa), o que
+// impedia enxergar "essa causa se repete" tanto no alerta de histórico quanto
+// numa visão geral do dashboard.
+export const MOTIVOS_NAO_FEITO = ["Falta de Material", "Falta de Tempo", "Falta de Recurso/Equipe", "Equipamento Indisponível", "Outro"] as const;
+export type MotivoNaoFeitoCategoria = (typeof MOTIVOS_NAO_FEITO)[number];
+
 export interface ParadaResumo {
   id: string;
   nome: string;
@@ -62,9 +69,12 @@ export interface Servico {
   fotoDepois: string;
   fotoDepoisHorario?: string;
   categoria?: string;
-  // Preenchido pelo técnico em campo quando o serviço não vai ser feito (ex:
-  // peça não chegou, precisa de outro recurso). Só aparece pro editor, num
-  // painel à parte na tela principal — não é mostrado na apresentação.
+  // Marcado pelo técnico em campo quando o serviço não vai ser feito. A
+  // categoria É o sinal de "está marcado" (undefined = não marcado) — o
+  // texto é só um detalhe opcional que complementa a categoria, nunca
+  // sozinho. Só aparece pro editor, num painel à parte na tela principal —
+  // não é mostrado na apresentação.
+  naoFeitoCategoria?: MotivoNaoFeitoCategoria;
   justificativaNaoFeito?: string;
 }
 

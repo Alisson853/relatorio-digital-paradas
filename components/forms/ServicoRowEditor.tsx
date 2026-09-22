@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, Copy, Trash2 } from "lucide-react";
-import type { Equipe, StatusItem } from "@/lib/types";
+import type { Equipe, MotivoNaoFeitoCategoria, StatusItem } from "@/lib/types";
 import { formatDateCompact } from "@/lib/utils";
 import type { HistoricoNaoFeitoItem } from "@/lib/historico-nao-feito";
 import { SelectField, TextField } from "./FormControls";
@@ -21,6 +21,13 @@ export interface ServicoRow {
   fotoAntes: string;
   fotoDurante: string;
   fotoDepois: string;
+  // "Não será feito" só é marcado pela Captura Rápida (celular) — esse
+  // formulário não edita esses dois campos, só carrega o valor de volta ao
+  // salvar. Sem isso, salvar o formulário apagava silenciosamente qualquer
+  // marcação feita em campo, porque o objeto reconstruído no submit nunca
+  // incluía esses campos.
+  naoFeitoCategoria?: MotivoNaoFeitoCategoria;
+  justificativaNaoFeito?: string;
 }
 
 const EQUIPE_OPTIONS = ["Elétrica", "Mecânica", "Instrumentação", "Operação", "Segurança", "Civil", "Caldeiraria", "Preditiva", "Lubrificação"].map((e) => ({ value: e, label: e }));
@@ -69,6 +76,17 @@ export function ServicoRowEditor({ item, index, onChange, onRemove, onDuplicate,
       </div>
       <p className="mb-3 text-xs font-bold text-brand-600">OS {index + 1}</p>
 
+      {/* Estado atual DESTE serviço (marcado pelo celular) — diferente do
+          alerta de histórico abaixo, que é sobre OUTRA parada. Só leitura:
+          esse formulário não marca/desmarca, é a Captura Rápida que faz
+          isso; aqui é só pra o coordenador ver sem precisar abrir o celular. */}
+      {item.naoFeitoCategoria && (
+        <div className="mb-4 rounded-xl border border-danger-200 bg-danger-50 px-3 py-2.5">
+          <p className="text-xs font-bold text-danger-800">Marcado em campo como não será feito — {item.naoFeitoCategoria}</p>
+          {item.justificativaNaoFeito && <p className="mt-0.5 text-xs text-danger-700">{item.justificativaNaoFeito}</p>}
+        </div>
+      )}
+
       {/* Mesmo alerta da Captura Rápida, aqui no formulário de montagem do
           relatório — é aqui que dá tempo de resolver (pedir material,
           remanejar equipe) antes da parada começar, não só constatar em
@@ -78,9 +96,9 @@ export function ServicoRowEditor({ item, index, onChange, onRemove, onDuplicate,
           <AlertTriangle size={15} className="mt-0.5 flex-none text-warning-600" />
           <div className="min-w-0">
             <p className="text-xs font-bold text-warning-800">
-              Não foi feito na parada &quot;{historicoNaoFeito.paradaNome}&quot; ({formatDateCompact(historicoNaoFeito.paradaData)})
+              Não foi feito na parada &quot;{historicoNaoFeito.paradaNome}&quot; ({formatDateCompact(historicoNaoFeito.paradaData)}) — {historicoNaoFeito.categoria}
             </p>
-            <p className="mt-0.5 text-xs text-warning-700">{historicoNaoFeito.justificativa}</p>
+            {historicoNaoFeito.justificativa && <p className="mt-0.5 text-xs text-warning-700">{historicoNaoFeito.justificativa}</p>}
           </div>
         </div>
       )}

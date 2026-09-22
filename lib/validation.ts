@@ -1,16 +1,18 @@
-import type {
-  CaminhoCriticoItem,
-  Equipe,
-  GraficosData,
-  Kpis,
-  ParadaCompleta,
-  ParadaResumo,
-  Pendencia,
-  ResultadoFinal,
-  Servico,
-  StatusGeral,
-  StatusItem,
-  TimelineEvento,
+import {
+  MOTIVOS_NAO_FEITO,
+  type CaminhoCriticoItem,
+  type Equipe,
+  type GraficosData,
+  type Kpis,
+  type MotivoNaoFeitoCategoria,
+  type ParadaCompleta,
+  type ParadaResumo,
+  type Pendencia,
+  type ResultadoFinal,
+  type Servico,
+  type StatusGeral,
+  type StatusItem,
+  type TimelineEvento,
 } from "@/lib/types";
 
 // Saneamento do que chega do cliente antes de encostar no banco.
@@ -64,6 +66,15 @@ function numero(valor: unknown, { min = 0, max = 1_000_000 } = {}): number {
 
 function umDe<T extends string>(valor: unknown, permitidos: T[], padrao: T): T {
   return permitidos.includes(valor as T) ? (valor as T) : padrao;
+}
+
+// Igual a umDe, mas sem valor padrão — usado quando "não é nenhuma das
+// opções" precisa virar ausência (undefined), não uma opção qualquer
+// escolhida por default. É o caso da categoria de "não será feito": um valor
+// inválido/ausente tem que significar "não marcado", não silenciosamente
+// virar "Outro" ou a primeira opção da lista.
+function umDeOpcional<T extends string>(valor: unknown, permitidos: readonly T[]): T | undefined {
+  return permitidos.includes(valor as T) ? (valor as T) : undefined;
 }
 
 function lista<T>(valor: unknown, mapeia: (item: unknown) => T): T[] {
@@ -161,6 +172,7 @@ export function sanearServico(bruto: unknown): Servico {
     fotoDepois: urlDeImagem(s.fotoDepois),
     fotoDepoisHorario: texto(s.fotoDepoisHorario, 20) || undefined,
     categoria: texto(s.categoria) || undefined,
+    naoFeitoCategoria: umDeOpcional<MotivoNaoFeitoCategoria>(s.naoFeitoCategoria, MOTIVOS_NAO_FEITO),
     justificativaNaoFeito: texto(s.justificativaNaoFeito, LIMITE_TEXTO_LONGO) || undefined,
   };
 }
@@ -278,6 +290,13 @@ export function sanearEquipe(valor: unknown): Equipe {
 
 export function sanearIcone(valor: unknown): TimelineEvento["icone"] {
   return umDe(valor, ICONES, "flag");
+}
+
+// String vazia é um valor válido aqui — é o que desmarca "não será feito".
+// Qualquer outra coisa que não seja uma das categorias fechadas é rejeitada.
+export function sanearMotivoNaoFeito(valor: unknown): MotivoNaoFeitoCategoria | "" {
+  if (valor === "") return "";
+  return umDeOpcional<MotivoNaoFeitoCategoria>(valor, MOTIVOS_NAO_FEITO) ?? "";
 }
 
 export { texto as sanearTexto };

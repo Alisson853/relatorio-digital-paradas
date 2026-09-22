@@ -5,7 +5,7 @@ import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { sufixoAleatorio } from "@/lib/utils";
 import { paradas } from "@/lib/db/schema";
-import type { CaminhoCriticoItem, Equipe, Kpis, ParadaCompleta, ParadaResumo, Servico, StatusItem, TimelineEvento } from "@/lib/types";
+import type { CaminhoCriticoItem, Equipe, Kpis, MotivoNaoFeitoCategoria, ParadaCompleta, ParadaResumo, Servico, StatusItem, TimelineEvento } from "@/lib/types";
 import type { HistoricoNaoFeitoItem } from "@/lib/historico-nao-feito";
 import { deriveFotoCapa, deriveFotos, deriveGraficos, deriveKpis, gerarDescricaoExecucao, parseHoras, textoResultadoPadrao } from "@/lib/derive";
 import { gerarResultadoFinal } from "@/lib/mock-data";
@@ -17,6 +17,7 @@ import {
   sanearEquipe,
   sanearIcone,
   sanearId,
+  sanearMotivoNaoFeito,
   sanearParadaCompleta,
   sanearStatusItem,
   sanearTexto,
@@ -277,6 +278,11 @@ export async function clonarParada(idOrigemBruto: string): Promise<{ ok: boolean
     fotoDuranteHorario: undefined,
     fotoDepois: NO_PHOTO_PLACEHOLDER,
     fotoDepoisHorario: undefined,
+    // "Não será feito" é uma decisão sobre a execução da parada de ORIGEM,
+    // não um atributo permanente do serviço — sem isso, todo clone nasceria
+    // com OS já marcadas como não feitas antes de qualquer trabalho começar.
+    naoFeitoCategoria: undefined,
+    justificativaNaoFeito: undefined,
   }));
 
   const timelineClonada: TimelineEvento[] = row.timeline.map((t) => ({ ...t, id: crypto.randomUUID(), status: "pendente" }));
@@ -355,6 +361,7 @@ export interface PendenciaChecklistItem {
   equipe: string;
   responsavel: string;
   faltando: string[];
+  naoFeitoCategoria?: MotivoNaoFeitoCategoria;
   justificativaNaoFeito?: string;
 }
 
@@ -383,7 +390,7 @@ export async function listChecklistPendencias(): Promise<PendenciaChecklistItem[
       if (!s.fotoAntes || s.fotoAntes === NO_PHOTO_PLACEHOLDER) faltando.push("Foto Antes");
       if (!s.fotoDepois || s.fotoDepois === NO_PHOTO_PLACEHOLDER) faltando.push("Foto Depois");
       if (s.status !== "concluido") faltando.push("Status pendente");
-      if (s.justificativaNaoFeito) faltando.push("Não será feito");
+      if (s.naoFeitoCategoria) faltando.push("Não será feito");
 
       if (faltando.length > 0) {
         itens.push({
@@ -396,6 +403,7 @@ export async function listChecklistPendencias(): Promise<PendenciaChecklistItem[
           equipe: s.equipe,
           responsavel: s.responsavel,
           faltando,
+          naoFeitoCategoria: s.naoFeitoCategoria,
           justificativaNaoFeito: s.justificativaNaoFeito,
         });
       }
@@ -424,14 +432,15 @@ export async function listHistoricoNaoFeito(): Promise<HistoricoNaoFeitoItem[]> 
   const itens: HistoricoNaoFeitoItem[] = [];
   for (const row of rows) {
     for (const s of row.servicos) {
-      if (!s.justificativaNaoFeito) continue;
+      if (!s.naoFeitoCategoria) continue;
       itens.push({
         paradaId: row.id,
         paradaNome: row.nome,
         paradaData: row.data,
         numeroOS: s.numeroOS,
         equipamento: s.equipamento,
-        justificativa: s.justificativaNaoFeito,
+        categoria: s.naoFeitoCategoria,
+        justificativa: s.justificativaNaoFeito ?? "",
       });
     }
   }
@@ -659,13 +668,16 @@ export async function marcarStatusServico(
   return { ok: true };
 }
 
-// Justificativa que o técnico escreve em campo quando um serviço não vai ser
-// feito (ex: peça não chegou). Não mexe no status nem nos KPIs — é só um
-// texto que passa a aparecer pro editor no checklist de pendências de todos
-// os relatórios. Texto vazio apaga a justificativa (desmarcar o quadradinho).
-export async function definirJustificativaNaoFeito(
+// Marca (ou desmarca) um serviço como "não será feito", com uma categoria
+// fechada — Falta de Material, Falta de Tempo etc — e um detalhe opcional
+// em texto livre. A categoria É o sinal de "está marcado": categoria vazia
+// apaga os dois campos (desmarcar o quadradinho). Não mexe no status nem nos
+// KPIs — só aparece pro editor no checklist de pendências e no alerta de
+// histórico entre relatórios.
+export async function definirNaoFeito(
   paradaIdBruto: string,
   servicoIdBruto: string,
+  categoriaBruta: string,
   justificativaBruta: string
 ): Promise<{ ok: boolean; erro?: string }> {
   const autorizado = await ehEditor();
@@ -678,6 +690,7 @@ export async function definirJustificativaNaoFeito(
     return { ok: false, erro: "Identificador inválido." };
   }
   const servicoId = sanearTexto(servicoIdBruto, 80);
+  const categoria = sanearMotivoNaoFeito(categoriaBruta);
   const justificativa = sanearTexto(justificativaBruta, 5000);
 
   const [row] = await getDb().select().from(paradas).where(eq(paradas.id, paradaId)).limit(1);
@@ -687,7 +700,11 @@ export async function definirJustificativaNaoFeito(
   if (idx === -1) return { ok: false, erro: "Serviço não encontrado." };
 
   const servicosAtualizados = [...row.servicos];
-  servicosAtualizados[idx] = { ...servicosAtualizados[idx], justificativaNaoFeito: justificativa || undefined };
+  servicosAtualizados[idx] = {
+    ...servicosAtualizados[idx],
+    naoFeitoCategoria: categoria || undefined,
+    justificativaNaoFeito: justificativa || undefined,
+  };
 
   await getDb().update(paradas).set({ servicos: servicosAtualizados, atualizadoEm: new Date() }).where(eq(paradas.id, paradaId));
 

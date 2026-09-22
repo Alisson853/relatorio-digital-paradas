@@ -5,6 +5,7 @@ import { listParadasResumo } from "@/lib/actions/paradas";
 import { ParadaGrid } from "@/components/dashboard/ParadaGrid";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { BackupControls } from "@/components/dashboard/BackupControls";
+import { RecorrenciasNaoFeito } from "@/components/dashboard/RecorrenciasNaoFeito";
 import { EditorOnly } from "@/components/shared/EditorOnly";
 import { EditorToggle } from "@/components/shared/EditorToggle";
 
@@ -80,6 +81,8 @@ export default async function DashboardPage() {
 
           <DashboardStats paradas={paradas} />
         </div>
+
+        <RecorrenciasNaoFeito />
 
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">

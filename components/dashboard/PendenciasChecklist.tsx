@@ -107,10 +107,11 @@ export function PendenciasChecklist() {
                     ))}
                   </div>
                 </div>
-                {item.justificativaNaoFeito && (
+                {item.naoFeitoCategoria && (
                   <p className="mt-2 rounded-lg bg-danger-50 px-3 py-2 text-xs text-danger-700">
                     <span className="font-bold">Motivo: </span>
-                    {item.justificativaNaoFeito}
+                    {item.naoFeitoCategoria}
+                    {item.justificativaNaoFeito && ` — ${item.justificativaNaoFeito}`}
                   </p>
                 )}
               </div>

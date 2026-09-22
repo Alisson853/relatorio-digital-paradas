@@ -161,6 +161,8 @@ function servicoParaLinha(s: Servico): ServicoRow {
     fotoAntes: s.fotoAntes === NO_PHOTO_PLACEHOLDER ? "" : s.fotoAntes,
     fotoDurante: s.fotoDurante ?? "",
     fotoDepois: s.fotoDepois === NO_PHOTO_PLACEHOLDER ? "" : s.fotoDepois,
+    naoFeitoCategoria: s.naoFeitoCategoria,
+    justificativaNaoFeito: s.justificativaNaoFeito,
   };
 }
 
@@ -549,6 +551,10 @@ function NovaParadaForm() {
           fotoAntes: existente?.fotoAntes ?? "",
           fotoDurante: existente?.fotoDurante ?? "",
           fotoDepois: existente?.fotoDepois ?? "",
+          // Reimportar a planilha não pode apagar uma OS marcada "não será
+          // feito" em campo — só carrega o que já estava, igual às fotos.
+          naoFeitoCategoria: existente?.naoFeitoCategoria,
+          justificativaNaoFeito: existente?.justificativaNaoFeito,
         };
       });
 
@@ -645,6 +651,11 @@ function NovaParadaForm() {
           fotoAntes: s.fotoAntes || NO_PHOTO_PLACEHOLDER,
           fotoDurante: s.fotoDurante || undefined,
           fotoDepois: s.fotoDepois || NO_PHOTO_PLACEHOLDER,
+          // Esse formulário nunca marca/desmarca "não será feito" (só a
+          // Captura Rápida faz isso) — só devolve o que já veio carregado,
+          // pra salvar o relatório não apagar uma marcação feita em campo.
+          naoFeitoCategoria: s.naoFeitoCategoria,
+          justificativaNaoFeito: s.justificativaNaoFeito,
         };
       });
 
