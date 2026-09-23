@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, ChevronLeft, ChevronRight, Clock, MapPin, Users2, Wrench, X, Zap } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Clock, MapPin, Search, Users2, Wrench, X, Zap } from "lucide-react";
 import type { Servico } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { PhotoLightbox } from "@/components/presentation/PhotoLightbox";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { servicosComFoto } from "@/lib/derive";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,21 @@ function CategoriaBadge({ categoria }: { categoria?: string }) {
 }
 
 function ServiceSlide({ servico }: { servico: Servico }) {
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  const fotosDisponiveis = [
+    ...(servico.fotoAntes && servico.fotoAntes !== NO_PHOTO_PLACEHOLDER
+      ? [{ key: "antes", url: servico.fotoAntes, label: "Antes", horario: servico.fotoAntesHorario, badge: "bg-slate-900/80" }]
+      : []),
+    ...(servico.fotoDurante
+      ? [{ key: "durante", url: servico.fotoDurante, label: "Durante", horario: servico.fotoDuranteHorario, badge: "bg-warning-600/90" }]
+      : []),
+    ...(servico.fotoDepois && servico.fotoDepois !== NO_PHOTO_PLACEHOLDER
+      ? [{ key: "depois", url: servico.fotoDepois, label: "Depois", horario: servico.fotoDepoisHorario, badge: "bg-brand-600/90" }]
+      : []),
+  ];
+  const mostrarRotulo = fotosDisponiveis.length > 1;
+
   return (
     <div className="grid grid-rows-[minmax(0,1fr)] flex-1 grid-cols-1 gap-8 overflow-hidden lg:grid-cols-[1fr_1.05fr] lg:gap-10">
       {/* O painel tem altura fixa pra secao caber na tela, entao o texto do
@@ -116,80 +132,77 @@ function ServiceSlide({ servico }: { servico: Servico }) {
       </div>
 
       <div className="flex flex-col gap-4 rounded-3xl border-2 border-brand-100 bg-brand-50/40 p-3 sm:p-4 lg:h-full">
-        {(() => {
-          const fotosDisponiveis = [
-            ...(servico.fotoAntes && servico.fotoAntes !== NO_PHOTO_PLACEHOLDER
-              ? [{ key: "antes", url: servico.fotoAntes, label: "Antes", horario: servico.fotoAntesHorario, badge: "bg-slate-900/80" }]
-              : []),
-            ...(servico.fotoDurante
-              ? [{ key: "durante", url: servico.fotoDurante, label: "Durante", horario: servico.fotoDuranteHorario, badge: "bg-warning-600/90" }]
-              : []),
-            ...(servico.fotoDepois && servico.fotoDepois !== NO_PHOTO_PLACEHOLDER
-              ? [{ key: "depois", url: servico.fotoDepois, label: "Depois", horario: servico.fotoDepoisHorario, badge: "bg-brand-600/90" }]
-              : []),
-          ];
-          const mostrarRotulo = fotosDisponiveis.length > 1;
-          return (
-            // Grade de 2 colunas (1 só quando há uma única foto), cada célula
-            // preenchendo igualmente a altura disponível (auto-rows-fr) — ao
-            // contrário de empilhar em 1 coluna só (o que dava caixas largas
-            // e baixas demais com 3 fotos) ou forçar quadrado perfeito (o que
-            // limitava o tamanho ao menor dos dois lados), essa grade mantém
-            // a proporção de cada caixa perto da proporção do próprio painel,
-            // então fica grande e sem cortar demais em nenhum sentido.
-            <div
+        {/* Grade de 2 colunas (1 só quando há uma única foto), cada célula
+            preenchendo igualmente a altura disponível (auto-rows-fr) — ao
+            contrário de empilhar em 1 coluna só (o que dava caixas largas
+            e baixas demais com 3 fotos) ou forçar quadrado perfeito (o que
+            limitava o tamanho ao menor dos dois lados), essa grade mantém
+            a proporção de cada caixa perto da proporção do próprio painel,
+            então fica grande e sem cortar demais em nenhum sentido. */}
+        <div
+          className={cn(
+            // A altura vem de h-full, que so existe porque o cartao tem
+            // lg:h-[90vh] no desktop. No celular nao ha altura nenhuma pra
+            // herdar: o grid colapsa, e como as imagens usam fill, elas
+            // somem junto — o painel de fotos vira uma capsula vazia no meio
+            // do cartao. Uma altura propria no estreito devolve as fotos e
+            // mantem o resto do calculo (auto-rows-fr dividindo o espaco)
+            // exatamente como estava.
+            "grid h-[46vh] auto-rows-fr gap-3 lg:h-full",
+            fotosDisponiveis.length === 1 ? "grid-cols-1" : "grid-cols-2"
+          )}
+        >
+          {fotosDisponiveis.map((foto, i) => (
+            <button
+              key={foto.key}
+              type="button"
+              onClick={() => setLightboxIndex(i)}
+              aria-label={`Ampliar foto ${foto.label}`}
               className={cn(
-                // A altura vem de h-full, que so existe porque o cartao tem
-                // lg:h-[90vh] no desktop. No celular nao ha altura nenhuma pra
-                // herdar: o grid colapsa, e como as imagens usam fill, elas
-                // somem junto — o painel de fotos vira uma capsula vazia no meio
-                // do cartao. Uma altura propria no estreito devolve as fotos e
-                // mantem o resto do calculo (auto-rows-fr dividindo o espaco)
-                // exatamente como estava.
-                "grid h-[46vh] auto-rows-fr gap-3 lg:h-full",
-                fotosDisponiveis.length === 1 ? "grid-cols-1" : "grid-cols-2"
+                "group relative overflow-hidden rounded-2xl border-2 border-white bg-slate-100 shadow-md",
+                // Com tres fotos, a grade de duas colunas deixava a quarta
+                // celula vazia — um buraco no canto, bem no painel que a
+                // reuniao fica olhando. A ultima passa a ocupar a linha
+                // inteira: fecha o vazio e, como a ordem e Antes/Durante/
+                // Depois, quem ganha a faixa larga e justamente o Depois,
+                // que e o resultado do servico.
+                fotosDisponiveis.length === 3 && i === 2 && "col-span-2"
               )}
             >
-              {fotosDisponiveis.map((foto, i) => (
-                <div
-                  key={foto.key}
+              <Image
+                src={foto.url}
+                alt={servico.equipamento}
+                fill
+                sizes="(min-width: 1024px) 480px, (min-width: 640px) 320px, 90vw"
+                className="object-cover transition-transform duration-500 group-hover:scale-110"
+                loading="eager"
+                unoptimized={foto.url.startsWith("data:")}
+              />
+              {mostrarRotulo && (
+                <span
                   className={cn(
-                    "relative overflow-hidden rounded-2xl border-2 border-white bg-slate-100 shadow-md",
-                    // Com tres fotos, a grade de duas colunas deixava a quarta
-                    // celula vazia — um buraco no canto, bem no painel que a
-                    // reuniao fica olhando. A ultima passa a ocupar a linha
-                    // inteira: fecha o vazio e, como a ordem e Antes/Durante/
-                    // Depois, quem ganha a faixa larga e justamente o Depois,
-                    // que e o resultado do servico.
-                    fotosDisponiveis.length === 3 && i === 2 && "col-span-2"
+                    "absolute left-3 top-3 flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white",
+                    foto.badge
                   )}
                 >
-                  <Image
-                    src={foto.url}
-                    alt={servico.equipamento}
-                    fill
-                    sizes="(min-width: 1024px) 480px, (min-width: 640px) 320px, 90vw"
-                    className="object-cover"
-                    loading="eager"
-                    unoptimized={foto.url.startsWith("data:")}
-                  />
-                    {mostrarRotulo && (
-                      <span
-                        className={cn(
-                          "absolute left-3 top-3 flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white",
-                          foto.badge
-                        )}
-                      >
-                        {foto.label}
-                        {foto.horario && <span className="font-mono normal-case opacity-80">· {foto.horario}</span>}
-                      </span>
-                    )}
-                </div>
-              ))}
-            </div>
-          );
-        })()}
+                  {foto.label}
+                  {foto.horario && <span className="font-mono normal-case opacity-80">· {foto.horario}</span>}
+                </span>
+              )}
+              <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-opacity group-hover:bg-black/10 group-hover:opacity-100">
+                <Search size={22} className="text-white drop-shadow" />
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
+
+      <PhotoLightbox
+        photos={fotosDisponiveis.map((f) => ({ id: f.key, url: f.url, label: f.label }))}
+        activeIndex={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+        onNavigate={setLightboxIndex}
+      />
     </div>
   );
 }

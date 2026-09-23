@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { useState } from "react";
 import Image from "next/image";
-import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import { motion } from "framer-motion";
+import { Search } from "lucide-react";
 import type { FotoGaleria } from "@/lib/types";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { PhotoLightbox } from "@/components/presentation/PhotoLightbox";
 import { cn } from "@/lib/utils";
 
 type Filtro = "todas" | "antes" | "durante" | "depois";
@@ -21,24 +21,6 @@ export function GallerySection({ fotos }: { fotos: FotoGaleria[] }) {
     acc[f.servico] = (acc[f.servico] ?? 0) + 1;
     return acc;
   }, {});
-
-  const close = () => setActiveIndex(null);
-  const next = () => setActiveIndex((i) => (i === null ? null : (i + 1) % filtradas.length));
-  const prev = () => setActiveIndex((i) => (i === null ? null : (i - 1 + filtradas.length) % filtradas.length));
-
-  useEffect(() => {
-    if (activeIndex === null) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") close();
-      if (e.key === "ArrowRight") next();
-      if (e.key === "ArrowLeft") prev();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeIndex, filtradas.length]);
-
-  const active = activeIndex !== null ? filtradas[activeIndex] : null;
 
   return (
     <section id="fotos" className="section-screen flex items-center bg-white px-6 py-24 sm:px-10">
@@ -117,66 +99,12 @@ export function GallerySection({ fotos }: { fotos: FotoGaleria[] }) {
         </div>
       </div>
 
-      {typeof document !== "undefined" &&
-        createPortal(
-          <AnimatePresence>
-            {active && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 p-6 backdrop-blur-sm"
-                onClick={close}
-              >
-                <button onClick={close} className="absolute right-6 top-6 rounded-full bg-white/10 p-2.5 text-white hover:bg-white/20">
-                  <X size={20} />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    prev();
-                  }}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2.5 text-white hover:bg-white/20 sm:left-8"
-                >
-                  <ChevronLeft size={22} />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    next();
-                  }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2.5 text-white hover:bg-white/20 sm:right-8"
-                >
-                  <ChevronRight size={22} />
-                </button>
-
-                <motion.div
-                  key={active.id}
-                  initial={{ opacity: 0, scale: 0.94 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.96 }}
-                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="relative aspect-[4/3] w-full max-w-3xl overflow-hidden rounded-2xl bg-slate-900"
-                >
-                  <Image
-                    src={active.url}
-                    alt={active.servico}
-                    fill
-                    sizes="800px"
-                    className="object-contain"
-                    loading="eager"
-                    unoptimized={active.url.startsWith("data:")}
-                  />
-                </motion.div>
-                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 rounded-full bg-white/10 px-5 py-2 text-center text-sm font-semibold text-white">
-                  {active.servico}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>,
-          document.body
-        )}
+      <PhotoLightbox
+        photos={filtradas.map((f) => ({ id: f.id, url: f.url, label: f.servico }))}
+        activeIndex={activeIndex}
+        onClose={() => setActiveIndex(null)}
+        onNavigate={setActiveIndex}
+      />
     </section>
   );
 }
