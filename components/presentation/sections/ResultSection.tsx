@@ -90,7 +90,7 @@ export function ResultSection({ resultado, pendencias }: { resultado: ResultadoF
           >
             <p className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-warning-100">
               <AlertTriangle size={14} />
-              O Que Não Foi Feito
+              Pendências — O Que Não Foi Feito
             </p>
             <ul className="space-y-3">
               {pendencias.map((p) => (

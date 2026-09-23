@@ -9,9 +9,9 @@ import { cn } from "@/lib/utils";
 import { Sidebar } from "./Sidebar";
 import { FitToScreen } from "./FitToScreen";
 import { CoverSection } from "./sections/CoverSection";
-import { SummarySection } from "./sections/SummarySection";
+import { SummarySection, type SummaryCardLabel } from "./sections/SummarySection";
 import { TimelineSection } from "./sections/TimelineSection";
-import { ServicesSection } from "./sections/ServicesSection";
+import { ServicesSection, type FiltroServicos } from "./sections/ServicesSection";
 import { GallerySection } from "./sections/GallerySection";
 import { ChartsSection } from "./sections/ChartsSection";
 import { CriticalPathSection } from "./sections/CriticalPathSection";
@@ -21,11 +21,11 @@ import { PrintReport } from "./PrintReport";
 export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qrDataUrl?: string }) {
   const [presentationMode, setPresentationMode] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
-  // Setado quando o card "Etiqueta Vermelha"/"Etiqueta Amarela" do Resumo
-  // Executivo é clicado — estreita o carrossel de Serviços a essa categoria.
-  // Mora aqui (não dentro de ServicesSection) porque quem dispara a mudança
-  // é a seção de Resumo, uma irmã dela.
-  const [filtroEtiqueta, setFiltroEtiqueta] = useState<"Etiqueta Vermelha" | "Etiqueta Amarela" | null>(null);
+  // Setado quando um card do Resumo Executivo com uma lista de OS por trás
+  // é clicado — estreita o carrossel de Serviços a essa condição (categoria,
+  // equipe, status...). Mora aqui (não dentro de ServicesSection) porque
+  // quem dispara a mudança é a seção de Resumo, uma irmã dela.
+  const [filtroServicos, setFiltroServicos] = useState<FiltroServicos | null>(null);
 
   // Refs (não state) pra irParaSecao sempre enxergar a versão mais recente
   // de "sections"/"presentationMode" sem precisar entrar nas dependências do
@@ -35,7 +35,9 @@ export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qr
   // na hora que importa.
   const sectionsRef = useRef<SectionMeta[]>([]);
   const presentationModeRef = useRef(presentationMode);
-  presentationModeRef.current = presentationMode;
+  useEffect(() => {
+    presentationModeRef.current = presentationMode;
+  }, [presentationMode]);
 
   // Vai direto pra uma seção pelo id — usado pelos cards do Resumo
   // Executivo ("Pendências", "Etiqueta Vermelha/Amarela") pra pular pra onde
@@ -50,6 +52,56 @@ export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qr
       document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
     }
   }, []);
+
+  // Decide pra onde cada card do Resumo Executivo leva. "Segurança" é o
+  // único indicador sem card clicável (SummarySection não chama isto pra
+  // ele) — todos os outros viram um atalho: pra Serviços com um filtro, ou
+  // direto pra Gráficos/Resultado quando o número não é sobre uma lista de
+  // OS específica. Referência estável (só depende de irParaSecao, que também
+  // é estável) pelo mesmo motivo de irParaSecao: usada dentro de
+  // secoesAtivas sem criar dependência circular com "sections".
+  const handleKpiClick = useCallback(
+    (label: SummaryCardLabel) => {
+      switch (label) {
+        case "Pendências":
+          irParaSecao("resultado");
+          return;
+        case "Etiqueta Vermelha":
+          setFiltroServicos({ label: "Etiqueta Vermelha", predicate: (s) => s.categoria === "Etiqueta Vermelha" });
+          irParaSecao("servicos");
+          return;
+        case "Etiqueta Amarela":
+          setFiltroServicos({ label: "Etiqueta Amarela", predicate: (s) => s.categoria === "Etiqueta Amarela" });
+          irParaSecao("servicos");
+          return;
+        case "OS Planejadas":
+          setFiltroServicos(null);
+          irParaSecao("servicos");
+          return;
+        case "OS Concluídas":
+          setFiltroServicos({ label: "OS Concluídas", predicate: (s) => s.status === "concluido" });
+          irParaSecao("servicos");
+          return;
+        case "OS Elétrica":
+          setFiltroServicos({ label: "Equipe Elétrica", predicate: (s) => s.equipe === "Elétrica" });
+          irParaSecao("servicos");
+          return;
+        case "OS Mecânica":
+          setFiltroServicos({ label: "Equipe Mecânica", predicate: (s) => s.equipe === "Mecânica" });
+          irParaSecao("servicos");
+          return;
+        case "OS Instrumentação":
+          setFiltroServicos({ label: "Equipe Instrumentação", predicate: (s) => s.equipe === "Instrumentação" });
+          irParaSecao("servicos");
+          return;
+        case "Eficiência":
+        case "Horas Trabalhadas":
+          irParaSecao("graficos");
+          return;
+      }
+    },
+    [irParaSecao]
+  );
 
   // "O Que Não Foi Feito" mistura duas origens: as pendências digitadas à
   // mão no formulário /novo (data.pendencias) e os serviços que um técnico
@@ -79,17 +131,7 @@ export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qr
       },
       {
         id: "resumo",
-        node: (
-          <SummarySection
-            key="resumo"
-            kpis={data.kpis}
-            onVerPendencias={() => irParaSecao("resultado")}
-            onVerEtiqueta={(categoria) => {
-              setFiltroEtiqueta(categoria);
-              irParaSecao("servicos");
-            }}
-          />
-        ),
+        node: <SummarySection key="resumo" kpis={data.kpis} onCardClick={handleKpiClick} />,
         bg: "bg-slate-50",
       },
       data.timeline.length > 0 && {
@@ -103,8 +145,8 @@ export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qr
           <ServicesSection
             key="servicos"
             servicos={data.servicos}
-            filtroCategoria={filtroEtiqueta}
-            onLimparFiltro={() => setFiltroEtiqueta(null)}
+            filtro={filtroServicos}
+            onLimparFiltro={() => setFiltroServicos(null)}
           />
         ),
         bg: "bg-slate-50",
@@ -123,17 +165,19 @@ export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qr
       },
     ];
     return candidatas.filter((s): s is { id: string; node: React.ReactNode; bg: string } => !!s);
-  }, [data, filtroEtiqueta, irParaSecao, pendenciasDeServicosNaoFeitos]);
+  }, [data, filtroServicos, handleKpiClick, pendenciasDeServicosNaoFeitos]);
 
   const sections = useMemo(
     () => SECTIONS.filter((meta) => secoesAtivas.some((s) => s.id === meta.id)),
     [secoesAtivas]
   );
-  // Sincroniza a ref com a versão fresca de "sections" a cada render — é o
-  // que faz irParaSecao (referência estável, criada uma vez) sempre enxergar
-  // a lista atual sem precisar recriar a função nem entrar nas dependências
-  // de secoesAtivas.
-  sectionsRef.current = sections;
+  // Sincroniza a ref com a versão fresca de "sections" — é o que faz
+  // irParaSecao (referência estável, criada uma vez) sempre enxergar a lista
+  // atual sem precisar recriar a função nem entrar nas dependências de
+  // secoesAtivas.
+  useEffect(() => {
+    sectionsRef.current = sections;
+  }, [sections]);
   const sectionNodes = useMemo(() => secoesAtivas.map((s) => s.node), [secoesAtivas]);
   const SECTION_BG = useMemo(() => secoesAtivas.map((s) => s.bg), [secoesAtivas]);
 

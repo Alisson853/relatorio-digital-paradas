@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, ChevronLeft, ChevronRight, Clock, MapPin, Users2, Wrench, X, Zap } from "lucide-react";
@@ -194,39 +194,54 @@ function ServiceSlide({ servico }: { servico: Servico }) {
   );
 }
 
+// Um filtro é só um rótulo (pro chip e pra mensagem de vazio) mais um
+// predicado — não precisou virar um union type de "categoria | equipe |
+// status" porque quem monta o filtro (PresentationView, a partir do clique
+// num card do Resumo) já sabe exatamente o que quer comparar.
+export interface FiltroServicos {
+  label: string;
+  predicate: (s: Servico) => boolean;
+}
+
 interface Props {
   servicos: Servico[];
-  // Setado quando alguém chega aqui clicando no card "Etiqueta Vermelha"/
-  // "Etiqueta Amarela" do Resumo Executivo — estreita o carrossel só às OS
-  // daquela categoria, em vez de precisar passar por todas pra achá-las.
-  filtroCategoria?: string | null;
+  // Setado quando alguém chega aqui clicando num card do Resumo Executivo
+  // (Etiqueta Vermelha/Amarela, OS Concluídas, OS por equipe...) — estreita
+  // o carrossel só ao que aquele número representa, em vez de precisar
+  // passar por todas as OS pra achá-las.
+  filtro?: FiltroServicos | null;
   onLimparFiltro?: () => void;
 }
 
-export function ServicesSection({ servicos: todosServicos, filtroCategoria, onLimparFiltro }: Props) {
+export function ServicesSection({ servicos: todosServicos, filtro, onLimparFiltro }: Props) {
   const [index, setIndex] = useState(0);
   const comFoto = servicosComFoto(todosServicos);
-  const servicos = filtroCategoria ? comFoto.filter((s) => s.categoria === filtroCategoria) : comFoto;
+  const servicos = filtro ? comFoto.filter(filtro.predicate) : comFoto;
   const total = servicos.length;
   const atual = servicos[index];
 
   // Volta pro início do carrossel sempre que o filtro muda — senão o índice
   // de antes (ex: 5) pode não existir mais na lista filtrada (que tem só 2),
-  // e a tela mostraria o card errado ou nenhum.
-  useEffect(() => {
+  // e a tela mostraria o card errado ou nenhum. Ajustado durante o render
+  // (não num useEffect) seguindo o padrão do próprio React pra "resetar
+  // estado quando uma prop muda" — evita o efeito colateral disparar um
+  // segundo render depois que o primeiro já mostrou o índice errado.
+  const [filtroVisto, setFiltroVisto] = useState(filtro);
+  if (filtro !== filtroVisto) {
+    setFiltroVisto(filtro);
     setIndex(0);
-  }, [filtroCategoria]);
+  }
 
   const goPrev = () => setIndex((i) => Math.max(0, i - 1));
   const goNext = () => setIndex((i) => Math.min(total - 1, i + 1));
 
-  const chipFiltro = filtroCategoria && (
+  const chipFiltro = filtro && (
     <button
       type="button"
       onClick={onLimparFiltro}
       className="mb-4 flex items-center gap-1.5 rounded-full bg-brand-600 px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-brand-700"
     >
-      Filtrando: {filtroCategoria}
+      Filtrando: {filtro.label}
       <X size={13} />
     </button>
   );
@@ -239,10 +254,10 @@ export function ServicesSection({ servicos: todosServicos, filtroCategoria, onLi
           {chipFiltro}
           <SectionHeading
             eyebrow="Serviços Executados"
-            title={filtroCategoria ? `Nenhuma OS com ${filtroCategoria}` : "Nenhum Serviço Registrado"}
+            title={filtro ? `Nenhuma OS em ${filtro.label}` : "Nenhum Serviço Registrado"}
             description={
-              filtroCategoria
-                ? "Nenhum dos serviços com foto desta parada está marcado com essa categoria."
+              filtro
+                ? "Nenhum dos serviços com foto desta parada está nessa condição."
                 : temServicosSemFoto
                   ? "As OS desta parada ainda não têm foto — assim que a primeira for enviada, o serviço aparece aqui."
                   : "Nenhuma ordem de serviço foi cadastrada para esta parada."
@@ -253,7 +268,7 @@ export function ServicesSection({ servicos: todosServicos, filtroCategoria, onLi
               <Wrench size={22} />
             </div>
             <p className="text-sm font-medium text-slate-400">
-              {filtroCategoria
+              {filtro
                 ? "Experimente limpar o filtro pra ver todos os serviços."
                 : temServicosSemFoto
                   ? `${todosServicos.length} OS aguardando foto para entrar na apresentação.`
