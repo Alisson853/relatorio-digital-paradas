@@ -51,6 +51,23 @@ export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qr
     }
   }, []);
 
+  // "O Que Não Foi Feito" mistura duas origens: as pendências digitadas à
+  // mão no formulário /novo (data.pendencias) e os serviços que um técnico
+  // marcou como "não será feito" pelo celular (a caixinha da Captura
+  // Rápida) — que até aqui só apareciam pro editor no checklist de
+  // pendências do dashboard, nunca na apresentação em si.
+  const pendenciasDeServicosNaoFeitos = useMemo(
+    () =>
+      data.servicos
+        .filter((s) => s.naoFeitoCategoria)
+        .map((s) => ({
+          id: `naofeito-${s.id}`,
+          item: s.numeroOS !== "Oportunidade" ? `OS ${s.numeroOS} — ${s.titulo || s.equipamento}` : s.titulo || s.equipamento,
+          motivo: s.justificativaNaoFeito ? `${s.naoFeitoCategoria} — ${s.justificativaNaoFeito}` : s.naoFeitoCategoria!,
+        })),
+    [data.servicos]
+  );
+
   // Cada seção só entra na apresentação se tiver conteúdo — evita ficar
   // exibindo um título vazio (ex: "Linha do Tempo" sem nenhum evento).
   const secoesAtivas = useMemo(() => {
@@ -101,12 +118,12 @@ export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qr
       },
       {
         id: "resultado",
-        node: <ResultSection key="resultado" resultado={data.resultadoFinal} pendencias={data.pendencias} />,
+        node: <ResultSection key="resultado" resultado={data.resultadoFinal} pendencias={[...data.pendencias, ...pendenciasDeServicosNaoFeitos]} />,
         bg: "bg-gradient-to-br from-brand-950 via-brand-900 to-slate-950",
       },
     ];
     return candidatas.filter((s): s is { id: string; node: React.ReactNode; bg: string } => !!s);
-  }, [data, filtroEtiqueta, irParaSecao]);
+  }, [data, filtroEtiqueta, irParaSecao, pendenciasDeServicosNaoFeitos]);
 
   const sections = useMemo(
     () => SECTIONS.filter((meta) => secoesAtivas.some((s) => s.id === meta.id)),
