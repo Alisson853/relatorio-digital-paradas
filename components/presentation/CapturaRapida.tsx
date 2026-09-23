@@ -44,6 +44,7 @@ import { useEditorMode } from "@/lib/useEditorMode";
 import { cn, formatDateCompact, pareceNomeDePessoa } from "@/lib/utils";
 import { type FotoPendente, listarFotosPendentes, removerFotoPendente, salvarFotoPendente } from "@/lib/offline-fotos";
 import { type NaoFeitoPendente, listarNaoFeitoPendente, removerNaoFeitoPendente, salvarNaoFeitoPendente } from "@/lib/offline-nao-feito";
+import { carregarParadaCache, salvarParadaCache } from "@/lib/offline-parada-cache";
 import { encontrarUltimoNaoFeito, type HistoricoNaoFeitoItem } from "@/lib/historico-nao-feito";
 
 // As 3 opções que fazem sentido marcar em campo pelo celular — "Atrasado" é
@@ -819,19 +820,51 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
   // (não muda a cada 8s como o resto da tela) e cruzado localmente contra
   // cada serviço pra decidir se mostra o alerta.
   const [historico, setHistorico] = useState<HistoricoNaoFeitoItem[]>([]);
+  // Timestamp de quando os dados na tela vieram do cache local (aparelho
+  // sem sinal), não do servidor — null quando o que está na tela é a
+  // versão real, recém-confirmada.
+  const [usandoCache, setUsandoCache] = useState<number | null>(null);
+  // Ref (não state) porque só serve pra decidir, dentro de carregar(), se uma
+  // falha de rede é a carga inicial (tenta o cache) ou só um refresh em
+  // segundo plano que não deu certo (ignora, mantém o que já está na tela).
+  // Precisa ser ref: carregar() roda dentro de um setInterval configurado
+  // uma vez no mount, então uma variável de state lida ali ficaria presa no
+  // valor da primeira renderização.
+  const temDadosRef = useRef(false);
 
   // Sem nenhum setState síncrono no início — assim dá pra chamar direto no
   // corpo de um efeito (carga inicial, atualização em segundo plano) sem
   // disparar um render extra fora do fluxo normal do React. Quem precisa
   // mostrar spinner (o botão de atualizar manual) usa atualizarComSpinner.
   async function carregar() {
-    const res = await getParadaCompleta(id);
-    if (res) {
-      setData(res);
-      setStatus("found");
-      setUltimaAtualizacao(new Date());
-    } else {
-      setStatus("not-found");
+    try {
+      const res = await getParadaCompleta(id);
+      if (res) {
+        temDadosRef.current = true;
+        setData(res);
+        setStatus("found");
+        setUltimaAtualizacao(new Date());
+        setUsandoCache(null);
+        void salvarParadaCache(id, res);
+        return;
+      }
+      if (!temDadosRef.current) setStatus("not-found");
+    } catch {
+      // Falha de rede (provavelmente sem sinal). Se a tela já tem algo
+      // carregado, é só um refresh em segundo plano que não deu certo — não
+      // mexe em nada, o que já está na tela continua valendo. Se é a carga
+      // inicial, tenta a última versão salva no aparelho em vez de travar
+      // em "carregando" pra sempre.
+      if (temDadosRef.current) return;
+      const cache = await carregarParadaCache(id);
+      if (cache) {
+        temDadosRef.current = true;
+        setData(cache.parada);
+        setStatus("found");
+        setUsandoCache(cache.salvoEm);
+      } else {
+        setStatus("not-found");
+      }
     }
   }
 
@@ -1048,19 +1081,35 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
     return base.filter((s) => s.status !== "concluido");
   }, [servicosOrdenados, busca, mostrarConcluidas]);
 
+  // As três funções abaixo também gravam a mudança no cache local (não só
+  // no state) — sem isso, uma edição feita offline (foto, status, "não será
+  // feito") sobrevivia até fechar o app, mas se reabrisse ainda sem sinal a
+  // tela voltava a carregar a versão salva ANTES dessa edição.
   function handleCaptured(servicoId: string, patch: Partial<Servico>) {
     setData((prev) => {
       if (!prev) return prev;
-      return { ...prev, servicos: prev.servicos.map((s) => (s.id === servicoId ? { ...s, ...patch } : s)) };
+      const atualizado = { ...prev, servicos: prev.servicos.map((s) => (s.id === servicoId ? { ...s, ...patch } : s)) };
+      void salvarParadaCache(id, atualizado);
+      return atualizado;
     });
   }
 
   function handleOsCriada(servico: Servico) {
-    setData((prev) => (prev ? { ...prev, servicos: [...prev.servicos, servico] } : prev));
+    setData((prev) => {
+      if (!prev) return prev;
+      const atualizado = { ...prev, servicos: [...prev.servicos, servico] };
+      void salvarParadaCache(id, atualizado);
+      return atualizado;
+    });
   }
 
   function handleEventoCriado(evento: TimelineEvento) {
-    setData((prev) => (prev ? { ...prev, timeline: [...prev.timeline, evento] } : prev));
+    setData((prev) => {
+      if (!prev) return prev;
+      const atualizado = { ...prev, timeline: [...prev.timeline, evento] };
+      void salvarParadaCache(id, atualizado);
+      return atualizado;
+    });
   }
 
   if (status === "loading") return <div className="min-h-screen bg-slate-50" />;
@@ -1070,6 +1119,9 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50 px-6 text-center">
         <AlertCircle size={28} className="text-warning-600" />
         <h1 className="text-lg font-bold text-slate-900">Relatório não encontrado</h1>
+        <p className="max-w-xs text-sm text-slate-500">
+          Se você está sem internet e nunca abriu esse relatório neste aparelho antes, não há uma versão salva pra mostrar offline.
+        </p>
         <Link href="/" className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
           Voltar ao Dashboard
         </Link>
@@ -1123,6 +1175,17 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
                 : `Atualizado há ${segundosAtras}s — toque para atualizar`}
         </button>
       </header>
+
+      {usandoCache !== null && (
+        // Diferente das filas de foto/"não será feito" (uma ação pendente de
+        // enviar), isso aqui avisa que a TELA INTEIRA é uma versão salva —
+        // o que está sendo mostrado pode já estar desatualizado em relação
+        // ao que outra pessoa mudou nesse relatório enquanto sem sinal.
+        <div className="flex items-center gap-2.5 border-b border-warning-200 bg-warning-50 px-4 py-2.5 text-xs font-bold text-warning-700">
+          <CloudOff size={14} className="flex-none" />
+          Sem internet — mostrando dados salvos às {new Date(usandoCache).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+        </div>
+      )}
 
       {filaPendente.length > 0 && (
         // Fica visível o tempo todo — é a garantia de que a foto não foi

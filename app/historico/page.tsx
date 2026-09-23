@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { listParadasHistorico } from "@/lib/actions/paradas";
+import { listHistoricoNaoFeito, listParadasHistorico } from "@/lib/actions/paradas";
 import { ehEditor } from "@/lib/auth/session";
 import { HistoricoCharts } from "@/components/dashboard/HistoricoCharts";
 import { PortaoEditor } from "@/components/shared/PortaoEditor";
@@ -13,6 +13,7 @@ export default async function HistoricoPage() {
   // nenhum numero de nenhum relatorio entra no HTML enviado ao navegador.
   const autorizado = await ehEditor();
   const itens = autorizado ? await listParadasHistorico() : [];
+  const historicoNaoFeito = autorizado ? await listHistoricoNaoFeito() : [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -32,7 +33,7 @@ export default async function HistoricoPage() {
 
       <main className="mx-auto max-w-7xl px-6 py-10 sm:px-10">
         {autorizado ? (
-          <HistoricoCharts itens={itens} />
+          <HistoricoCharts itens={itens} historicoNaoFeito={historicoNaoFeito} />
         ) : (
           <PortaoEditor titulo="Acesso Restrito" descricao="Digite a senha para comparar os indicadores entre paradas." />
         )}

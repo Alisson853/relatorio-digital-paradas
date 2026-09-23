@@ -7,7 +7,8 @@ import { sufixoAleatorio } from "@/lib/utils";
 import { paradas } from "@/lib/db/schema";
 import type { CaminhoCriticoItem, Equipe, Kpis, MotivoNaoFeitoCategoria, ParadaCompleta, ParadaResumo, Servico, StatusItem, TimelineEvento } from "@/lib/types";
 import type { HistoricoNaoFeitoItem } from "@/lib/historico-nao-feito";
-import { deriveFotoCapa, deriveFotos, deriveGraficos, deriveKpis, gerarDescricaoExecucao, parseHoras, textoResultadoPadrao } from "@/lib/derive";
+import { calcularPorEquipe, deriveFotoCapa, deriveFotos, deriveGraficos, deriveKpis, gerarDescricaoExecucao, parseHoras, textoResultadoPadrao } from "@/lib/derive";
+import type { EquipePorParada } from "@/lib/derive";
 import { gerarResultadoFinal } from "@/lib/mock-data";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { ehEditor } from "@/lib/auth/session";
@@ -118,11 +119,14 @@ export async function getParadaCompleta(idBruto: string): Promise<ParadaCompleta
 export interface ParadaHistoricoItem {
   resumo: ParadaResumo;
   kpis: Kpis;
+  porEquipe: EquipePorParada[];
 }
 
 // Uma linha por relatório com só o que a página de Histórico precisa —
-// evita carregar servicos/fotos/graficos inteiros de cada parada só pra
-// comparar KPIs entre elas.
+// evita carregar fotos/graficos inteiros de cada parada só pra comparar
+// KPIs entre elas. "servicos" já vem dentro de COLUNAS_RESUMO (rowParaResumo
+// precisa dele pra foto de capa), então calcular a quebra por equipe aqui
+// não custa nenhuma consulta a mais — só processa o que já chegou.
 export async function listParadasHistorico(): Promise<ParadaHistoricoItem[]> {
   // Cruza indicadores de TODOS os relatorios — mesma sensibilidade do backup
   // completo e do checklist de pendencias, e a mesma regra: exige sessao.
@@ -134,7 +138,7 @@ export async function listParadasHistorico(): Promise<ParadaHistoricoItem[]> {
     .select({ ...COLUNAS_RESUMO, kpis: paradas.kpis })
     .from(paradas)
     .orderBy(asc(paradas.data));
-  return rows.map((row) => ({ resumo: rowParaResumo(row), kpis: row.kpis }));
+  return rows.map((row) => ({ resumo: rowParaResumo(row), kpis: row.kpis, porEquipe: calcularPorEquipe(row.servicos) }));
 }
 
 // Exporta TODOS os relatórios de uma vez (fotos, responsáveis, tudo) — bem

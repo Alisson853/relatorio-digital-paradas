@@ -96,6 +96,29 @@ export function parseHoras(tempo: string): number {
   return 0;
 }
 
+export interface EquipePorParada {
+  equipe: Equipe;
+  quantidade: number;
+  horas: number;
+}
+
+// Quebra os serviços de UMA parada por equipe — usado pra comparar equipes
+// ao longo do tempo na tela de Histórico. Diferente de horasPorSetor (que
+// tem um teto pela duração da parada, pra não estourar quando times
+// trabalham em paralelo), aqui soma bruto: é uma comparação ENTRE paradas
+// diferentes, não a duração real de uma parada específica, e buscar a
+// duração de cada uma só pra isso não compensa a complexidade.
+export function calcularPorEquipe(servicos: Servico[]): EquipePorParada[] {
+  return EQUIPES.map((equipe) => {
+    const doTime = servicos.filter((s) => s.equipe === equipe);
+    return {
+      equipe,
+      quantidade: doTime.length,
+      horas: Math.round(doTime.reduce((soma, s) => soma + parseHoras(s.tempoGasto), 0) * 10) / 10,
+    };
+  }).filter((e) => e.quantidade > 0);
+}
+
 export interface DeriveKpisOpcoes {
   totalPlanejado?: number;
   totalExecutadas?: number;
