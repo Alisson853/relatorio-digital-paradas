@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, SearchX } from "lucide-react";
 import type { ParadaResumo, StatusGeral } from "@/lib/types";
@@ -30,6 +30,28 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
     paradas.forEach((p) => vistos.add(codigoMaquina(p.maquina)));
     return Array.from(vistos).sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [paradas]);
+
+  // Abre já filtrado quando o link vem com ?maquina=MP09 — é o que deixa um
+  // QR code colado na própria máquina levar direto pras paradas dela, sem
+  // precisar tocar na aba depois de abrir. Lido do window.location (não
+  // useSearchParams) pelo mesmo motivo do "edit" em /novo: evita o Suspense
+  // boundary que esse hook exige, mantendo o padrão já usado no resto do app.
+  useEffect(() => {
+    const daUrl = new URLSearchParams(window.location.search).get("maquina");
+    if (daUrl) setMaquinaFiltro(daUrl.toUpperCase());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Escolher uma aba também atualiza a URL — assim o link da tela (pra
+  // favoritar, mandar por WhatsApp, ou virar QR code) sempre reflete o que
+  // está sendo mostrado, sem precisar de uma página separada por máquina.
+  function selecionarMaquina(cod: string) {
+    setMaquinaFiltro(cod);
+    const url = new URL(window.location.href);
+    if (cod === "todas") url.searchParams.delete("maquina");
+    else url.searchParams.set("maquina", cod);
+    router.replace(`${url.pathname}${url.search}`, { scroll: false });
+  }
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Excluir este relatório? Essa ação não pode ser desfeita.")) return;
@@ -74,7 +96,7 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
         // dentro do que a aba já escolheu.
         <div className="no-scrollbar mb-4 flex gap-1.5 overflow-x-auto">
           <button
-            onClick={() => setMaquinaFiltro("todas")}
+            onClick={() => selecionarMaquina("todas")}
             className={cn(
               "flex-none rounded-full border px-4 py-2 text-xs font-bold transition-colors",
               maquinaFiltro === "todas" ? "border-brand-600 bg-brand-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
@@ -85,7 +107,7 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
           {maquinas.map((cod) => (
             <button
               key={cod}
-              onClick={() => setMaquinaFiltro(cod)}
+              onClick={() => selecionarMaquina(cod)}
               className={cn(
                 "flex-none rounded-full border px-4 py-2 text-xs font-bold transition-colors",
                 maquinaFiltro === cod ? "border-brand-600 bg-brand-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
