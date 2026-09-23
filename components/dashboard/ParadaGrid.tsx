@@ -6,7 +6,7 @@ import { Search, SearchX } from "lucide-react";
 import type { ParadaResumo, StatusGeral } from "@/lib/types";
 import { clonarParada, deleteParada, getParadaCompleta } from "@/lib/actions/paradas";
 import { triggerJsonDownload } from "@/lib/local-json";
-import { cn } from "@/lib/utils";
+import { cn, codigoMaquina } from "@/lib/utils";
 import { ParadaCard } from "./ParadaCard";
 
 const STATUS_FILTROS: Array<{ value: "todos" | StatusGeral; label: string }> = [
@@ -20,6 +20,16 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
   const router = useRouter();
   const [busca, setBusca] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<"todos" | StatusGeral>("todos");
+  const [maquinaFiltro, setMaquinaFiltro] = useState("todas");
+
+  // Só vira aba a máquina que já tem relatório — nada de aba vazia. Com só
+  // uma máquina no histórico, a aba "Todas" sozinha não ajudaria em nada,
+  // então a fileira inteira some.
+  const maquinas = useMemo(() => {
+    const vistos = new Set<string>();
+    paradas.forEach((p) => vistos.add(codigoMaquina(p.maquina)));
+    return Array.from(vistos).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [paradas]);
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Excluir este relatório? Essa ação não pode ser desfeita.")) return;
@@ -51,12 +61,42 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
     return paradas.filter((p) => {
       const bateBusca = !termo || [p.nome, p.maquina, p.area, p.responsavel].some((campo) => campo.toLowerCase().includes(termo));
       const bateStatus = statusFiltro === "todos" || p.status === statusFiltro;
-      return bateBusca && bateStatus;
+      const bateMaquina = maquinaFiltro === "todas" || codigoMaquina(p.maquina) === maquinaFiltro;
+      return bateBusca && bateStatus && bateMaquina;
     });
-  }, [busca, statusFiltro, paradas]);
+  }, [busca, statusFiltro, maquinaFiltro, paradas]);
 
   return (
     <div>
+      {maquinas.length > 1 && (
+        // Aba de máquina separada da fileira de busca/status, mais acima —
+        // é o agrupamento principal (qual máquina), os outros dois filtram
+        // dentro do que a aba já escolheu.
+        <div className="no-scrollbar mb-4 flex gap-1.5 overflow-x-auto">
+          <button
+            onClick={() => setMaquinaFiltro("todas")}
+            className={cn(
+              "flex-none rounded-full border px-4 py-2 text-xs font-bold transition-colors",
+              maquinaFiltro === "todas" ? "border-brand-600 bg-brand-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+            )}
+          >
+            Todas as Máquinas
+          </button>
+          {maquinas.map((cod) => (
+            <button
+              key={cod}
+              onClick={() => setMaquinaFiltro(cod)}
+              className={cn(
+                "flex-none rounded-full border px-4 py-2 text-xs font-bold transition-colors",
+                maquinaFiltro === cod ? "border-brand-600 bg-brand-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+              )}
+            >
+              {cod}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />

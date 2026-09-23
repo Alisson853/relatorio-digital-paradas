@@ -62,6 +62,19 @@ export function formatDateCompact(iso: string): string {
   return `${String(d.getDate()).padStart(2, "0")} ${mes} ${d.getFullYear()}`;
 }
 
+// Agrupa relatórios pela máquina de verdade, não pelo texto exato digitado —
+// "Máquina de Papel 09" e "Maquina de Papel 09" (com/sem acento, digitado em
+// momentos diferentes por pessoas diferentes) precisam cair na mesma aba, e
+// "Máquina de Papel 11 e Utilidades" precisa cair junto com "Máquina de
+// Papel 11" pura. O nome dessas máquinas sempre carrega o número dela, que
+// é justamente como o time já chama informalmente ("MP09", "MP11") — esse
+// número é a chave de agrupamento. Máquina sem número no nome (raro) cai no
+// próprio nome, sem agrupar com nada.
+export function codigoMaquina(maquina: string): string {
+  const numero = maquina.match(/\d+/);
+  return numero ? `MP${numero[0]}` : maquina.trim();
+}
+
 // A coluna "Executante" da planilha às vezes traz lixo em vez de nome —
 // número de turno, célula com erro de acentuação virando uma sequência de
 // "?". Usado tanto na importação (pra nem gravar isso como responsável)
