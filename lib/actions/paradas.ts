@@ -683,7 +683,7 @@ export async function definirNaoFeito(
   servicoIdBruto: string,
   categoriaBruta: string,
   justificativaBruta: string
-): Promise<{ ok: boolean; erro?: string }> {
+): Promise<{ ok: boolean; erro?: string; fotosRemovidas?: boolean }> {
   const autorizado = await ehEditor();
   if (!autorizado) return { ok: false, erro: "Não autorizado." };
 
@@ -703,16 +703,38 @@ export async function definirNaoFeito(
   const idx = row.servicos.findIndex((s) => s.id === servicoId);
   if (idx === -1) return { ok: false, erro: "Serviço não encontrado." };
 
+  const servico = row.servicos[idx];
+  const atualizado: Servico = { ...servico, naoFeitoCategoria: categoria || undefined, justificativaNaoFeito: justificativa || undefined };
+
+  // Marcar "não será feito" com foto já tirada não faz sentido — a OS não
+  // vai acontecer, então as fotos que já tinha somem: do relatório (viram o
+  // placeholder de novo) e do Blob (apagadas de verdade, não só desanexadas,
+  // senão fica imagem órfã pagando armazenamento sem nenhum serviço
+  // apontando pra ela). Só roda ao MARCAR (categoria não-vazia); desmarcar
+  // não mexe em foto nenhuma.
+  let fotosRemovidas = false;
+  if (categoria) {
+    const urls = [servico.fotoAntes, servico.fotoDurante, servico.fotoDepois].filter((u): u is string => !!u && u !== NO_PHOTO_PLACEHOLDER);
+    if (urls.length > 0) {
+      fotosRemovidas = true;
+      atualizado.fotoAntes = NO_PHOTO_PLACEHOLDER;
+      atualizado.fotoAntesHorario = undefined;
+      atualizado.fotoDurante = undefined;
+      atualizado.fotoDuranteHorario = undefined;
+      atualizado.fotoDepois = NO_PHOTO_PLACEHOLDER;
+      atualizado.fotoDepoisHorario = undefined;
+      // Melhor esforço — mesma lógica de excluirFoto: não trava a marcação
+      // se o Blob já não tiver o arquivo por algum motivo.
+      await Promise.all(urls.map((url) => del(url).catch(() => {})));
+    }
+  }
+
   const servicosAtualizados = [...row.servicos];
-  servicosAtualizados[idx] = {
-    ...servicosAtualizados[idx],
-    naoFeitoCategoria: categoria || undefined,
-    justificativaNaoFeito: justificativa || undefined,
-  };
+  servicosAtualizados[idx] = atualizado;
 
   await getDb().update(paradas).set({ servicos: servicosAtualizados, atualizadoEm: new Date() }).where(eq(paradas.id, paradaId));
 
-  return { ok: true };
+  return { ok: true, fotosRemovidas };
 }
 
 interface NovaOsInput {

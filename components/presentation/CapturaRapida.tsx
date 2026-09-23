@@ -544,9 +544,24 @@ function ServicoCapturaCard({
     }
   }
 
+  // Marcar com foto já tirada não faz sentido — a OS não vai acontecer — e
+  // deixar ali travava só na tela, com a foto de verdade ainda no Blob e no
+  // relatório. Some daqui igual some no servidor (definirNaoFeito também
+  // apaga, é a mesma decisão espelhada dos dois lados): mostra localmente na
+  // hora, sem esperar o round-trip.
   function aplicarNaoFeitoLocal(cat: MotivoNaoFeitoCategoria | "", just: string) {
     lastSavedRef.current = { categoria: cat, justificativa: just };
-    onCaptured(servico.id, { naoFeitoCategoria: cat || undefined, justificativaNaoFeito: just || undefined });
+    const patch: Partial<Servico> = { naoFeitoCategoria: cat || undefined, justificativaNaoFeito: just || undefined };
+    const temFoto = temAntes || temDurante || temDepois;
+    if (cat && temFoto) {
+      patch.fotoAntes = NO_PHOTO_PLACEHOLDER;
+      patch.fotoAntesHorario = undefined;
+      patch.fotoDurante = undefined;
+      patch.fotoDuranteHorario = undefined;
+      patch.fotoDepois = NO_PHOTO_PLACEHOLDER;
+      patch.fotoDepoisHorario = undefined;
+    }
+    onCaptured(servico.id, patch);
   }
 
   // Tenta salvar direto; se estiver sem internet ou a chamada falhar (rede
@@ -607,6 +622,10 @@ function ServicoCapturaCard({
   // precisa esperar o técnico digitar um detalhe pra a marcação valer.
   function handleEscolherCategoria(opcao: MotivoNaoFeitoCategoria) {
     setCategoria(opcao);
+    // Some com qualquer mensagem de captura de foto anterior — ela deixa de
+    // fazer sentido assim que a área de foto trava.
+    setUltimoResultado("");
+    setErro("");
     void salvarNaoFeito(opcao, justificativa.trim());
   }
 
@@ -745,44 +764,58 @@ function ServicoCapturaCard({
         </div>
       )}
 
-      {/* O rotulo antigo era "Toque para escolher a etapa da foto" — uma
-          instrucao, quando o que falta e uma resposta. A etapa ja vem escolhida
-          sozinha (etapaSugerida), entao a pergunta de quem olha nao e "o que eu
-          faco aqui", e sim "onde e que essa foto vai parar". O texto agora diz
-          isso, e diz por extenso qual etapa esta valendo. */}
-      <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-        A próxima foto entra em <span className="text-brand-700">{etapaAtiva}</span>
-        {jaTemFotoNaEtapaAtiva && <span className="text-warning-700"> · vai substituir a atual</span>}
-      </p>
-      <div className="mt-1.5 flex gap-2">
-        <EtapaDot preenchida={temAntes} selecionada={etapaAtiva === "Antes"} horario={servico.fotoAntesHorario} label="Antes" onClick={() => setEtapaEscolhida("Antes")} />
-        <EtapaDot preenchida={temDurante} selecionada={etapaAtiva === "Durante"} horario={servico.fotoDuranteHorario} label="Durante" opcional onClick={() => setEtapaEscolhida("Durante")} />
-        <EtapaDot preenchida={temDepois} selecionada={etapaAtiva === "Depois"} horario={servico.fotoDepoisHorario} label="Depois" onClick={() => setEtapaEscolhida("Depois")} />
-      </div>
+      {/* Marcado como "não será feito": a OS não vai acontecer, então não
+          faz sentido continuar oferecendo tirar foto — trava a área inteira
+          em vez de só deixar do jeito que estava (o que deixaria tirar foto
+          de um serviço que a própria tela diz que não vai ser feito). Some
+          até desmarcar a caixinha lá em cima. */}
+      {categoria ? (
+        <div className="mt-3 flex items-center gap-2 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold text-slate-400">
+          <Lock size={14} className="flex-none" />
+          Fotos bloqueadas — desmarque &quot;Não será feito&quot; pra tirar foto
+        </div>
+      ) : (
+        <>
+          {/* O rotulo antigo era "Toque para escolher a etapa da foto" — uma
+              instrucao, quando o que falta e uma resposta. A etapa ja vem escolhida
+              sozinha (etapaSugerida), entao a pergunta de quem olha nao e "o que eu
+              faco aqui", e sim "onde e que essa foto vai parar". O texto agora diz
+              isso, e diz por extenso qual etapa esta valendo. */}
+          <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+            A próxima foto entra em <span className="text-brand-700">{etapaAtiva}</span>
+            {jaTemFotoNaEtapaAtiva && <span className="text-warning-700"> · vai substituir a atual</span>}
+          </p>
+          <div className="mt-1.5 flex gap-2">
+            <EtapaDot preenchida={temAntes} selecionada={etapaAtiva === "Antes"} horario={servico.fotoAntesHorario} label="Antes" onClick={() => setEtapaEscolhida("Antes")} />
+            <EtapaDot preenchida={temDurante} selecionada={etapaAtiva === "Durante"} horario={servico.fotoDuranteHorario} label="Durante" opcional onClick={() => setEtapaEscolhida("Durante")} />
+            <EtapaDot preenchida={temDepois} selecionada={etapaAtiva === "Depois"} horario={servico.fotoDepoisHorario} label="Depois" onClick={() => setEtapaEscolhida("Depois")} />
+          </div>
 
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        disabled={loading}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3.5 text-sm font-bold text-white transition-colors hover:bg-brand-700 disabled:opacity-60"
-      >
-        {loading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
-        {loading ? "Enviando..." : jaTemFotoNaEtapaAtiva ? `Substituir foto de ${etapaAtiva}` : `Tirar foto de ${etapaAtiva}`}
-      </button>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={loading}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3.5 text-sm font-bold text-white transition-colors hover:bg-brand-700 disabled:opacity-60"
+          >
+            {loading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
+            {loading ? "Enviando..." : jaTemFotoNaEtapaAtiva ? `Substituir foto de ${etapaAtiva}` : `Tirar foto de ${etapaAtiva}`}
+          </button>
 
-      {pendentesDoServico.length > 0 && (
-        <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-warning-700">
-          <WifiOff size={13} className="flex-none" />
-          {pendentesDoServico.length} foto{pendentesDoServico.length > 1 ? "s" : ""} guardada{pendentesDoServico.length > 1 ? "s" : ""} sem internet — envia sozinha quando voltar a conexão
-        </p>
-      )}
+          {pendentesDoServico.length > 0 && (
+            <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-warning-700">
+              <WifiOff size={13} className="flex-none" />
+              {pendentesDoServico.length} foto{pendentesDoServico.length > 1 ? "s" : ""} guardada{pendentesDoServico.length > 1 ? "s" : ""} sem internet — envia sozinha quando voltar a conexão
+            </p>
+          )}
 
-      {ultimoResultado && <p className="mt-2 text-center text-xs font-semibold text-success-600">{ultimoResultado}</p>}
-      {erro && (
-        <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-danger-600">
-          <AlertCircle size={13} />
-          {erro}
-        </p>
+          {ultimoResultado && <p className="mt-2 text-center text-xs font-semibold text-success-600">{ultimoResultado}</p>}
+          {erro && (
+            <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-danger-600">
+              <AlertCircle size={13} />
+              {erro}
+            </p>
+          )}
+        </>
       )}
     </div>
   );
