@@ -6,7 +6,7 @@ import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Too
 import type { ParadaHistoricoItem } from "@/lib/actions/paradas";
 import type { HistoricoNaoFeitoItem } from "@/lib/historico-nao-feito";
 import { MOTIVOS_NAO_FEITO, type Equipe } from "@/lib/types";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, formatDate, formatDateCompact } from "@/lib/utils";
 
 const tooltipStyle = {
   borderRadius: 12,
@@ -63,8 +63,12 @@ function GraficoPorEquipe({ itens }: { itens: ParadaHistoricoItem[] }) {
 
   const dados = itens.map((item) => {
     const linha: Record<string, string | number> = {
-      nome: item.resumo.nome.length > 18 ? `${item.resumo.nome.slice(0, 18)}…` : item.resumo.nome,
+      // Nomes de relatório se repetem entre paradas (ex: várias "Relatório
+      // Preventiva MP09") — a data é o que realmente distingue uma barra da
+      // outra, então é ela que vai no eixo, não o nome truncado.
+      dataLabel: formatDateCompact(item.resumo.data),
       nomeCompleto: item.resumo.nome,
+      dataCompleta: formatDate(item.resumo.data),
       id: item.resumo.id,
     };
     for (const e of item.porEquipe) linha[e.equipe] = metrica === "quantidade" ? e.quantidade : e.horas;
@@ -109,9 +113,9 @@ function GraficoPorEquipe({ itens }: { itens: ParadaHistoricoItem[] }) {
       <ResponsiveContainer width="100%" height="90%">
         <BarChart data={dados} margin={{ left: -20 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#eef1f7" vertical={false} />
-          <XAxis dataKey="nome" tick={{ fontSize: 10, fill: "#64749a" }} interval={0} angle={-20} textAnchor="end" height={50} />
+          <XAxis dataKey="dataLabel" tick={{ fontSize: 10, fill: "#64749a" }} interval={0} angle={-20} textAnchor="end" height={50} />
           <YAxis tick={{ fontSize: 11, fill: "#64749a" }} allowDecimals={metrica === "horas"} />
-          <Tooltip contentStyle={tooltipStyle} labelFormatter={(_, p) => p?.[0]?.payload?.nomeCompleto} />
+          <Tooltip contentStyle={tooltipStyle} labelFormatter={(_, p) => `${p?.[0]?.payload?.nomeCompleto} — ${p?.[0]?.payload?.dataCompleta}`} />
           {equipesAtivas.map((eq) => (
             <Bar key={eq} dataKey={eq} name={eq} radius={[4, 4, 0, 0]} fill={CORES_EQUIPE[eq]} />
           ))}
@@ -157,7 +161,10 @@ export function HistoricoCharts({ itens, historicoNaoFeito }: { itens: ParadaHis
   }
 
   const dados = itens.map((item) => ({
-    nome: item.resumo.nome.length > 18 ? `${item.resumo.nome.slice(0, 18)}…` : item.resumo.nome,
+    // Nomes de relatório se repetem entre paradas (ex: várias "Relatório
+    // Preventiva MP09") — a data é o que realmente distingue uma barra da
+    // outra nos gráficos, então é ela que vai no eixo, não o nome truncado.
+    dataLabel: formatDateCompact(item.resumo.data),
     nomeCompleto: item.resumo.nome,
     data: formatDate(item.resumo.data),
     maquina: item.resumo.maquina,
@@ -198,9 +205,9 @@ export function HistoricoCharts({ itens, historicoNaoFeito }: { itens: ParadaHis
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={dados} margin={{ left: -20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eef1f7" vertical={false} />
-              <XAxis dataKey="nome" tick={{ fontSize: 10, fill: "#64749a" }} interval={0} angle={-20} textAnchor="end" height={50} />
+              <XAxis dataKey="dataLabel" tick={{ fontSize: 10, fill: "#64749a" }} interval={0} angle={-20} textAnchor="end" height={50} />
               <YAxis tick={{ fontSize: 11, fill: "#64749a" }} domain={[0, 100]} />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v) => `${v}%`} labelFormatter={(_, p) => p?.[0]?.payload?.nomeCompleto} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v) => `${v}%`} labelFormatter={(_, p) => `${p?.[0]?.payload?.nomeCompleto} — ${p?.[0]?.payload?.data}`} />
               <Line type="monotone" dataKey="eficiencia" stroke="#1b4d99" strokeWidth={2.5} dot={{ r: 4 }} />
             </LineChart>
           </ResponsiveContainer>
@@ -210,9 +217,9 @@ export function HistoricoCharts({ itens, historicoNaoFeito }: { itens: ParadaHis
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={dados} margin={{ left: -20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eef1f7" vertical={false} />
-              <XAxis dataKey="nome" tick={{ fontSize: 10, fill: "#64749a" }} interval={0} angle={-20} textAnchor="end" height={50} />
+              <XAxis dataKey="dataLabel" tick={{ fontSize: 10, fill: "#64749a" }} interval={0} angle={-20} textAnchor="end" height={50} />
               <YAxis tick={{ fontSize: 11, fill: "#64749a" }} />
-              <Tooltip contentStyle={tooltipStyle} labelFormatter={(_, p) => p?.[0]?.payload?.nomeCompleto} />
+              <Tooltip contentStyle={tooltipStyle} labelFormatter={(_, p) => `${p?.[0]?.payload?.nomeCompleto} — ${p?.[0]?.payload?.data}`} />
               <Bar dataKey="horasTrabalhadas" radius={[6, 6, 0, 0]} fill="#4a83d4" />
             </BarChart>
           </ResponsiveContainer>
@@ -222,9 +229,9 @@ export function HistoricoCharts({ itens, historicoNaoFeito }: { itens: ParadaHis
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={dados} margin={{ left: -20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eef1f7" vertical={false} />
-              <XAxis dataKey="nome" tick={{ fontSize: 10, fill: "#64749a" }} interval={0} angle={-20} textAnchor="end" height={50} />
+              <XAxis dataKey="dataLabel" tick={{ fontSize: 10, fill: "#64749a" }} interval={0} angle={-20} textAnchor="end" height={50} />
               <YAxis tick={{ fontSize: 11, fill: "#64749a" }} />
-              <Tooltip contentStyle={tooltipStyle} labelFormatter={(_, p) => p?.[0]?.payload?.nomeCompleto} />
+              <Tooltip contentStyle={tooltipStyle} labelFormatter={(_, p) => `${p?.[0]?.payload?.nomeCompleto} — ${p?.[0]?.payload?.data}`} />
               <Bar dataKey="pendencias" radius={[6, 6, 0, 0]} fill="#b8760f" />
             </BarChart>
           </ResponsiveContainer>
@@ -234,9 +241,9 @@ export function HistoricoCharts({ itens, historicoNaoFeito }: { itens: ParadaHis
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={dados} margin={{ left: -20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eef1f7" vertical={false} />
-              <XAxis dataKey="nome" tick={{ fontSize: 10, fill: "#64749a" }} interval={0} angle={-20} textAnchor="end" height={50} />
+              <XAxis dataKey="dataLabel" tick={{ fontSize: 10, fill: "#64749a" }} interval={0} angle={-20} textAnchor="end" height={50} />
               <YAxis tick={{ fontSize: 11, fill: "#64749a" }} />
-              <Tooltip contentStyle={tooltipStyle} labelFormatter={(_, p) => p?.[0]?.payload?.nomeCompleto} />
+              <Tooltip contentStyle={tooltipStyle} labelFormatter={(_, p) => `${p?.[0]?.payload?.nomeCompleto} — ${p?.[0]?.payload?.data}`} />
               <Bar dataKey="osPlanejadas" name="Planejadas" radius={[6, 6, 0, 0]} fill="#b7cff0" />
               <Bar dataKey="osConcluidas" name="Concluídas" radius={[6, 6, 0, 0]} fill="#1b4d99" />
             </BarChart>
