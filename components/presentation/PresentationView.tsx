@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { ParadaCompleta } from "@/lib/types";
-import { SECTIONS } from "@/lib/sections";
+import { SECTIONS, type SectionMeta } from "@/lib/sections";
 import { cn } from "@/lib/utils";
 import { Sidebar } from "./Sidebar";
 import { FitToScreen } from "./FitToScreen";
@@ -21,6 +21,35 @@ import { PrintReport } from "./PrintReport";
 export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qrDataUrl?: string }) {
   const [presentationMode, setPresentationMode] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  // Setado quando o card "Etiqueta Vermelha"/"Etiqueta Amarela" do Resumo
+  // Executivo é clicado — estreita o carrossel de Serviços a essa categoria.
+  // Mora aqui (não dentro de ServicesSection) porque quem dispara a mudança
+  // é a seção de Resumo, uma irmã dela.
+  const [filtroEtiqueta, setFiltroEtiqueta] = useState<"Etiqueta Vermelha" | "Etiqueta Amarela" | null>(null);
+
+  // Refs (não state) pra irParaSecao sempre enxergar a versão mais recente
+  // de "sections"/"presentationMode" sem precisar entrar nas dependências do
+  // useMemo de secoesAtivas — que ficaria circular, já que "sections" é
+  // derivado DE secoesAtivas. Atualizadas a cada render, lidas só dentro do
+  // clique (bem depois desse render terminar), então nunca chegam atrasadas
+  // na hora que importa.
+  const sectionsRef = useRef<SectionMeta[]>([]);
+  const presentationModeRef = useRef(presentationMode);
+  presentationModeRef.current = presentationMode;
+
+  // Vai direto pra uma seção pelo id — usado pelos cards do Resumo
+  // Executivo ("Pendências", "Etiqueta Vermelha/Amarela") pra pular pra onde
+  // aquele número é detalhado. Referência estável (deps vazias) de propósito:
+  // é o que permite usá-la dentro de secoesAtivas sem criar uma dependência
+  // circular com "sections".
+  const irParaSecao = useCallback((id: string) => {
+    const idx = sectionsRef.current.findIndex((s) => s.id === id);
+    if (idx === -1) return;
+    setActiveIndex(idx);
+    if (!presentationModeRef.current) {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, []);
 
   // Cada seção só entra na apresentação se tiver conteúdo — evita ficar
   // exibindo um título vazio (ex: "Linha do Tempo" sem nenhum evento).
@@ -31,13 +60,38 @@ export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qr
         node: <CoverSection key="capa" resumo={data.resumo} />,
         bg: "bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800",
       },
-      { id: "resumo", node: <SummarySection key="resumo" kpis={data.kpis} />, bg: "bg-slate-50" },
+      {
+        id: "resumo",
+        node: (
+          <SummarySection
+            key="resumo"
+            kpis={data.kpis}
+            onVerPendencias={() => irParaSecao("resultado")}
+            onVerEtiqueta={(categoria) => {
+              setFiltroEtiqueta(categoria);
+              irParaSecao("servicos");
+            }}
+          />
+        ),
+        bg: "bg-slate-50",
+      },
       data.timeline.length > 0 && {
         id: "timeline",
         node: <TimelineSection key="timeline" timeline={data.timeline} />,
         bg: "bg-white",
       },
-      { id: "servicos", node: <ServicesSection key="servicos" servicos={data.servicos} />, bg: "bg-slate-50" },
+      {
+        id: "servicos",
+        node: (
+          <ServicesSection
+            key="servicos"
+            servicos={data.servicos}
+            filtroCategoria={filtroEtiqueta}
+            onLimparFiltro={() => setFiltroEtiqueta(null)}
+          />
+        ),
+        bg: "bg-slate-50",
+      },
       { id: "fotos", node: <GallerySection key="fotos" fotos={data.fotos} />, bg: "bg-white" },
       { id: "graficos", node: <ChartsSection key="graficos" graficos={data.graficos} />, bg: "bg-slate-50" },
       data.caminhoCritico.length > 0 && {
@@ -52,12 +106,17 @@ export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qr
       },
     ];
     return candidatas.filter((s): s is { id: string; node: React.ReactNode; bg: string } => !!s);
-  }, [data]);
+  }, [data, filtroEtiqueta, irParaSecao]);
 
   const sections = useMemo(
     () => SECTIONS.filter((meta) => secoesAtivas.some((s) => s.id === meta.id)),
     [secoesAtivas]
   );
+  // Sincroniza a ref com a versão fresca de "sections" a cada render — é o
+  // que faz irParaSecao (referência estável, criada uma vez) sempre enxergar
+  // a lista atual sem precisar recriar a função nem entrar nas dependências
+  // de secoesAtivas.
+  sectionsRef.current = sections;
   const sectionNodes = useMemo(() => secoesAtivas.map((s) => s.node), [secoesAtivas]);
   const SECTION_BG = useMemo(() => secoesAtivas.map((s) => s.bg), [secoesAtivas]);
 

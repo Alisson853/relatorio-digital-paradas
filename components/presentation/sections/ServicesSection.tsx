@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, ChevronLeft, ChevronRight, Clock, MapPin, Users2, Wrench, Zap } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Clock, MapPin, Users2, Wrench, X, Zap } from "lucide-react";
 import type { Servico } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -194,27 +194,58 @@ function ServiceSlide({ servico }: { servico: Servico }) {
   );
 }
 
-export function ServicesSection({ servicos: todosServicos }: { servicos: Servico[] }) {
+interface Props {
+  servicos: Servico[];
+  // Setado quando alguém chega aqui clicando no card "Etiqueta Vermelha"/
+  // "Etiqueta Amarela" do Resumo Executivo — estreita o carrossel só às OS
+  // daquela categoria, em vez de precisar passar por todas pra achá-las.
+  filtroCategoria?: string | null;
+  onLimparFiltro?: () => void;
+}
+
+export function ServicesSection({ servicos: todosServicos, filtroCategoria, onLimparFiltro }: Props) {
   const [index, setIndex] = useState(0);
-  const servicos = servicosComFoto(todosServicos);
+  const comFoto = servicosComFoto(todosServicos);
+  const servicos = filtroCategoria ? comFoto.filter((s) => s.categoria === filtroCategoria) : comFoto;
   const total = servicos.length;
   const atual = servicos[index];
 
+  // Volta pro início do carrossel sempre que o filtro muda — senão o índice
+  // de antes (ex: 5) pode não existir mais na lista filtrada (que tem só 2),
+  // e a tela mostraria o card errado ou nenhum.
+  useEffect(() => {
+    setIndex(0);
+  }, [filtroCategoria]);
+
   const goPrev = () => setIndex((i) => Math.max(0, i - 1));
   const goNext = () => setIndex((i) => Math.min(total - 1, i + 1));
+
+  const chipFiltro = filtroCategoria && (
+    <button
+      type="button"
+      onClick={onLimparFiltro}
+      className="mb-4 flex items-center gap-1.5 rounded-full bg-brand-600 px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-brand-700"
+    >
+      Filtrando: {filtroCategoria}
+      <X size={13} />
+    </button>
+  );
 
   if (total === 0 || !atual) {
     const temServicosSemFoto = todosServicos.length > 0;
     return (
       <section id="servicos" className="section-screen flex items-center bg-slate-50 px-6 py-24 sm:px-10">
         <div className="mx-auto w-full max-w-6xl">
+          {chipFiltro}
           <SectionHeading
             eyebrow="Serviços Executados"
-            title="Nenhum Serviço Registrado"
+            title={filtroCategoria ? `Nenhuma OS com ${filtroCategoria}` : "Nenhum Serviço Registrado"}
             description={
-              temServicosSemFoto
-                ? "As OS desta parada ainda não têm foto — assim que a primeira for enviada, o serviço aparece aqui."
-                : "Nenhuma ordem de serviço foi cadastrada para esta parada."
+              filtroCategoria
+                ? "Nenhum dos serviços com foto desta parada está marcado com essa categoria."
+                : temServicosSemFoto
+                  ? "As OS desta parada ainda não têm foto — assim que a primeira for enviada, o serviço aparece aqui."
+                  : "Nenhuma ordem de serviço foi cadastrada para esta parada."
             }
           />
           <div className="flex flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-slate-200 bg-white py-20 text-center">
@@ -222,9 +253,11 @@ export function ServicesSection({ servicos: todosServicos }: { servicos: Servico
               <Wrench size={22} />
             </div>
             <p className="text-sm font-medium text-slate-400">
-              {temServicosSemFoto
-                ? `${todosServicos.length} OS aguardando foto para entrar na apresentação.`
-                : "Nenhum serviço foi adicionado a este relatório."}
+              {filtroCategoria
+                ? "Experimente limpar o filtro pra ver todos os serviços."
+                : temServicosSemFoto
+                  ? `${todosServicos.length} OS aguardando foto para entrar na apresentação.`
+                  : "Nenhum serviço foi adicionado a este relatório."}
             </p>
           </div>
         </div>
@@ -235,6 +268,7 @@ export function ServicesSection({ servicos: todosServicos }: { servicos: Servico
   return (
     <section id="servicos" className="section-screen flex items-center bg-slate-50 px-4 py-8 sm:px-6 sm:py-10">
       <div className="mx-auto w-full max-w-7xl">
+        {chipFiltro}
         <div className="relative flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_4px_24px_rgba(16,24,40,0.06)] sm:p-10 lg:h-[90vh]">
           <div className="absolute inset-y-0 left-0 w-1.5 bg-brand-600" />
 

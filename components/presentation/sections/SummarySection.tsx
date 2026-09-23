@@ -5,7 +5,17 @@ import type { Kpis } from "@/lib/types";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 
-export function SummarySection({ kpis }: { kpis: Kpis }) {
+interface Props {
+  kpis: Kpis;
+  // Some indicadores são um resumo de algo detalhado em outra seção — os
+  // callbacks levam a apresentação até lá quando o card é clicado. Opcionais
+  // porque o PrintReport (export estático) reaproveita esse mesmo componente
+  // sem ter pra onde navegar.
+  onVerPendencias?: () => void;
+  onVerEtiqueta?: (categoria: "Etiqueta Vermelha" | "Etiqueta Amarela") => void;
+}
+
+export function SummarySection({ kpis, onVerPendencias, onVerEtiqueta }: Props) {
   const cards = [
     { label: "OS Planejadas", value: kpis.osPlanejadas, icon: ClipboardList, accent: "brand" as const },
     { label: "OS Concluídas", value: kpis.osConcluidas, icon: CheckCircle2, accent: "success" as const },
@@ -15,9 +25,15 @@ export function SummarySection({ kpis }: { kpis: Kpis }) {
     { label: "OS Mecânica", value: kpis.equipeMecanica, icon: HardHat, accent: "brand" as const },
     { label: "OS Instrumentação", value: kpis.equipeInstrumentacao, icon: Radar, accent: "brand" as const },
     { label: "Segurança", value: kpis.seguranca, suffix: "%", icon: ShieldCheck, accent: "success" as const },
-    { label: "Pendências", value: kpis.pendencias, icon: AlertTriangle, accent: kpis.pendencias > 0 ? "warning" as const : "success" as const },
-    { label: "Etiqueta Vermelha", value: kpis.etiquetaVermelha, icon: Tag, accent: "danger" as const },
-    { label: "Etiqueta Amarela", value: kpis.etiquetaAmarela, icon: Tag, accent: "warning" as const },
+    {
+      label: "Pendências",
+      value: kpis.pendencias,
+      icon: AlertTriangle,
+      accent: kpis.pendencias > 0 ? ("warning" as const) : ("success" as const),
+      onClick: onVerPendencias,
+    },
+    { label: "Etiqueta Vermelha", value: kpis.etiquetaVermelha, icon: Tag, accent: "danger" as const, onClick: onVerEtiqueta && (() => onVerEtiqueta("Etiqueta Vermelha")) },
+    { label: "Etiqueta Amarela", value: kpis.etiquetaAmarela, icon: Tag, accent: "warning" as const, onClick: onVerEtiqueta && (() => onVerEtiqueta("Etiqueta Amarela")) },
   ];
 
   return (
