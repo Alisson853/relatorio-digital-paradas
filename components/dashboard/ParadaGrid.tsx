@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, SearchX } from "lucide-react";
+import { ScrollText, Search, SearchX } from "lucide-react";
 import type { ParadaResumo, StatusGeral } from "@/lib/types";
 import { clonarParada, deleteParada, getParadaCompleta } from "@/lib/actions/paradas";
 import { triggerJsonDownload } from "@/lib/local-json";
+import { useEditorMode } from "@/lib/useEditorMode";
 import { cn, codigoMaquina } from "@/lib/utils";
 import { ParadaCard } from "./ParadaCard";
 
@@ -18,6 +19,7 @@ const STATUS_FILTROS: Array<{ value: "todos" | StatusGeral; label: string }> = [
 
 export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
   const router = useRouter();
+  const { isEditor } = useEditorMode();
   const [busca, setBusca] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<"todos" | StatusGeral>("todos");
   const [maquinaFiltro, setMaquinaFiltro] = useState("todas");
@@ -105,16 +107,32 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
             Todas as Máquinas
           </button>
           {maquinas.map((cod) => (
-            <button
+            <div
               key={cod}
-              onClick={() => selecionarMaquina(cod)}
               className={cn(
-                "flex-none rounded-full border px-4 py-2 text-xs font-bold transition-colors",
-                maquinaFiltro === cod ? "border-brand-600 bg-brand-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                "flex flex-none items-stretch overflow-hidden rounded-full border transition-colors",
+                maquinaFiltro === cod ? "border-brand-600 bg-brand-600" : "border-slate-200 bg-white"
               )}
             >
-              {cod}
-            </button>
+              <button
+                onClick={() => selecionarMaquina(cod)}
+                className={cn("px-4 py-2 text-xs font-bold", maquinaFiltro === cod ? "text-white" : "text-slate-600 hover:bg-slate-50")}
+              >
+                {cod}
+              </button>
+              {isEditor && (
+                <a
+                  href={`/api/export/rtf/maquina/${cod}`}
+                  title={`Baixar RTF com o QR code de ${cod} (colar no Mantec)`}
+                  className={cn(
+                    "flex items-center border-l px-2.5 transition-colors",
+                    maquinaFiltro === cod ? "border-white/25 text-white/80 hover:bg-brand-700" : "border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+                  )}
+                >
+                  <ScrollText size={13} />
+                </a>
+              )}
+            </div>
           ))}
         </div>
       )}

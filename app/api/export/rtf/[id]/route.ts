@@ -9,15 +9,37 @@ import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { gerarQrCodeBuffer, urlDaParada } from "@/lib/qrcode";
 import { formatDate, statusLabel } from "@/lib/utils";
 import type { ParadaCompleta } from "@/lib/types";
+import {
+  C_BRAND,
+  C_DANGER,
+  C_INK,
+  C_NAVY,
+  C_SLATE,
+  C_SLATE_LIGHT,
+  C_SUCCESS,
+  C_WARNING,
+  C_WHITE,
+  type Celula,
+  envelopeRtf,
+  eyebrow,
+  hyperlink,
+  pageBreak,
+  pageTitle,
+  para,
+  paraRaw,
+  run,
+  tabela,
+} from "@/lib/rtf";
 
 export const dynamic = "force-dynamic";
 
 // RTF puro, feito pra colar direto num campo de texto de sistema de manutenção
 // (Mantec e afins). Fotos vêm embutidas como \pict — redimensionadas e
 // recomprimidas antes, senão o arquivo fica gigante e é o que costuma travar
-// esse tipo de importação em sistema legado.
+// esse tipo de importação em sistema legado. As primitivas de parágrafo,
+// tabela e imagem RTF ficam em lib/rtf.ts, reaproveitadas também pelo export
+// de QR code por máquina (app/api/export/rtf/maquina/[codigo]).
 
-const PAGE_WIDTH_TWIPS = 9026; // A4, margem de 1" de cada lado
 const FOTO_LARGURA_PX = 320;
 
 async function fetchImagemRtf(url: string, origin: string): Promise<{ hex: string; width: number; height: number } | null> {
@@ -33,139 +55,6 @@ async function fetchImagemRtf(url: string, origin: string): Promise<{ hex: strin
   } catch {
     return null;
   }
-}
-
-// Quebra o hex em linhas — evita uma única linha gigantesca, que alguns
-// leitores de RTF truncam ou travam ao processar.
-function pictBlock(foto: { hex: string; width: number; height: number }): string {
-  const goalW = Math.round(foto.width * 15); // ~96dpi -> twips
-  const goalH = Math.round(foto.height * 15);
-  const linhasHex: string[] = [];
-  for (let i = 0; i < foto.hex.length; i += 128) linhasHex.push(foto.hex.slice(i, i + 128));
-  return `{\\pict\\jpegblip\\picw${foto.width}\\pich${foto.height}\\picwgoal${goalW}\\pichgoal${goalH}\n${linhasHex.join("\n")}\n}`;
-}
-
-// Paleta como índice na tabela de cores do RTF (ordem importa).
-const COLORS = ["auto", "101828", "1B4D99", "64749A", "0F8A5F", "B8760F", "C23A2F", "FFFFFF", "0A1E3F", "F7F9FC", "DBE2EE"] as const;
-const [, C_INK, C_BRAND, C_SLATE, C_SUCCESS, C_WARNING, C_DANGER, C_WHITE, C_NAVY, C_SLATE_LIGHT, C_BORDER] = COLORS.map((_, i) => i);
-
-function esc(texto: string): string {
-  return String(texto ?? "")
-    .split("")
-    .map((ch) => {
-      const code = ch.codePointAt(0) ?? 0;
-      if (ch === "\\") return "\\\\";
-      if (ch === "{") return "\\{";
-      if (ch === "}") return "\\}";
-      if (ch === "\n") return "\\line ";
-      if (code > 126) return `\\u${code}?`;
-      return ch;
-    })
-    .join("");
-}
-
-interface RunOpts {
-  bold?: boolean;
-  italic?: boolean;
-  size?: number; // em pt
-  color?: number;
-  bg?: number;
-  font?: 0 | 1 | 2; // 0=display, 1=corpo, 2=mono
-  caps?: boolean;
-  letterSpacing?: number; // em twips (~1/20 pt), usado só de leve
-}
-
-function run(texto: string, opts: RunOpts = {}): string {
-  const parts: string[] = [];
-  if (opts.font !== undefined) parts.push(`\\f${opts.font}`);
-  if (opts.size) parts.push(`\\fs${opts.size * 2}`);
-  if (opts.color !== undefined) parts.push(`\\cf${opts.color}`);
-  if (opts.bg !== undefined) parts.push(`\\highlight${opts.bg}`);
-  if (opts.bold) parts.push("\\b");
-  if (opts.italic) parts.push("\\i");
-  if (opts.caps) parts.push("\\caps");
-  return `{${parts.join("")} ${esc(opts.caps ? texto.toUpperCase() : texto)}}`;
-}
-
-interface ParaOpts {
-  align?: "l" | "c" | "r";
-  spaceBefore?: number;
-  spaceAfter?: number;
-  borderBottom?: boolean;
-}
-
-// Monta o preâmbulo \pard de um parágrafo, sem tocar no conteúdo — usado
-// tanto por para() (que escapa o texto) quanto por paraRaw() (que recebe
-// markup RTF já pronto, ex: um campo HYPERLINK, e não pode ser escapado de novo).
-function pardPreambulo(paraOpts: ParaOpts): string {
-  const align = paraOpts.align === "c" ? "\\qc" : paraOpts.align === "r" ? "\\qr" : "\\ql";
-  const sb = paraOpts.spaceBefore !== undefined ? `\\sb${paraOpts.spaceBefore}` : "";
-  const sa = paraOpts.spaceAfter !== undefined ? `\\sa${paraOpts.spaceAfter}` : "\\sa120";
-  const border = paraOpts.borderBottom ? `\\brdrb\\brdrs\\brdrw10\\brsp40\\brdrcf${C_BORDER}` : "";
-  return `\\pard${align}${sb}${sa}${border}`;
-}
-
-function para(texto: string, runOpts: RunOpts = {}, paraOpts: ParaOpts = {}): string {
-  return `${pardPreambulo(paraOpts)} ${run(texto, runOpts)}\\par\n`;
-}
-
-// Pra conteúdo que já é markup RTF pronto (ex: um campo HYPERLINK) — nunca
-// passar texto solto aqui, ele não passa pelo esc().
-function paraRaw(rtf: string, paraOpts: ParaOpts = {}): string {
-  return `${pardPreambulo(paraOpts)} ${rtf}\\par\n`;
-}
-
-interface Celula {
-  texto: string;
-  run?: RunOpts;
-  bg?: number;
-  pict?: { hex: string; width: number; height: number };
-  legenda?: string;
-}
-
-// Uma tabela simples: cada linha é um array de células, larguras em frações (somam 1).
-function tabela(linhas: Celula[][], larguras: number[]): string {
-  let out = "";
-  const bordas = "\\clbrdrt\\brdrs\\brdrw5\\brdrcf" + C_BORDER + "\\clbrdrb\\brdrs\\brdrw5\\brdrcf" + C_BORDER + "\\clbrdrl\\brdrs\\brdrw5\\brdrcf" + C_BORDER + "\\clbrdrr\\brdrs\\brdrw5\\brdrcf" + C_BORDER;
-  for (const linha of linhas) {
-    out += "\\trowd\\trgaph80\\trleft0\\trpaddl80\\trpaddr80\\trpaddt60\\trpaddb60\n";
-    let acumulado = 0;
-    for (const largura of larguras) {
-      acumulado += Math.round(largura * PAGE_WIDTH_TWIPS);
-      out += `${bordas}\\cellx${acumulado}\n`;
-    }
-    for (let i = 0; i < linha.length; i++) {
-      const celula = linha[i];
-      const bg = celula.bg !== undefined ? `\\clcbpat${celula.bg}` : "";
-      if (celula.pict) {
-        out += `\\pard\\intbl\\qc${bg} ${pictBlock(celula.pict)}\\par\n`;
-        if (celula.legenda) out += `\\pard\\intbl\\qc ${run(celula.legenda, { size: 8, color: C_SLATE, font: 1 })}\\par\n`;
-        out += "\\cell\n";
-      } else {
-        out += `\\pard\\intbl${bg} ${run(celula.texto, celula.run)}\\cell\n`;
-      }
-    }
-    out += "\\row\n";
-  }
-  return out;
-}
-
-function eyebrow(texto: string): string {
-  return para(texto, { bold: true, size: 9, color: C_BRAND, font: 1, caps: true }, { spaceBefore: 240, spaceAfter: 40 });
-}
-
-function pageTitle(texto: string): string {
-  return para(texto, { bold: true, size: 20, color: C_NAVY, font: 0 }, { spaceAfter: 160 });
-}
-
-function pageBreak(): string {
-  return "\\page\n";
-}
-
-// Link clicável de verdade (campo HYPERLINK do RTF) — útil quando o sistema
-// que recebe o RTF (Mantec) descarta imagens e só o QR não bastaria.
-function hyperlink(url: string, texto: string): string {
-  return `{\\field{\\*\\fldinst HYPERLINK "${url}"}{\\fldrslt ${run(texto, { color: C_BRAND, size: 8, font: 2 })}}}`;
 }
 
 async function buildCapa(data: ParadaCompleta): Promise<string> {
@@ -392,9 +281,6 @@ function buildResultado(data: ParadaCompleta): string {
 }
 
 async function buildRtf(data: ParadaCompleta, origin: string): Promise<string> {
-  const fontTable = "{\\fonttbl{\\f0\\froman Cambria;}{\\f1\\fswiss Calibri;}{\\f2\\fmodern Consolas;}}";
-  const colorTable = "{\\colortbl;" + COLORS.slice(1).map((hex) => `\\red${parseInt(hex.slice(0, 2), 16)}\\green${parseInt(hex.slice(2, 4), 16)}\\blue${parseInt(hex.slice(4, 6), 16)};`).join("") + "}";
-
   let body = "";
   body += await buildCapa(data);
   body += pageBreak();
@@ -419,7 +305,7 @@ async function buildRtf(data: ParadaCompleta, origin: string): Promise<string> {
   body += pageBreak();
   body += buildResultado(data);
 
-  return `{\\rtf1\\ansi\\ansicpg1252\\deff1\\deflang1046\n${fontTable}\n${colorTable}\n\\margl1440\\margr1440\\margt1440\\margb1440\n${body}}`;
+  return envelopeRtf(body);
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
