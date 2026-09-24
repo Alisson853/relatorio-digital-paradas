@@ -1182,26 +1182,35 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
           )}
         </div>
         {totalServicos > 0 && (
-          <div className="px-4 pb-3">
-            <div className="mb-1 flex items-center justify-between text-[11px] font-bold text-slate-500">
-              <span>
-                {concluidasCount}/{totalServicos} OS concluídas
-                {/* Só aparece quando tem algo em andamento — senão vira ruído
-                    fixo no header assim que a parada começa e nada ainda foi
-                    tocado no celular. */}
-                {emAndamentoCount > 0 && <span className="text-brand-600"> · {emAndamentoCount} em andamento</span>}
-              </span>
-              <span>{percConcluido}%</span>
+          <div className="space-y-2 px-4 pb-3">
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px] font-bold text-slate-500">
+                <span>
+                  {concluidasCount}/{totalServicos} OS concluídas
+                </span>
+                <span>{percConcluido}%</span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full rounded-full bg-success-600 transition-all" style={{ width: `${percConcluido}%` }} />
+              </div>
             </div>
-            {/* Duas faixas empilhadas no mesmo trilho: verde (concluído) e azul
-                (em andamento), lado a lado. O arredondado vem só do container
-                (overflow-hidden + rounded-full) — colocar rounded-full em cada
-                faixa também criaria um vão em forma de lente onde elas se
-                encontram. */}
-            <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full bg-success-600 transition-all" style={{ width: `${percConcluido}%` }} />
-              <div className="h-full bg-brand-500 transition-all" style={{ width: `${percEmAndamento}%` }} />
-            </div>
+            {/* Barra própria pra "em andamento", separada da de concluído — só
+                aparece quando tem algo nesse status, senão vira uma segunda
+                barra vazia (ruído) assim que a parada começa e nada ainda foi
+                tocado no celular. */}
+            {emAndamentoCount > 0 && (
+              <div>
+                <div className="mb-1 flex items-center justify-between text-[11px] font-bold text-brand-600">
+                  <span>
+                    {emAndamentoCount}/{totalServicos} OS em andamento
+                  </span>
+                  <span>{percEmAndamento}%</span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full rounded-full bg-brand-500 transition-all" style={{ width: `${percEmAndamento}%` }} />
+                </div>
+              </div>
+            )}
           </div>
         )}
         <button
