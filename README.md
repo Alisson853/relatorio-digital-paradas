@@ -86,11 +86,47 @@ Variáveis de ambiente necessárias (veja `.env.local` — nunca committado):
 
 | Variável | Para quê |
 |---|---|
-| `DATABASE_URL` | Conexão com o Neon Postgres |
+| `APP_DATABASE_URL` | Conexão com o Neon Postgres, pelo role limitado `app_paradas` (SELECT/INSERT/UPDATE/DELETE, sem DDL) — é a que o app usa em runtime |
+| `DATABASE_URL` | Conexão com o role DONO do banco — só para rodar migração (`drizzle-kit`); fallback de `APP_DATABASE_URL` se ela não estiver definida |
 | `BLOB_READ_WRITE_TOKEN` | Upload de fotos no Vercel Blob |
-| `EDITOR_PASSWORD` | Senha do modo editor (também usada pra assinar o token de sessão) |
+| `EDITOR_PASSWORD_HASH` | Hash scrypt da senha do modo editor (preferido — gerado com `scripts/gerar-hash-senha.mjs`) |
+| `EDITOR_PASSWORD` | Senha em texto puro do modo editor — fallback de `EDITOR_PASSWORD_HASH` para deploys ainda não migrados; evite em produção |
+| `SESSION_SECRET` | Segredo usado para assinar (HMAC) o token de sessão do editor — se ausente, cai para `EDITOR_PASSWORD_HASH`/`EDITOR_PASSWORD` |
 
-Migrações de schema: `npx dotenv -e .env.local -- npx drizzle-kit push`.
+Migrações de schema: `npx dotenv -e .env.local -- npx drizzle-kit push` (usa `DATABASE_URL`, a credencial de dono — nunca `APP_DATABASE_URL`).
+
+## Escrita e concorrência
+
+Toda mutação pontual (foto, status, "não será feito", OS/evento rápido) usa concorrência
+otimista sobre a coluna `atualizado_em` (`lib/db/paradas-repo.ts`): lê o relatório, tenta
+gravar só se a versão não mudou desde a leitura, e relê+reaplica automaticamente em caso de
+conflito (até 5 tentativas). O formulário `/novo` (que reenvia o relatório inteiro) usa a
+mesma coluna para **recusar** salvar por cima de uma mudança concorrente, em vez de tentar
+de novo — quem está editando decide se recarrega. Não existe transação/lock no banco: o
+driver (`neon-http`) fala por HTTP, sem conexão persistente, então cada escrita é um
+`UPDATE ... WHERE atualizado_em = X` de via única.
+
+## Offline e sincronização
+
+A Captura Rápida (`/parada/[id]/fotos`) guarda três filas independentes no IndexedDB do
+aparelho (fotos, "não será feito", mudança de status — `lib/offline-fotos.ts`,
+`lib/offline-nao-feito.ts`, `lib/offline-status.ts`), processadas por um motor comum
+(`lib/offline-sync.ts`) que tenta reenviar a cada 20s e no evento `online`. Um item que falha
+por rede continua tentando sozinho; um item recusado pelo servidor vira "erro" e só é
+tentado de novo com o botão "Tentar novamente" explícito — evita repetir uma rejeição de
+negócio pra sempre. Cada fila tem uma guarda de reentrância própria para nunca processar a
+si mesma duas vezes em paralelo.
+
+## Testes
+
+```bash
+npx vitest run
+```
+
+Cobre a lógica pura de concorrência, mutações de serviço, filtros, exportação tabular e as
+filas offline — deliberadamente sem jsdom/Testing Library: componentes `"use client"` são
+validados por inspeção + TypeScript, não por teste automatizado (ver comentários em
+`vitest.config.mts`).
 
 ## Deploy
 

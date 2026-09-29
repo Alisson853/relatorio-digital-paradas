@@ -7,8 +7,28 @@ function pareceHeic(file: File): boolean {
   return /heic|heif/.test(alvo);
 }
 
+// Bloco F: nada aqui limitava o tamanho do arquivo ORIGINAL antes de
+// carregá-lo inteiro — FileReader.readAsDataURL segura o arquivo inteiro (mais
+// ~33% do base64) na memória, e o <canvas> decodifica a imagem nas dimensões
+// REAIS antes de qualquer redimensionamento acontecer (uma foto de 48MP vira
+// ~190MB de pixels crus só pra virar um JPEG de 1600px de largura no fim).
+// Este projeto já teve problema de memória antes; uma foto fora do comum
+// (arquivo trocado, câmera em modo de altíssima resolução) não pode travar a
+// aba no celular em campo. 35MB é folgado o bastante pra qualquer JPEG normal
+// de câmera de celular, mas barra o caso extremo antes de tocar em qualquer
+// API de imagem.
+export const LIMITE_BYTES_FOTO_ORIGEM = 35 * 1024 * 1024;
+
+export function fotoOrigemMuitoGrande(tamanhoBytes: number): boolean {
+  return tamanhoBytes > LIMITE_BYTES_FOTO_ORIGEM;
+}
+
 export function compressImageFile(file: File, maxWidth = 1600, quality = 0.8): Promise<Blob> {
   return new Promise((resolve, reject) => {
+    if (fotoOrigemMuitoGrande(file.size)) {
+      reject(new Error("Essa foto é grande demais para processar no aparelho (máximo 35 MB). Tente uma foto com resolução menor."));
+      return;
+    }
     if (pareceHeic(file)) {
       reject(
         new Error(

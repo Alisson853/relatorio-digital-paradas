@@ -209,9 +209,63 @@ body {
  * deslocamento — e, principalmente, sem nunca passar por opacity:0. */
 @media (prefers-reduced-motion: reduce) {
   .revelar,
-  .revelar-foto {
+  .revelar-foto,
+  .animate-pulse {
     animation: none;
   }
+}
+
+/* Textura de "prancha técnica" — a mesma malha fina que já existia só na capa
+ * da apresentação (CoverSection), agora um utilitário reaproveitável. Usar o
+ * mesmo motivo em mais cabeçalhos (Dashboard, Histórico, /novo) é o que
+ * costura as telas como um sistema só, em vez de cada uma ter sua própria
+ * ideia de "fundo com estilo". Sempre sobre um fundo escuro (brand-900/950) —
+ * a malha é feita pra 6% de opacidade branca, ilegível sobre fundo claro.
+ */
+.bg-blueprint {
+  position: relative;
+}
+.bg-blueprint::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* Rótulo no estilo "anotação de desenho técnico" — mono, caixa alta,
+ * espaçado. Reaproveita a fonte JetBrains Mono que já carrega no projeto
+ * (só usada na apresentação até aqui) para dar a mesma textura industrial
+ * em rótulos de outras telas, sem introduzir fonte nova nenhuma.
+ */
+.label-tecnico {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Marca de canto tipo desenho técnico (mesma usada na foto da capa) — um
+ * detalhe pequeno e discreto que reaparece pra marcar "isto é um registro",
+ * não decoração aleatória repetida sem motivo. */
+.marca-canto {
+  position: absolute;
+  width: 0.75rem;
+  height: 0.75rem;
+  pointer-events: none;
+}
+.marca-canto-tl {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--signal-500);
+  border-left: 2px solid var(--signal-500);
+}
+.marca-canto-br {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--signal-500);
+  border-right: 2px solid var(--signal-500);
 }
 
 /* Exportação em PDF: cada .print-page vira uma página, cores/gradientes preservados. */

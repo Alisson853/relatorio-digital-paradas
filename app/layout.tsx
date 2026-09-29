@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Oswald } from "next/font/google";
 import "./globals.css";
 
@@ -23,6 +23,23 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Relatório Digital de Parada de Máquina",
   description: "Plataforma digital de relatórios de paradas de manutenção industrial",
+  // Sem isso, "Adicionar à Tela de Início" no iOS abre em aba de Safari
+  // normal (com barra de endereço) em vez de tela cheia como app instalado.
+  appleWebApp: {
+    capable: true,
+    title: "Relatório Digital",
+    statusBarStyle: "black-translucent",
+  },
+};
+
+// viewportFit: "cover" + as variáveis env(safe-area-inset-*) usadas na
+// navegação mobile (Sidebar) são o que evita conteúdo entalado atrás do
+// notch/home indicator em iPhone quando o site roda instalado em tela cheia.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#1b4d99",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

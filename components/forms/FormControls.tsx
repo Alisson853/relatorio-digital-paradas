@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChangeEvent, ReactNode } from "react";
+import { useId, type ChangeEvent, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 const baseInput =
@@ -33,9 +33,14 @@ interface TextFieldProps {
   required?: boolean;
   className?: string;
   type?: string;
+  // Nomes já usados em outros relatórios, para sugerir sem obrigar — o campo
+  // continua texto livre (<datalist> só sugere, nunca restringe o que pode
+  // ser digitado). Omitido/vazio: campo comum, sem sugestão nenhuma.
+  suggestions?: string[];
 }
 
-export function TextField({ label, value, onChange, placeholder, required, className, type = "text" }: TextFieldProps) {
+export function TextField({ label, value, onChange, placeholder, required, className, type = "text", suggestions }: TextFieldProps) {
+  const datalistId = useId();
   return (
     <FieldWrapper label={label} required={required} className={className}>
       <input
@@ -43,8 +48,16 @@ export function TextField({ label, value, onChange, placeholder, required, class
         value={value}
         placeholder={placeholder}
         onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
+        list={suggestions?.length ? datalistId : undefined}
         className={baseInput}
       />
+      {suggestions && suggestions.length > 0 && (
+        <datalist id={datalistId}>
+          {suggestions.map((s) => (
+            <option key={s} value={s} />
+          ))}
+        </datalist>
+      )}
     </FieldWrapper>
   );
 }

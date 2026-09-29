@@ -16,6 +16,27 @@ export interface FotoPendente {
   nomeArquivo: string;
   blob: Blob;
   criadoEm: number;
+  // "pendente": nunca tentado, ou falhou por falta de conexão — a
+  // sincronização automática continua tentando sozinha. "erro": o servidor
+  // respondeu e recusou (ex: serviço não existe mais) — só volta a ser
+  // tentado com "Tentar novamente" explícito, pra não repetir a mesma
+  // rejeição a cada 20s pra sempre. Sempre presente depois de
+  // listarFotosPendentes — fotos gravadas antes deste campo existir ganham o
+  // padrão "pendente"/0 ali, então quem consome este tipo nunca precisa
+  // tratar como opcional.
+  sincronizacao: "pendente" | "erro";
+  tentativas: number;
+  ultimoErro?: string;
+}
+
+// Chave determinística por (parada, serviço, etapa) — não um id aleatório.
+// Sem isso, tirar a mesma foto de novo (ex: a primeira ficou tremida) sem
+// conexão empilhava uma segunda entrada na fila em vez de substituir a
+// primeira: as duas seriam enviadas depois, desperdiçando upload e deixando
+// uma foto órfã no Blob. put() com esta chave faz a segunda tentativa
+// substituir a primeira, igual lib/offline-nao-feito.ts já faz.
+export function chaveFotoPendente(paradaId: string, servicoId: string, etapa: FotoPendente["etapa"]): string {
+  return `${paradaId}:${servicoId}:${etapa}`;
 }
 
 function abrirDb(): Promise<IDBDatabase> {
@@ -47,7 +68,14 @@ export async function listarFotosPendentes(paradaId?: string): Promise<FotoPende
   const itens = await new Promise<FotoPendente[]>((resolve, reject) => {
     const tx = db.transaction(STORE, "readonly");
     const req = tx.objectStore(STORE).getAll();
-    req.onsuccess = () => resolve(req.result as FotoPendente[]);
+    // Espalha primeiro, sobrescreve depois com fallback — não "default
+    // depois espalhado por cima" (o TypeScript recusa essa ordem quando o
+    // campo é obrigatório no tipo, porque o spread sempre venceria o
+    // default, tornando o default morto). Mesmo resultado: registros
+    // antigos (gravados antes destes dois campos existirem) recebem
+    // "pendente"/0; registros que já têm valor mantêm o valor.
+    req.onsuccess = () =>
+      resolve((req.result as FotoPendente[]).map((i) => ({ ...i, sincronizacao: i.sincronizacao ?? "pendente", tentativas: i.tentativas ?? 0 })));
     req.onerror = () => reject(req.error);
   });
   db.close();

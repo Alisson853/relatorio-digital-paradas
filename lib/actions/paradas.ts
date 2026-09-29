@@ -13,6 +13,16 @@ import { gerarResultadoFinal } from "@/lib/mock-data";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { ehEditor } from "@/lib/auth/session";
 import { consumirLimite, identificarRequisitante, limiteExcedidoMsg } from "@/lib/rate-limit";
+import { registrarAuditoria } from "@/lib/auditoria";
+import { escreverComVersao, upsertComVersao } from "@/lib/db/paradas-repo";
+import {
+  aplicarCapturaFoto,
+  aplicarMarcarStatus,
+  aplicarNaoFeito,
+  aplicarNovoEventoRapido,
+  aplicarNovoServicoRapido,
+  coletarResponsaveisConhecidos,
+} from "@/lib/actions/paradas-logic";
 import {
   DadosInvalidosError,
   sanearEquipe,
@@ -103,6 +113,17 @@ export async function listParadasResumo(): Promise<ParadaResumo[]> {
   return rows.map(rowParaResumo).reverse();
 }
 
+// Nomes já usados como responsável (da parada ou de algum serviço dela), pra
+// sugerir no autocomplete de "Responsável" sem transformar o campo em
+// cadastro — quem digita continua podendo escrever qualquer nome novo, isto
+// aqui só ajuda a não redigitar um nome que já apareceu antes. Leitura
+// pública porque "responsavel" já aparece na apresentação de qualquer
+// relatório publicado — não é informação nova sendo exposta.
+export async function listResponsaveisConhecidos(): Promise<string[]> {
+  const rows = await getDb().select({ responsavel: paradas.responsavel, servicos: paradas.servicos }).from(paradas);
+  return coletarResponsaveisConhecidos(rows);
+}
+
 export async function getParadaCompleta(idBruto: string): Promise<ParadaCompleta | null> {
   // Leitura publica, mas nem por isso o id entra cru na consulta. O Drizzle ja
   // manda o valor como parametro (nao ha concatenacao de SQL em lugar nenhum
@@ -153,15 +174,36 @@ export async function exportarBackupCompleto(): Promise<{ ok: boolean; erro?: st
   return { ok: true, dados: rows.map(rowParaCompleta).reverse() };
 }
 
-export async function getParadaAtualizadaEm(idBruto: string): Promise<number | null> {
+// Igual a getParadaCompleta, mas devolve também a versão (atualizadoEm) da
+// MESMA leitura, numa única consulta — usado por /novo ao entrar em modo de
+// edição.
+//
+// Bloco F: antes disto, o formulário chamava getParadaCompleta() e, em
+// seguida, uma segunda função separada só pra pegar atualizadoEm. As duas
+// leituras não são atômicas: se uma escrita concorrente (ex: uma captura de
+// foto pela Captura Rápida) acontecesse bem no intervalo entre elas, a
+// segunda leitura trazia a versão NOVA enquanto os dados do formulário
+// (carregados na primeira leitura) continuavam sendo os ANTIGOS — e o
+// controle de conflito em saveParada() comparava a versão nova contra o
+// banco, via, e deixava passar, apagando silenciosamente a mudança feita no
+// meio do caminho. Uma consulta só fecha essa janela: dado e versão sempre
+// vêm do mesmo instante.
+export async function getParadaCompletaComVersao(idBruto: string): Promise<{ parada: ParadaCompleta; atualizadoEm: number } | null> {
   const id = idSeguro(idBruto);
   if (!id) return null;
 
-  const [row] = await getDb().select({ atualizadoEm: paradas.atualizadoEm }).from(paradas).where(eq(paradas.id, id)).limit(1);
-  return row ? row.atualizadoEm.getTime() : null;
+  const [row] = await getDb().select().from(paradas).where(eq(paradas.id, id)).limit(1);
+  return row ? { parada: rowParaCompleta(row), atualizadoEm: row.atualizadoEm.getTime() } : null;
 }
 
-export async function saveParada(dataBruta: unknown): Promise<{ ok: boolean; erro?: string }> {
+// atualizadoEmEsperado (epoch ms) vem do relatório que o formulário /novo
+// carregou pra editar — undefined/ausente significa "relatório novo, sem
+// versão anterior pra conferir". Quando presente e divergir do que está no
+// banco agora, é sinal de que alguém mexeu no relatório (ex: uma captura de
+// foto em campo) enquanto o formulário estava aberto: a gravação é recusada
+// em vez de sobrescrever silenciosamente o que essa outra ação salvou. Ver
+// lib/db/paradas-repo.ts (upsertComVersao) para o mecanismo.
+export async function saveParada(dataBruta: unknown, atualizadoEmEsperado?: number): Promise<{ ok: boolean; erro?: string; conflito?: boolean }> {
   const autorizado = await ehEditor();
   if (!autorizado) return { ok: false, erro: "Não autorizado." };
 
@@ -180,9 +222,10 @@ export async function saveParada(dataBruta: unknown): Promise<{ ok: boolean; err
   }
 
   const { resumo } = data;
-  await getDb()
-    .insert(paradas)
-    .values({
+  const versaoEsperada = typeof atualizadoEmEsperado === "number" && Number.isFinite(atualizadoEmEsperado) ? new Date(atualizadoEmEsperado) : null;
+
+  const sucesso = await upsertComVersao(
+    {
       id: resumo.id,
       nome: resumo.nome,
       maquina: resumo.maquina,
@@ -202,31 +245,24 @@ export async function saveParada(dataBruta: unknown): Promise<{ ok: boolean; err
       graficos: data.graficos,
       resultadoFinal: data.resultadoFinal,
       atualizadoEm: new Date(),
-    })
-    .onConflictDoUpdate({
-      target: paradas.id,
-      set: {
-        nome: resumo.nome,
-        maquina: resumo.maquina,
-        area: resumo.area,
-        data: resumo.data,
-        duracaoPlanejada: resumo.duracaoPlanejada,
-        duracaoRealizada: resumo.duracaoRealizada,
-        status: resumo.status,
-        responsavel: resumo.responsavel,
-        imagem: resumo.imagem,
-        fotosMaquina: resumo.fotosMaquina ?? [],
-        kpis: data.kpis,
-        timeline: data.timeline,
-        servicos: data.servicos,
-        caminhoCritico: data.caminhoCritico,
-        pendencias: data.pendencias,
-        graficos: data.graficos,
-        resultadoFinal: data.resultadoFinal,
-        atualizadoEm: new Date(),
-      },
-    });
+    },
+    versaoEsperada
+  );
 
+  if (!sucesso) {
+    // Bloco F: antes, um conflito de versão não deixava rastro nenhum no
+    // log — só o erro genérico voltava pro navegador de quem editava. Sem
+    // isto não havia como depois descobrir, a partir do log, que um
+    // conflito real aconteceu (quantas vezes, em qual relatório).
+    await registrarAuditoria({ acao: "conflito_salvar_relatorio", paradaId: resumo.id, origem: await identificarRequisitante() });
+    return {
+      ok: false,
+      conflito: true,
+      erro: "Este relatório foi alterado por outra ação (provavelmente pela Captura Rápida) enquanto você editava. Recarregue a página para ver as mudanças mais recentes antes de salvar de novo.",
+    };
+  }
+
+  await registrarAuditoria({ acao: "salvar_relatorio", paradaId: resumo.id, origem: await identificarRequisitante() });
   return { ok: true };
 }
 
@@ -244,6 +280,7 @@ export async function deleteParada(idBruto: string): Promise<{ ok: boolean; erro
   }
 
   await getDb().delete(paradas).where(eq(paradas.id, id));
+  await registrarAuditoria({ acao: "excluir_relatorio", paradaId: id, origem: await identificarRequisitante() });
   return { ok: true };
 }
 
@@ -328,7 +365,7 @@ export async function clonarParada(idOrigemBruto: string): Promise<{ ok: boolean
     kpisClonados.eficiencia,
     tetoHorasClone
   );
-  const resultadoClonado = gerarResultadoFinal(resumoClonado, kpisClonados);
+  const resultadoClonado = gerarResultadoFinal(resumoClonado, kpisClonados, graficosClonados);
 
   await getDb().insert(paradas).values({
     id: novoId,
@@ -352,6 +389,7 @@ export async function clonarParada(idOrigemBruto: string): Promise<{ ok: boolean
     atualizadoEm: new Date(),
   });
 
+  await registrarAuditoria({ acao: "clonar_relatorio", paradaId: novoId, origem: await identificarRequisitante(), detalhe: { idOrigem } });
   return { ok: true, novoId };
 }
 
@@ -489,38 +527,13 @@ export async function uploadFoto(formData: FormData): Promise<{ ok: boolean; url
   return { ok: true, url: blob.url };
 }
 
-function horarioAgora(): string {
-  return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Sao_Paulo" }).format(new Date());
-}
-
-type Etapa = { campo: "fotoAntes" | "fotoDurante" | "fotoDepois"; horarioCampo: "fotoAntesHorario" | "fotoDuranteHorario" | "fotoDepoisHorario"; label: string };
-
-const ETAPA_ANTES: Etapa = { campo: "fotoAntes", horarioCampo: "fotoAntesHorario", label: "Antes" };
-const ETAPA_DURANTE: Etapa = { campo: "fotoDurante", horarioCampo: "fotoDuranteHorario", label: "Durante" };
-const ETAPA_DEPOIS: Etapa = { campo: "fotoDepois", horarioCampo: "fotoDepoisHorario", label: "Depois" };
-
-// A maioria das OS só usa duas fotos (antes no computador, depois em campo pelo
-// celular) — "Durante" é opcional. Por isso a busca pela próxima etapa vazia
-// prioriza Depois antes de Durante: senão a foto tirada em campo cai em
-// "Durante" mesmo quando a intenção era fechar o registro com "Depois".
-const ORDEM_CAPTURA: Etapa[] = [ETAPA_ANTES, ETAPA_DEPOIS, ETAPA_DURANTE];
-
-function etapaEstaVazia(servico: Servico, etapa: Etapa): boolean {
-  const valor = servico[etapa.campo];
-  if (etapa.campo === "fotoDurante") return !valor;
-  return !valor || valor === NO_PHOTO_PLACEHOLDER;
-}
-
 // Grava a foto direto na OS certa, mexendo só no array de serviços — assim uma
 // captura em campo não corre o risco de sobrescrever outras edições feitas ao
 // mesmo tempo em outras partes do relatório (diferente do formulário completo,
-// que reenvia o relatório inteiro a cada salvamento).
-const ETAPAS_POR_LABEL: Record<"Antes" | "Durante" | "Depois", Etapa> = {
-  Antes: ETAPA_ANTES,
-  Durante: ETAPA_DURANTE,
-  Depois: ETAPA_DEPOIS,
-};
-
+// que reenvia o relatório inteiro a cada salvamento). escreverComVersao (ver
+// lib/db/paradas-repo.ts) garante isso mesmo quando DUAS capturas acontecem ao
+// mesmo tempo no mesmo relatório: relê e tenta de novo em vez de perder uma
+// das duas.
 export async function capturarFotoServico(
   paradaIdBruto: string,
   servicoIdBruto: string,
@@ -545,64 +558,10 @@ export async function capturarFotoServico(
   const etapaEscolhida =
     etapaEscolhidaBruta === "Antes" || etapaEscolhidaBruta === "Durante" || etapaEscolhidaBruta === "Depois" ? etapaEscolhidaBruta : undefined;
 
-  const [row] = await getDb().select().from(paradas).where(eq(paradas.id, paradaId)).limit(1);
-  if (!row) return { ok: false, erro: "Relatório não encontrado." };
-
-  const idx = row.servicos.findIndex((s) => s.id === servicoId);
-  if (idx === -1) return { ok: false, erro: "Serviço não encontrado." };
-
-  const servico = row.servicos[idx];
-  // Se o usuário escolheu a etapa manualmente (Antes/Durante/Depois), usa essa
-  // direto — só cai na detecção automática quando nada foi escolhido.
-  const etapaVazia = etapaEscolhida ? ETAPAS_POR_LABEL[etapaEscolhida] : (ORDEM_CAPTURA.find((e) => etapaEstaVazia(servico, e)) ?? ETAPA_DEPOIS);
-
-  const horario = horarioAgora();
-  let servicoAtualizado: Servico = { ...servico, [etapaVazia.campo]: url, [etapaVazia.horarioCampo]: horario };
-
-  // Antes e Depois são as duas fotos que realmente fecham o registro (Durante
-  // é opcional) — assim que as duas existem, a OS conclui sozinha, sem
-  // precisar voltar depois só pra tocar em "Concluído" pelo celular.
-  const temAntes = !!servicoAtualizado.fotoAntes && servicoAtualizado.fotoAntes !== NO_PHOTO_PLACEHOLDER;
-  const temDepois = !!servicoAtualizado.fotoDepois && servicoAtualizado.fotoDepois !== NO_PHOTO_PLACEHOLDER;
-  const fechaAutomaticamente = temAntes && temDepois && servicoAtualizado.status !== "concluido";
-  if (fechaAutomaticamente) {
-    servicoAtualizado = {
-      ...servicoAtualizado,
-      status: "concluido",
-      servicoExecutado: gerarDescricaoExecucao(servicoAtualizado.problemaIdentificado, "concluido"),
-      resultado: textoResultadoPadrao("concluido"),
-    };
-  }
-
-  const servicosAtualizados = [...row.servicos];
-  servicosAtualizados[idx] = servicoAtualizado;
-
-  if (!fechaAutomaticamente) {
-    await getDb().update(paradas).set({ servicos: servicosAtualizados, atualizadoEm: new Date() }).where(eq(paradas.id, paradaId));
-    return { ok: true, label: etapaVazia.label, horario };
-  }
-
-  // Fechar sozinho muda a contagem de concluídas — recalcula kpis/gráficos na
-  // hora, igual marcarStatusServico já faz pra mudança manual de status.
-  const tetoHoras = parseHoras(row.duracaoRealizada) || parseHoras(row.duracaoPlanejada) || undefined;
-  const kpisAtualizados = deriveKpis(servicosAtualizados, row.kpis.seguranca, { totalPlanejado: row.kpis.osPlanejadas, duracaoMaximaHoras: tetoHoras });
-  const atrasoGeralHoras = Math.max(0, parseHoras(row.duracaoRealizada) - parseHoras(row.duracaoPlanejada));
-  const graficosAtualizados = deriveGraficos(
-    servicosAtualizados,
-    row.caminhoCritico,
-    row.graficos.planejadoRealizado,
-    kpisAtualizados.eficiencia,
-    tetoHoras,
-    atrasoGeralHoras
-  );
-  const resultadoAtualizado = { ...row.resultadoFinal, eficiencia: kpisAtualizados.eficiencia, pendenciasAbertas: kpisAtualizados.pendencias };
-
-  await getDb()
-    .update(paradas)
-    .set({ servicos: servicosAtualizados, kpis: kpisAtualizados, graficos: graficosAtualizados, resultadoFinal: resultadoAtualizado, atualizadoEm: new Date() })
-    .where(eq(paradas.id, paradaId));
-
-  return { ok: true, label: etapaVazia.label, horario, statusFechado: "concluido" };
+  const resultado = await escreverComVersao(paradaId, (row) => aplicarCapturaFoto(row, { servicoId, url, etapaEscolhida }));
+  if (!resultado.ok) return { ok: false, erro: resultado.erro };
+  await registrarAuditoria({ acao: "captura_foto", paradaId, servicoId, origem: await identificarRequisitante(), detalhe: { etapa: resultado.extra.label } });
+  return { ok: true, ...resultado.extra };
 }
 
 // Serviços importados de planilha entram como "pendente" e podem ser marcados
@@ -630,45 +589,9 @@ export async function marcarStatusServico(
     return { ok: false, erro: "Status inválido." };
   }
 
-  const [row] = await getDb().select().from(paradas).where(eq(paradas.id, paradaId)).limit(1);
-  if (!row) return { ok: false, erro: "Relatório não encontrado." };
-
-  const idx = row.servicos.findIndex((s) => s.id === servicoId);
-  if (idx === -1) return { ok: false, erro: "Serviço não encontrado." };
-
-  const servico = row.servicos[idx];
-  const servicoAtualizado: Servico = {
-    ...servico,
-    status,
-    servicoExecutado: gerarDescricaoExecucao(servico.problemaIdentificado, status),
-    resultado: textoResultadoPadrao(status),
-  };
-  const servicosAtualizados = [...row.servicos];
-  servicosAtualizados[idx] = servicoAtualizado;
-
-  // Marcar concluído/pendente pelo celular precisa refletir na eficiência na
-  // hora — por isso, diferente de capturarFotoServico (que não muda status),
-  // aqui os KPIs são recalculados a partir da contagem real de status, não
-  // do número "OS Executadas" digitado manualmente (que fica desatualizado
-  // assim que o trabalho passa a ser marcado em campo).
-  const tetoHoras = parseHoras(row.duracaoRealizada) || parseHoras(row.duracaoPlanejada) || undefined;
-  const kpisAtualizados = deriveKpis(servicosAtualizados, row.kpis.seguranca, { totalPlanejado: row.kpis.osPlanejadas, duracaoMaximaHoras: tetoHoras });
-  const atrasoGeralHoras = Math.max(0, parseHoras(row.duracaoRealizada) - parseHoras(row.duracaoPlanejada));
-  const graficosAtualizados = deriveGraficos(
-    servicosAtualizados,
-    row.caminhoCritico,
-    row.graficos.planejadoRealizado,
-    kpisAtualizados.eficiencia,
-    tetoHoras,
-    atrasoGeralHoras
-  );
-  const resultadoAtualizado = { ...row.resultadoFinal, eficiencia: kpisAtualizados.eficiencia, pendenciasAbertas: kpisAtualizados.pendencias };
-
-  await getDb()
-    .update(paradas)
-    .set({ servicos: servicosAtualizados, kpis: kpisAtualizados, graficos: graficosAtualizados, resultadoFinal: resultadoAtualizado, atualizadoEm: new Date() })
-    .where(eq(paradas.id, paradaId));
-
+  const resultado = await escreverComVersao(paradaId, (row) => aplicarMarcarStatus(row, { servicoId, status }));
+  if (!resultado.ok) return { ok: false, erro: resultado.erro };
+  await registrarAuditoria({ acao: "mudanca_status", paradaId, servicoId, origem: await identificarRequisitante(), detalhe: { status } });
   return { ok: true };
 }
 
@@ -697,44 +620,21 @@ export async function definirNaoFeito(
   const categoria = sanearMotivoNaoFeito(categoriaBruta);
   const justificativa = sanearTexto(justificativaBruta, 5000);
 
-  const [row] = await getDb().select().from(paradas).where(eq(paradas.id, paradaId)).limit(1);
-  if (!row) return { ok: false, erro: "Relatório não encontrado." };
+  const resultado = await escreverComVersao(paradaId, (row) => aplicarNaoFeito(row, { servicoId, categoria, justificativa }));
+  if (!resultado.ok) return { ok: false, erro: resultado.erro };
 
-  const idx = row.servicos.findIndex((s) => s.id === servicoId);
-  if (idx === -1) return { ok: false, erro: "Serviço não encontrado." };
-
-  const servico = row.servicos[idx];
-  const atualizado: Servico = { ...servico, naoFeitoCategoria: categoria || undefined, justificativaNaoFeito: justificativa || undefined };
-
-  // Marcar "não será feito" com foto já tirada não faz sentido — a OS não
-  // vai acontecer, então as fotos que já tinha somem: do relatório (viram o
-  // placeholder de novo) e do Blob (apagadas de verdade, não só desanexadas,
-  // senão fica imagem órfã pagando armazenamento sem nenhum serviço
-  // apontando pra ela). Só roda ao MARCAR (categoria não-vazia); desmarcar
-  // não mexe em foto nenhuma.
-  let fotosRemovidas = false;
-  if (categoria) {
-    const urls = [servico.fotoAntes, servico.fotoDurante, servico.fotoDepois].filter((u): u is string => !!u && u !== NO_PHOTO_PLACEHOLDER);
-    if (urls.length > 0) {
-      fotosRemovidas = true;
-      atualizado.fotoAntes = NO_PHOTO_PLACEHOLDER;
-      atualizado.fotoAntesHorario = undefined;
-      atualizado.fotoDurante = undefined;
-      atualizado.fotoDuranteHorario = undefined;
-      atualizado.fotoDepois = NO_PHOTO_PLACEHOLDER;
-      atualizado.fotoDepoisHorario = undefined;
-      // Melhor esforço — mesma lógica de excluirFoto: não trava a marcação
-      // se o Blob já não tiver o arquivo por algum motivo.
-      await Promise.all(urls.map((url) => del(url).catch(() => {})));
-    }
+  // Apaga do Blob de verdade (não só desanexa), senão fica imagem órfã
+  // pagando armazenamento sem nenhum serviço apontando pra ela. Roda só
+  // depois da gravação ter sucesso, e só uma vez — nas urls da tentativa que
+  // realmente venceu a escrita (ver aplicarNaoFeito em paradas-logic.ts).
+  // Melhor esforço — mesma lógica de excluirFoto: não é isso que decide se a
+  // marcação deu certo.
+  if (resultado.extra.urlsParaApagar.length > 0) {
+    await Promise.all(resultado.extra.urlsParaApagar.map((url) => del(url).catch(() => {})));
   }
 
-  const servicosAtualizados = [...row.servicos];
-  servicosAtualizados[idx] = atualizado;
-
-  await getDb().update(paradas).set({ servicos: servicosAtualizados, atualizadoEm: new Date() }).where(eq(paradas.id, paradaId));
-
-  return { ok: true, fotosRemovidas };
+  await registrarAuditoria({ acao: "nao_sera_feito", paradaId, servicoId, origem: await identificarRequisitante(), detalhe: { categoria: categoria || null } });
+  return { ok: true, fotosRemovidas: resultado.extra.fotosRemovidas };
 }
 
 interface NovaOsInput {
@@ -773,60 +673,10 @@ export async function adicionarServicoRapido(paradaIdBruto: string, inputBruto: 
     motivo: sanearTexto(inputBruto?.motivo, 5000),
   };
 
-  const equipamento = input.equipamento.trim();
-  if (!equipamento) return { ok: false, erro: "Informe o equipamento." };
-
-  const [row] = await getDb().select().from(paradas).where(eq(paradas.id, paradaId)).limit(1);
-  if (!row) return { ok: false, erro: "Relatório não encontrado." };
-
-  const problemaIdentificado = input.motivo.trim() || "Necessidade identificada durante a parada.";
-  const novoServico: Servico = {
-    id: crypto.randomUUID(),
-    numeroOS: input.numeroOS.trim() || "Oportunidade",
-    titulo: `Manutenção em ${equipamento}`,
-    equipamento,
-    area: input.area.trim() || row.maquina,
-    responsavel: input.responsavel.trim() || row.responsavel,
-    equipe: input.equipe,
-    categoria: input.categoria,
-    horaInicio: "",
-    horaFim: "",
-    tempoGasto: "1h",
-    problemaIdentificado,
-    servicoExecutado: gerarDescricaoExecucao(problemaIdentificado, "concluido"),
-    resultado: textoResultadoPadrao("concluido"),
-    status: "concluido",
-    fotoAntes: NO_PHOTO_PLACEHOLDER,
-    fotoDepois: NO_PHOTO_PLACEHOLDER,
-  };
-
-  const servicosAtualizados = [...row.servicos, novoServico];
-  const tetoHoras = parseHoras(row.duracaoRealizada) || parseHoras(row.duracaoPlanejada) || undefined;
-  // OS Executadas é um número informado manualmente (não conta mais os serviços
-  // detalhados um a um, já que só os "principais" com foto ganham entrada aqui) —
-  // como essa OS nova nasce concluída, soma 1 ao total já registrado.
-  const kpisAtualizados = deriveKpis(servicosAtualizados, row.kpis.seguranca, {
-    totalPlanejado: row.kpis.osPlanejadas,
-    totalExecutadas: row.kpis.osConcluidas + 1,
-    duracaoMaximaHoras: tetoHoras,
-  });
-  const atrasoGeralHoras = Math.max(0, parseHoras(row.duracaoRealizada) - parseHoras(row.duracaoPlanejada));
-  const graficosAtualizados = deriveGraficos(
-    servicosAtualizados,
-    row.caminhoCritico,
-    row.graficos.planejadoRealizado,
-    kpisAtualizados.eficiencia,
-    tetoHoras,
-    atrasoGeralHoras
-  );
-  const resultadoAtualizado = { ...row.resultadoFinal, eficiencia: kpisAtualizados.eficiencia, pendenciasAbertas: kpisAtualizados.pendencias };
-
-  await getDb()
-    .update(paradas)
-    .set({ servicos: servicosAtualizados, kpis: kpisAtualizados, graficos: graficosAtualizados, resultadoFinal: resultadoAtualizado, atualizadoEm: new Date() })
-    .where(eq(paradas.id, paradaId));
-
-  return { ok: true, servico: novoServico };
+  const resultado = await escreverComVersao(paradaId, (row) => aplicarNovoServicoRapido(row, input));
+  if (!resultado.ok) return { ok: false, erro: resultado.erro };
+  await registrarAuditoria({ acao: "nova_os_rapida", paradaId, servicoId: resultado.extra.servico.id, origem: await identificarRequisitante() });
+  return { ok: true, servico: resultado.extra.servico };
 }
 
 interface NovoEventoInput {
@@ -856,26 +706,10 @@ export async function adicionarEventoRapido(paradaIdBruto: string, inputBruto: N
     icone: sanearIcone(inputBruto?.icone),
   };
 
-  const titulo = input.titulo.trim();
-  if (!titulo) return { ok: false, erro: "Informe o evento." };
-
-  const [row] = await getDb().select({ timeline: paradas.timeline }).from(paradas).where(eq(paradas.id, paradaId)).limit(1);
-  if (!row) return { ok: false, erro: "Relatório não encontrado." };
-
-  const novoEvento: TimelineEvento = {
-    id: crypto.randomUUID(),
-    horario: horarioAgora(),
-    titulo,
-    responsavel: input.responsavel.trim() || "—",
-    descricao: input.descricao.trim(),
-    icone: input.icone,
-    status: "concluido",
-  };
-
-  const timelineAtualizada = [...row.timeline, novoEvento];
-  await getDb().update(paradas).set({ timeline: timelineAtualizada, atualizadoEm: new Date() }).where(eq(paradas.id, paradaId));
-
-  return { ok: true, evento: novoEvento };
+  const resultado = await escreverComVersao(paradaId, (row) => aplicarNovoEventoRapido(row, input));
+  if (!resultado.ok) return { ok: false, erro: resultado.erro };
+  await registrarAuditoria({ acao: "novo_evento_rapido", paradaId, origem: await identificarRequisitante(), detalhe: { titulo: resultado.extra.evento.titulo } });
+  return { ok: true, evento: resultado.extra.evento };
 }
 
 export async function excluirFoto(urlBruta: string): Promise<void> {

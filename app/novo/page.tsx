@@ -8,8 +8,8 @@ import { AlertCircle, ArrowLeft, FileSpreadsheet, History, Loader2, Plus, X } fr
 import type { CaminhoCriticoItem, ParadaCompleta, ParadaResumo, Pendencia, Servico, StatusGeral, TimelineEvento } from "@/lib/types";
 import { deriveGraficos, deriveKpis, gerarDescricaoExecucao, parseHoras, textoResultadoPadrao } from "@/lib/derive";
 import { gerarResultadoFinal } from "@/lib/mock-data";
-import { getParadaAtualizadaEm, getParadaCompleta, listHistoricoNaoFeito, saveParada } from "@/lib/actions/paradas";
-import { slugify, sufixoAleatorio } from "@/lib/utils";
+import { getParadaCompletaComVersao, listHistoricoNaoFeito, listResponsaveisConhecidos, saveParada } from "@/lib/actions/paradas";
+import { cn, slugify, sufixoAleatorio } from "@/lib/utils";
 import { clearDraft, getDraft, saveDraft } from "@/lib/draft-store";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { parsePlanilhaServicos } from "@/lib/import-planilha";
@@ -23,6 +23,8 @@ import { CaminhoRowEditor, type CaminhoRow } from "@/components/forms/CaminhoRow
 import { PendenciaRowEditor, type PendenciaRow } from "@/components/forms/PendenciaRowEditor";
 import { PhotoUploadField } from "@/components/forms/PhotoUploadField";
 import { EditorPasswordForm } from "@/components/shared/EditorPasswordForm";
+import { Button, LinkButton } from "@/components/ui/Button";
+import { StatusConexao } from "@/components/shared/StatusConexao";
 import { useEditorMode } from "@/lib/useEditorMode";
 
 const STATUS_GERAL_OPTIONS = [
@@ -32,18 +34,6 @@ const STATUS_GERAL_OPTIONS = [
 ];
 
 const IMAGEM_PADRAO = "industrial-press";
-
-// Textos que gerarResultadoFinal() gera sozinho a partir do status — se o
-// resumo salvo é um desses, não é um texto que o usuário escreveu à mão, é só
-// o resultado da última geração automática. Preenchê-lo de volta no campo
-// "opcional" travaria a regeneração pra sempre: toda vez que alguém mudasse o
-// Status Geral, esse texto antigo continuaria sendo salvo como se fosse um
-// override manual, mesmo com o status mudado.
-const TEXTOS_RESUMO_AUTOMATICOS = [
-  "Parada executada dentro do planejado, com todos os serviços críticos concluídos e equipamento liberado para operação em plena capacidade.",
-  "Parada concluída com pequenos desvios de prazo e pendências pontuais, já endereçadas em plano de ação de curto prazo.",
-  "Parada em andamento, com execução dentro dos padrões técnicos e de segurança estabelecidos.",
-];
 
 // Rascunhos de relatório NOVO (sem id) compartilham uma única chave no navegador,
 // então um rascunho velho demais é quase certamente de outra tentativa abandonada.
@@ -202,26 +192,57 @@ function FormSection({
   numero,
   titulo,
   descricao,
+  lead,
   children,
 }: {
   numero: number;
   titulo: string;
   descricao: string;
+  // Marca a seção de identificação — a que abre o fluxo e define o que
+  // aparece na capa do relatório — com um peso visual diferente das demais,
+  // em vez de todas as sete seções usando exatamente a mesma caixa. É essa
+  // repetição idêntica (mesmo círculo numerado, mesma faixa cinza, mesma
+  // borda) seção após seção que faz a tela inteira ler como uma lista de
+  // caixas iguais, não um formulário com começo, meio e fim.
+  lead?: boolean;
   children: React.ReactNode;
 }) {
+  // Cabeçalho vira uma faixa própria (levemente tingida, separada por
+  // borda) em vez de dividir o mesmo bloco de padding do conteúdo — cada
+  // seção lê como um módulo com título fixo no topo, não um texto solto
+  // acima de um monte de campos.
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-      <div className="mb-6 flex items-start gap-3">
-        <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-brand-600 text-xs font-bold text-white">
+    <section className={cn("overflow-hidden rounded-3xl border bg-white shadow-sm", lead ? "border-brand-200" : "border-slate-200")}>
+      <div className={cn("flex items-start gap-3 border-b px-6 py-5 sm:px-8", lead ? "border-brand-100 bg-brand-50/60" : "border-slate-100 bg-slate-50/70")}>
+        <span
+          className={cn(
+            "label-tecnico flex flex-none items-center justify-center rounded-lg font-bold text-white",
+            lead ? "h-10 w-10 bg-brand-700 text-base" : "h-9 w-9 bg-brand-600 text-sm"
+          )}
+        >
           {String(numero).padStart(2, "0")}
         </span>
         <div>
-          <h2 className="text-lg font-bold text-slate-900">{titulo}</h2>
+          <h2 className={cn("font-bold text-slate-900", lead ? "text-xl" : "text-lg")}>{titulo}</h2>
           <p className="text-sm text-slate-500">{descricao}</p>
         </div>
       </div>
-      {children}
+      <div className="p-6 sm:p-8">{children}</div>
     </section>
+  );
+}
+
+// Divisor de grupo — marca a mudança de "fluxo obrigatório" pra "detalhes
+// opcionais" (ou pro encerramento) com espaço editorial maior e um rótulo
+// técnico, em vez de mais uma seção numerada igual às de cima. É o tipo de
+// vão maior em mudança de contexto que uma lista de caixas idênticas não
+// consegue expressar.
+function DivisorGrupo({ rotulo }: { rotulo: string }) {
+  return (
+    <div className="flex items-center gap-3 pt-4">
+      <span className="label-tecnico flex-none text-[10px] font-bold text-slate-400">{rotulo}</span>
+      <div className="h-px flex-1 bg-slate-200" />
+    </div>
   );
 }
 
@@ -267,6 +288,13 @@ function NovaParadaForm() {
   const [planejadoRealizado, setPlanejadoRealizado] = useState(PLANEJADO_REALIZADO_PADRAO);
   const [resumoFinalCustom, setResumoFinalCustom] = useState("");
   const [erro, setErro] = useState("");
+  // Versão do relatório (atualizadoEm, epoch ms) no momento em que este
+  // formulário carregou os dados pra edição — mandada de volta em saveParada
+  // pra recusar a gravação se alguém mais (ex: a Captura Rápida) mudou o
+  // relatório enquanto o formulário estava aberto. Ref, não state: não deve
+  // disparar re-render nem participar de nenhuma outra lógica além do submit.
+  const atualizadoEmCarregadoRef = useRef<number | null>(null);
+  const [conflitoAoSalvar, setConflitoAoSalvar] = useState(false);
   const [draftDisponivel, setDraftDisponivel] = useState<DraftSnapshot | null>(null);
   const draftKeyRef = useRef("novo");
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -280,9 +308,13 @@ function NovaParadaForm() {
   // e cruzado localmente (por número de OS ou equipamento) contra cada linha
   // do formulário, pra avisar antes mesmo da parada começar.
   const [historicoNaoFeito, setHistoricoNaoFeito] = useState<HistoricoNaoFeitoItem[]>([]);
+  // Nomes já usados como responsável em outros relatórios — só para sugerir
+  // no autocomplete (ver TextField.suggestions); nunca restringe o campo.
+  const [responsaveisConhecidos, setResponsaveisConhecidos] = useState<string[]>([]);
 
   useEffect(() => {
     listHistoricoNaoFeito().then(setHistoricoNaoFeito);
+    listResponsaveisConhecidos().then(setResponsaveisConhecidos);
   }, []);
 
   useEffect(() => {
@@ -310,19 +342,20 @@ function NovaParadaForm() {
     }
 
     (async () => {
-      let existing;
+      let carregado;
       try {
-        existing = await getParadaCompleta(id);
+        carregado = await getParadaCompletaComVersao(id);
       } catch {
         setNotFound(true);
         setReady(true);
         return;
       }
-      if (!existing) {
+      if (!carregado) {
         setNotFound(true);
         setReady(true);
         return;
       }
+      const { parada: existing, atualizadoEm } = carregado;
       setNome(existing.resumo.nome);
       setMaquina(existing.resumo.maquina);
       setData(existing.resumo.data);
@@ -342,11 +375,17 @@ function NovaParadaForm() {
       setTimeline(existing.timeline.map((t) => ({ ...t })));
       setCaminhoCritico(existing.caminhoCritico.map(caminhoParaLinha));
       setPlanejadoRealizado(existing.graficos.planejadoRealizado.length ? existing.graficos.planejadoRealizado.map((p) => ({ ...p })) : PLANEJADO_REALIZADO_PADRAO);
-      setResumoFinalCustom(TEXTOS_RESUMO_AUTOMATICOS.includes(existing.resultadoFinal.resumo) ? "" : existing.resultadoFinal.resumo);
+      setResumoFinalCustom(existing.resultadoFinal.resumoAutomatico ? "" : existing.resultadoFinal.resumo);
+
+      // A versão (atualizadoEm) veio da MESMA consulta que trouxe os dados
+      // acima — não de uma segunda leitura separada — então não existe janela
+      // em que uma escrita concorrente (ex: uma captura de foto em campo)
+      // pudesse ficar entre as duas e ser apagada sem aviso ao salvar. Ver
+      // getParadaCompletaComVersao em lib/actions/paradas.ts.
+      atualizadoEmCarregadoRef.current = atualizadoEm;
 
       const draft = getDraft<DraftSnapshot>(draftKeyRef.current);
       if (draft && draftPossuiConteudo(draft)) {
-        const atualizadoEm = await getParadaAtualizadaEm(id).catch(() => null);
         if (atualizadoEm !== null && draft.savedAt <= atualizadoEm) {
           // O relatório foi salvo depois desse rascunho — o rascunho está
           // desatualizado e restaurá-lo apagaria dados já salvos (ex: OS
@@ -588,6 +627,7 @@ function NovaParadaForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setConflitoAoSalvar(false);
 
     if (!nome.trim() || !maquina.trim() || !data || !responsavel.trim()) {
       setErro("Preencha os campos obrigatórios em Dados Gerais.");
@@ -674,8 +714,11 @@ function NovaParadaForm() {
     });
     const atrasoGeralHoras = Math.max(0, parseHoras(resumo.duracaoRealizada) - parseHoras(resumo.duracaoPlanejada));
     const graficos = deriveGraficos(servicosFinal, caminhoCriticoFinal, planejadoRealizado, kpis.eficiencia, duracaoMaximaHoras, atrasoGeralHoras);
-    const resultadoFinal = gerarResultadoFinal(resumo, kpis);
-    if (resumoFinalCustom.trim()) resultadoFinal.resumo = resumoFinalCustom.trim();
+    const resultadoFinal = gerarResultadoFinal(resumo, kpis, graficos);
+    if (resumoFinalCustom.trim()) {
+      resultadoFinal.resumo = resumoFinalCustom.trim();
+      resultadoFinal.resumoAutomatico = false;
+    }
 
     const parada: ParadaCompleta = {
       resumo,
@@ -689,9 +732,10 @@ function NovaParadaForm() {
       resultadoFinal,
     };
 
-    const resultado = await saveParada(parada);
+    const resultado = await saveParada(parada, editId ? (atualizadoEmCarregadoRef.current ?? undefined) : undefined);
     if (!resultado.ok) {
       setErro(resultado.erro || "Não foi possível salvar o relatório.");
+      setConflitoAoSalvar(!!resultado.conflito);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -701,8 +745,33 @@ function NovaParadaForm() {
     router.push(`/parada/${id}`);
   }
 
+  // Skeleton em vez de tela em branco — ao editar, essa espera depende de
+  // rede (carregar o relatório existente), então pode durar o suficiente pra
+  // uma tela vazia parecer travada. Formato aproximado do formulário real
+  // (cabeçalho + seções), não pixel a pixel.
   if (!ready) {
-    return <div className="min-h-screen bg-slate-50" />;
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <header className="border-b border-slate-200 bg-white">
+          <div className="mx-auto flex max-w-5xl items-center gap-3 px-6 py-5 sm:px-10">
+            <div className="h-9 w-9 flex-none animate-pulse rounded-lg bg-slate-100" />
+            <div className="h-7 w-28 animate-pulse rounded bg-slate-100" />
+          </div>
+        </header>
+        <div className="mx-auto max-w-5xl space-y-6 px-6 py-10 sm:px-10">
+          {[0, 1].map((i) => (
+            <div key={i} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+              <div className="h-4 w-40 animate-pulse rounded bg-slate-100" />
+              <div className="mt-3 h-3 w-64 animate-pulse rounded bg-slate-100" />
+              <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="h-11 animate-pulse rounded-xl bg-slate-100" />
+                <div className="h-11 animate-pulse rounded-xl bg-slate-100" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   if (notFound) {
@@ -736,6 +805,8 @@ function NovaParadaForm() {
         </div>
       </header>
 
+      <StatusConexao />
+
       <form onSubmit={handleSubmit} className="mx-auto max-w-5xl space-y-6 px-6 py-10 sm:px-10">
         {draftDisponivel && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm">
@@ -764,17 +835,28 @@ function NovaParadaForm() {
         )}
 
         {erro && (
-          <div className="flex items-center gap-2 rounded-xl border border-danger-100 bg-danger-100/60 px-4 py-3 text-sm font-semibold text-danger-600">
-            <AlertCircle size={16} />
-            {erro}
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-danger-100 bg-danger-100/60 px-4 py-3 text-sm font-semibold text-danger-600">
+            <div className="flex flex-1 items-center gap-2">
+              <AlertCircle size={16} />
+              {erro}
+            </div>
+            {conflitoAoSalvar && (
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="flex-none rounded-lg bg-danger-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-danger-600/90"
+              >
+                Recarregar página
+              </button>
+            )}
           </div>
         )}
 
-        <FormSection numero={1} titulo="Dados Gerais" descricao="Identificação da parada, exibida na capa do relatório.">
+        <FormSection numero={1} titulo="Dados Gerais" descricao="Identificação da parada, exibida na capa do relatório." lead>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <TextField label="Nome da Parada" required value={nome} onChange={setNome} placeholder="Ex: Parada Geral — Prensa Hidráulica 01" className="sm:col-span-2" />
             <TextField label="Máquina" required value={maquina} onChange={setMaquina} placeholder="Ex: Prensa Hidráulica 01" />
-            <TextField label="Responsável" required value={responsavel} onChange={setResponsavel} placeholder="Nome do responsável" />
+            <TextField label="Responsável" required value={responsavel} onChange={setResponsavel} placeholder="Nome do responsável" suggestions={responsaveisConhecidos} />
             <TextField label="Data" required type="date" value={data} onChange={setData} />
             <SelectField label="Status Geral" value={status} onChange={(v) => setStatus(v as StatusGeral)} options={STATUS_GERAL_OPTIONS} />
             <TextField label="Tempo Planejado" value={duracaoPlanejada} onChange={setDuracaoPlanejada} placeholder="Ex: 48h" />
@@ -832,6 +914,7 @@ function NovaParadaForm() {
                 item={item}
                 index={i}
                 historicoNaoFeito={encontrarUltimoNaoFeito(item, editId, historicoNaoFeito)}
+                responsaveisSugeridos={responsaveisConhecidos}
                 onChange={(patch) => updateRow(setServicos, item.id, patch)}
                 onRemove={() => setServicos((prev) => prev.filter((r) => r.id !== item.id))}
                 onDuplicate={() =>
@@ -864,6 +947,8 @@ function NovaParadaForm() {
             <AddButton label="Adicionar Pendência" onClick={() => setPendencias((prev) => [...prev, novaPendenciaItem()])} />
           </div>
         </FormSection>
+
+        <DivisorGrupo rotulo="Detalhes Adicionais — Opcional" />
 
         <CollapsibleSection numero={4} titulo="Linha do Tempo" descricao="Eventos cronológicos — bloqueios, testes, partida, etc." badge="Opcional" defaultOpen={timeline.length > 0}>
           <div className="space-y-3">
@@ -939,6 +1024,8 @@ function NovaParadaForm() {
           </div>
         </CollapsibleSection>
 
+        <DivisorGrupo rotulo="Finalização" />
+
         <FormSection numero={7} titulo="Resultado Final" descricao="Índice de segurança e resumo executivo (opcional — gerado automaticamente se vazio).">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <TextField label="Índice de Segurança (%)" type="number" value={String(seguranca)} onChange={(v) => setSeguranca(Number(v) || 0)} />
@@ -954,13 +1041,32 @@ function NovaParadaForm() {
           </div>
         </FormSection>
 
-        <div className="flex items-center justify-end gap-3 pb-10">
-          <Link href="/" className="rounded-xl px-5 py-3 text-sm font-bold text-slate-500 hover:text-slate-800">
+        {/* Barra de ação em painel próprio (não botões soltos flutuando no
+            fim da página) — mesma ideia de "módulo" das seções acima.
+            No celular o formulário passa de 7 seções — o botão de Salvar só
+            no fim da página significava rolar tudo de volta pra baixo depois
+            de mexer em qualquer campo mais acima. A barra fixa deixa Salvar
+            sempre a um toque; a barra aqui embaixo continua existindo também
+            (é o caminho natural em desktop, onde a tela já mostra o fim do
+            formulário sem precisar de nada fixo). */}
+        <div className="mb-24 flex items-center justify-end gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm lg:mb-0">
+          <LinkButton href="/" variant="ghost">
             Cancelar
-          </Link>
-          <button type="submit" className="rounded-xl bg-brand-600 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-700">
+          </LinkButton>
+          <Button type="submit" variant="primary">
             {editId ? "Salvar Alterações" : "Salvar e Visualizar Relatório"}
-          </button>
+          </Button>
+        </div>
+
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
+          <div className="mx-auto flex max-w-5xl items-center gap-3">
+            <LinkButton href="/" variant="ghost" className="flex-none">
+              Cancelar
+            </LinkButton>
+            <Button type="submit" variant="primary" className="flex-1 shadow-[0_4px_12px_rgba(27,77,153,0.25)]">
+              {editId ? "Salvar Alterações" : "Salvar Relatório"}
+            </Button>
+          </div>
         </div>
       </form>
     </div>

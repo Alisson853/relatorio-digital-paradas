@@ -30,7 +30,43 @@ export const PARADAS_RESUMO: ParadaResumo[] = [
   },
 ];
 
-export function gerarResultadoFinal(resumo: ParadaResumo, kpis: Kpis): ResultadoFinal {
+// Frase de abertura pelo status — mantém o tom das três variantes fixas que
+// existiam antes (uma por status). O que muda é o que vem depois: números
+// reais desta parada, não um texto genérico igual pra toda parada "ressalvas".
+function aberturaPorStatus(status: ParadaResumo["status"]): string {
+  switch (status) {
+    case "concluida":
+      return "Parada executada dentro do planejado, com equipamento liberado para operação.";
+    case "ressalvas":
+      return "Parada concluída com desvios de prazo e pendências pontuais.";
+    default:
+      return "Parada em andamento, com execução dentro dos padrões técnicos e de segurança estabelecidos.";
+  }
+}
+
+// Monta o resumo a partir dos dados reais já calculados (kpis, e a maior
+// causa de atraso quando o Caminho Crítico tiver essa informação) — cada
+// cláusula só entra se o número que ela cita existir de fato. Uma parada
+// recém-criada sem nenhuma OS ainda, por exemplo, não teria "de X OS, Y
+// concluídas" fazendo sentido nenhum, então essa frase simplesmente não
+// aparece nesse caso, em vez de mostrar "de 0 OS, 0 concluídas".
+function gerarResumoTexto(resumo: ParadaResumo, kpis: Kpis, graficos?: GraficosData): string {
+  const partes = [aberturaPorStatus(resumo.status)];
+
+  if (kpis.osPlanejadas > 0) {
+    const base = `Foram registradas ${kpis.osPlanejadas} OS, das quais ${kpis.osConcluidas} concluídas (${kpis.eficiencia}% de eficiência)`;
+    partes.push(kpis.pendencias > 0 ? `${base}, restando ${kpis.pendencias} pendente${kpis.pendencias === 1 ? "" : "s"}.` : `${base}.`);
+  }
+
+  const maiorAtraso = graficos?.paretoAtrasos?.[0];
+  if (maiorAtraso && maiorAtraso.horas > 0) {
+    partes.push(`O maior atraso identificado foi atribuído a "${maiorAtraso.causa}" (${maiorAtraso.horas}h).`);
+  }
+
+  return partes.join(" ");
+}
+
+export function gerarResultadoFinal(resumo: ParadaResumo, kpis: Kpis, graficos?: GraficosData): ResultadoFinal {
   const planMatch = resumo.duracaoPlanejada.match(/\d+/);
   const realMatch = resumo.duracaoRealizada.match(/\d+/);
   const tempoPlanejadoHoras = planMatch ? Number(planMatch[0]) : 8;
@@ -43,12 +79,8 @@ export function gerarResultadoFinal(resumo: ParadaResumo, kpis: Kpis): Resultado
     disponibilidade,
     pendenciasAbertas: kpis.pendencias,
     selo: resumo.status,
-    resumo:
-      resumo.status === "concluida"
-        ? "Parada executada dentro do planejado, com todos os serviços críticos concluídos e equipamento liberado para operação em plena capacidade."
-        : resumo.status === "ressalvas"
-        ? "Parada concluída com pequenos desvios de prazo e pendências pontuais, já endereçadas em plano de ação de curto prazo."
-        : "Parada em andamento, com execução dentro dos padrões técnicos e de segurança estabelecidos.",
+    resumo: gerarResumoTexto(resumo, kpis, graficos),
+    resumoAutomatico: true,
   };
 }
 
@@ -398,7 +430,7 @@ export function gerarParadaCompleta(id: string): ParadaCompleta | null {
   const fotos = fotosMp09(servicos);
   const graficos = graficosMp09(kpis);
   const pendencias = pendenciasMp09();
-  const resultadoFinal = gerarResultadoFinal(resumo, kpis);
+  const resultadoFinal = gerarResultadoFinal(resumo, kpis, graficos);
 
   return { resumo, kpis, timeline, servicos, fotos, caminhoCritico, pendencias, graficos, resultadoFinal };
 }

@@ -5,6 +5,7 @@ import { listHistoricoNaoFeito, listParadasHistorico } from "@/lib/actions/parad
 import { ehEditor } from "@/lib/auth/session";
 import { HistoricoCharts } from "@/components/dashboard/HistoricoCharts";
 import { PortaoEditor } from "@/components/shared/PortaoEditor";
+import { StatusConexao } from "@/components/shared/StatusConexao";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,8 @@ export default async function HistoricoPage() {
           </div>
         </div>
       </header>
+
+      <StatusConexao />
 
       <main className="mx-auto max-w-7xl px-6 py-10 sm:px-10">
         {autorizado ? (

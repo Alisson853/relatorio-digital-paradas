@@ -51,9 +51,12 @@ interface Props {
   // Última vez que essa mesma OS (ou equipamento) ficou marcada "não será
   // feito" em outro relatório — null quando não há histórico.
   historicoNaoFeito?: HistoricoNaoFeitoItem | null;
+  // Nomes já usados como responsável em outros relatórios — só sugestão,
+  // nunca restringe o campo (ver TextField.suggestions).
+  responsaveisSugeridos?: string[];
 }
 
-export function ServicoRowEditor({ item, index, onChange, onRemove, onDuplicate, historicoNaoFeito }: Props) {
+export function ServicoRowEditor({ item, index, onChange, onRemove, onDuplicate, historicoNaoFeito, responsaveisSugeridos }: Props) {
   return (
     <div className="relative rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
       <div className="absolute right-3 top-3 flex items-center gap-1">
@@ -147,7 +150,7 @@ export function ServicoRowEditor({ item, index, onChange, onRemove, onDuplicate,
         <SelectField label="Status" value={item.status} onChange={(v) => onChange({ status: v as StatusItem })} options={STATUS_OPTIONS} />
         <SelectField label="Equipe" value={item.equipe} onChange={(v) => onChange({ equipe: v as Equipe })} options={EQUIPE_OPTIONS} />
         <SelectField label="Categoria" value={item.categoria} onChange={(v) => onChange({ categoria: v })} options={CATEGORIA_OPTIONS} />
-        <TextField label="Responsável" value={item.responsavel} onChange={(v) => onChange({ responsavel: v })} />
+        <TextField label="Responsável" value={item.responsavel} onChange={(v) => onChange({ responsavel: v })} suggestions={responsaveisSugeridos} />
         <TextField label="Tempo Gasto" value={item.tempoGasto} onChange={(v) => onChange({ tempoGasto: v })} placeholder="Ex: 2h" />
       </div>
     </div>

@@ -155,6 +155,15 @@ export interface ResultadoFinal {
   pendenciasAbertas: number;
   selo: StatusGeral;
   resumo: string;
+  // Marca se `resumo` foi gerado automaticamente (gerarResultadoFinal) ou
+  // escrito à mão no campo "opcional" do formulário. Substitui uma checagem
+  // antiga por comparação de texto exato contra uma lista de frases fixas —
+  // que parou de funcionar quando o texto automático passou a variar com os
+  // dados reais de cada parada. Ausente (relatórios salvos antes deste campo
+  // existir) é tratado como "não é automático", pelo mesmo motivo de
+  // segurança de graficos.horasPorServico em lib/actions/paradas.ts: nunca
+  // apagar um texto que a pessoa pode ter escrito à mão.
+  resumoAutomatico?: boolean;
 }
 
 export interface ParadaCompleta {

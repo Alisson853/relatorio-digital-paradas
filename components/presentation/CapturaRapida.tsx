@@ -41,9 +41,12 @@ import {
 import { compressImageFile, NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { EditorPasswordForm } from "@/components/shared/EditorPasswordForm";
 import { useEditorMode } from "@/lib/useEditorMode";
+import { useConectividade } from "@/lib/useConectividade";
 import { cn, formatDateCompact, pareceNomeDePessoa } from "@/lib/utils";
-import { type FotoPendente, listarFotosPendentes, removerFotoPendente, salvarFotoPendente } from "@/lib/offline-fotos";
-import { type NaoFeitoPendente, listarNaoFeitoPendente, removerNaoFeitoPendente, salvarNaoFeitoPendente } from "@/lib/offline-nao-feito";
+import { chaveFotoPendente, type FotoPendente, listarFotosPendentes, removerFotoPendente, salvarFotoPendente } from "@/lib/offline-fotos";
+import { atualizarItemNaoFeito, type NaoFeitoPendente, listarNaoFeitoPendente, removerNaoFeitoPendente, salvarNaoFeitoPendente } from "@/lib/offline-nao-feito";
+import { atualizarItemStatus, type StatusPendente, listarStatusPendente, removerStatusPendente, salvarStatusPendente } from "@/lib/offline-status";
+import { processarFila, type ResultadoTentativa } from "@/lib/offline-sync";
 import { carregarParadaCache, salvarParadaCache } from "@/lib/offline-parada-cache";
 import { encontrarUltimoNaoFeito, type HistoricoNaoFeitoItem } from "@/lib/historico-nao-feito";
 
@@ -67,12 +70,21 @@ function NovaOsForm({ paradaId, onCriada }: { paradaId: string; onCriada: (servi
   const [motivo, setMotivo] = useState("");
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
+  // Bloco F: guarda síncrona contra duplo-toque. `loading` (state) só reflete
+  // na tela — e no atributo `disabled` do botão — depois que o React
+  // re-renderiza; num toque duplo rápido no celular, o segundo toque pode
+  // chegar ANTES desse re-render e cair no mesmo `handleSalvar` com
+  // `loading` ainda lido como false, criando uma segunda OS igual à
+  // primeira. Ref é síncrona: a segunda chamada vê `true` na hora.
+  const submetendoRef = useRef(false);
 
   async function handleSalvar() {
+    if (submetendoRef.current) return;
     if (!equipamento.trim()) {
       setErro("Informe o equipamento.");
       return;
     }
+    submetendoRef.current = true;
     setErro("");
     setLoading(true);
     try {
@@ -93,6 +105,7 @@ function NovaOsForm({ paradaId, onCriada }: { paradaId: string; onCriada: (servi
     } catch {
       setErro("Não foi possível criar a OS. Tente novamente.");
     } finally {
+      submetendoRef.current = false;
       setLoading(false);
     }
   }
@@ -114,7 +127,12 @@ function NovaOsForm({ paradaId, onCriada }: { paradaId: string; onCriada: (servi
     <div className="rounded-2xl border border-brand-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-bold text-slate-900">Abrir Nova OS</h3>
-        <button type="button" onClick={() => setAberto(false)} className="text-slate-400">
+        <button
+          type="button"
+          onClick={() => setAberto(false)}
+          aria-label="Fechar"
+          className="-mr-1.5 flex h-9 w-9 items-center justify-center rounded-full text-slate-400 active:bg-slate-100"
+        >
           <ChevronDown size={18} />
         </button>
       </div>
@@ -285,12 +303,17 @@ function NovoEventoForm({ paradaId, onCriado }: { paradaId: string; onCriado: (e
   const [descricao, setDescricao] = useState("");
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
+  // Bloco F: mesma guarda síncrona contra duplo-toque de NovaOsForm acima —
+  // ver o comentário lá.
+  const submetendoRef = useRef(false);
 
   async function handleSalvar() {
+    if (submetendoRef.current) return;
     if (!titulo.trim()) {
       setErro("Escolha ou digite o evento.");
       return;
     }
+    submetendoRef.current = true;
     setErro("");
     setLoading(true);
     try {
@@ -306,6 +329,7 @@ function NovoEventoForm({ paradaId, onCriado }: { paradaId: string; onCriado: (e
     } catch {
       setErro("Não foi possível marcar o evento. Tente novamente.");
     } finally {
+      submetendoRef.current = false;
       setLoading(false);
     }
   }
@@ -327,7 +351,12 @@ function NovoEventoForm({ paradaId, onCriado }: { paradaId: string; onCriado: (e
     <div className="rounded-2xl border border-brand-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-bold text-slate-900">Marcar Evento</h3>
-        <button type="button" onClick={() => setAberto(false)} className="text-slate-400">
+        <button
+          type="button"
+          onClick={() => setAberto(false)}
+          aria-label="Fechar"
+          className="-mr-1.5 flex h-9 w-9 items-center justify-center rounded-full text-slate-400 active:bg-slate-100"
+        >
           <ChevronDown size={18} />
         </button>
       </div>
@@ -411,6 +440,8 @@ function ServicoCapturaCard({
   onEnfileirar,
   pendenteNaoFeito,
   onEnfileirarNaoFeito,
+  pendenteStatus,
+  onEnfileirarStatus,
   historicoNaoFeito,
 }: {
   paradaId: string;
@@ -420,6 +451,8 @@ function ServicoCapturaCard({
   onEnfileirar: (servicoId: string, etapa: "Antes" | "Durante" | "Depois", blob: Blob, nomeArquivo: string) => Promise<void>;
   pendenteNaoFeito: boolean;
   onEnfileirarNaoFeito: (servicoId: string, categoria: MotivoNaoFeitoCategoria | "", justificativa: string) => Promise<void>;
+  pendenteStatus: boolean;
+  onEnfileirarStatus: (servicoId: string, novoStatus: StatusItem) => Promise<void>;
   historicoNaoFeito: HistoricoNaoFeitoItem | null;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -533,12 +566,34 @@ function ServicoCapturaCard({
     }
   }
 
+  // Antes disto, sem internet a chamada só falhava (fetch rejeitando) e o
+  // toque não tinha efeito nenhum — nem aviso, nem o status mudava na tela,
+  // nem nada guardado pra tentar de novo depois. Fotos e "não será feito" já
+  // não tinham esse problema; agora o status também cai na fila offline
+  // quando a chamada falha, do mesmo jeito. O botão muda na tela na hora, em
+  // qualquer um dos dois casos — igual "não será feito" já faz (ver
+  // aplicarNaoFeitoLocal): o card de baixo (badge "sincronização pendente")
+  // é quem avisa que ainda não é a confirmação do servidor, não a ausência
+  // de reação ao toque.
   async function handleAlterarStatus(novoStatus: StatusItem) {
     if (novoStatus === servico.status) return;
     setStatusLoading(true);
     try {
+      if (!navigator.onLine) {
+        await onEnfileirarStatus(servico.id, novoStatus);
+        onCaptured(servico.id, { status: novoStatus });
+        return;
+      }
       const resultado = await marcarStatusServico(paradaId, servico.id, novoStatus);
-      if (resultado.ok) onCaptured(servico.id, { status: novoStatus });
+      if (resultado.ok) {
+        onCaptured(servico.id, { status: novoStatus });
+        return;
+      }
+      await onEnfileirarStatus(servico.id, novoStatus);
+      onCaptured(servico.id, { status: novoStatus });
+    } catch {
+      await onEnfileirarStatus(servico.id, novoStatus);
+      onCaptured(servico.id, { status: novoStatus });
     } finally {
       setStatusLoading(false);
     }
@@ -640,20 +695,31 @@ function ServicoCapturaCard({
     setNaoFeitoAberto((v) => !v);
   }
 
+  // Borda esquerda colorida pelo status — a mesma linguagem da faixa de
+  // estatísticas do Dashboard (border-l-4 + cor semântica), aplicada aqui
+  // como uma pista extra de status que dá pra notar rolando a lista, sem
+  // precisar ler os botões — nunca a ÚNICA pista, os botões de status e o
+  // rótulo continuam sendo a fonte de verdade.
+  const corBordaStatus =
+    servico.status === "concluido" ? "border-l-success-500" : servico.status === "em_andamento" ? "border-l-brand-500" : "border-l-slate-300";
+
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className={cn("rounded-2xl border border-slate-200 border-l-4 bg-white p-4 shadow-sm", corBordaStatus)}>
       {/* Sem "capture" de propósito: assim o celular mostra a opção de tirar
           foto NA HORA ou escolher uma já tirada antes (útil quando a foto foi
           tirada num momento sem internet e só agora dá pra anexar). */}
       <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
       <div className="min-w-0">
-        <p className="text-[10px] font-bold uppercase tracking-wide text-brand-600">
-          OS {servico.numeroOS} · {servico.area}
-        </p>
+        <div className="flex items-center gap-2">
+          <span className="label-tecnico inline-flex items-center rounded-sm bg-brand-50 px-1.5 py-0.5 text-[10px] font-bold text-brand-700">
+            OS {servico.numeroOS}
+          </span>
+          <span className="truncate text-[11px] font-semibold text-slate-400">{servico.area}</span>
+        </div>
         {/* O que precisa ser feito é a informação que realmente diferencia uma
             OS da outra em campo — o equipamento sozinho costuma ser um código
             técnico genérico que não diz nada de cara. */}
-        <h3 className="mt-0.5 text-base font-bold leading-snug text-slate-900">{servico.problemaIdentificado}</h3>
+        <h3 className="mt-1.5 text-base font-bold leading-snug text-slate-900">{servico.problemaIdentificado}</h3>
         <p className="mt-0.5 text-xs text-slate-400">{servico.equipamento}</p>
         {/* Nome de quem é responsável, sempre visível — é o que permite ir
             direto falar com a pessoa certa em vez de só saber a equipe. */}
@@ -705,6 +771,12 @@ function ServicoCapturaCard({
           </button>
         ))}
       </div>
+      {pendenteStatus && (
+        <p className="mt-1.5 flex items-center gap-1.5 text-[11px] font-bold text-warning-700">
+          <WifiOff size={11} className="flex-none" />
+          Salvo neste aparelho — sincroniza quando a conexão voltar
+        </p>
+      )}
 
       {/* Quadradinho separado dos 3 status: "não será feito" não é um estado
           transitório do serviço (como Pendente/Em Andamento), é uma decisão
@@ -715,7 +787,7 @@ function ServicoCapturaCard({
       <button
         type="button"
         onClick={handleToqueNaoFeito}
-        className="mt-2 flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-danger-600"
+        className="-ml-1 mt-2 flex min-h-11 items-center gap-1.5 rounded-lg px-1 text-xs font-bold text-slate-500 active:bg-slate-100 hover:text-danger-600"
       >
         {categoria ? <CheckSquare size={15} className="text-danger-600" /> : <Square size={15} />}
         Não será feito
@@ -776,45 +848,54 @@ function ServicoCapturaCard({
         </div>
       ) : (
         <>
-          {/* O rotulo antigo era "Toque para escolher a etapa da foto" — uma
-              instrucao, quando o que falta e uma resposta. A etapa ja vem escolhida
-              sozinha (etapaSugerida), entao a pergunta de quem olha nao e "o que eu
-              faco aqui", e sim "onde e que essa foto vai parar". O texto agora diz
-              isso, e diz por extenso qual etapa esta valendo. */}
-          <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-            A próxima foto entra em <span className="text-brand-700">{etapaAtiva}</span>
-            {jaTemFotoNaEtapaAtiva && <span className="text-warning-700"> · vai substituir a atual</span>}
-          </p>
-          <div className="mt-1.5 flex gap-2">
-            <EtapaDot preenchida={temAntes} selecionada={etapaAtiva === "Antes"} horario={servico.fotoAntesHorario} label="Antes" onClick={() => setEtapaEscolhida("Antes")} />
-            <EtapaDot preenchida={temDurante} selecionada={etapaAtiva === "Durante"} horario={servico.fotoDuranteHorario} label="Durante" opcional onClick={() => setEtapaEscolhida("Durante")} />
-            <EtapaDot preenchida={temDepois} selecionada={etapaAtiva === "Depois"} horario={servico.fotoDepoisHorario} label="Depois" onClick={() => setEtapaEscolhida("Depois")} />
+          {/* "Zona de captura" isolada num painel próprio — antes os pontos de
+              etapa e o botão de foto viviam soltos no mesmo espaço dos botões
+              de status, sem nada separando visualmente "decidir o status" de
+              "registrar a foto", que são as duas ações principais do card. */}
+          <div className="mt-3 rounded-xl bg-slate-50 p-3">
+            {/* O rotulo antigo era "Toque para escolher a etapa da foto" — uma
+                instrucao, quando o que falta e uma resposta. A etapa ja vem escolhida
+                sozinha (etapaSugerida), entao a pergunta de quem olha nao e "o que eu
+                faco aqui", e sim "onde e que essa foto vai parar". O texto agora diz
+                isso, e diz por extenso qual etapa esta valendo. */}
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              A próxima foto entra em <span className="text-brand-700">{etapaAtiva}</span>
+              {jaTemFotoNaEtapaAtiva && <span className="text-warning-700"> · vai substituir a atual</span>}
+            </p>
+            <div className="mt-1.5 flex gap-2">
+              <EtapaDot preenchida={temAntes} selecionada={etapaAtiva === "Antes"} horario={servico.fotoAntesHorario} label="Antes" onClick={() => setEtapaEscolhida("Antes")} />
+              <EtapaDot preenchida={temDurante} selecionada={etapaAtiva === "Durante"} horario={servico.fotoDuranteHorario} label="Durante" opcional onClick={() => setEtapaEscolhida("Durante")} />
+              <EtapaDot preenchida={temDepois} selecionada={etapaAtiva === "Depois"} horario={servico.fotoDepoisHorario} label="Depois" onClick={() => setEtapaEscolhida("Depois")} />
+            </div>
+
+            {/* Ação principal do card: maior sombra e feedback de toque
+                (active:scale) pra se destacar como O botão que importa aqui —
+                tudo o mais na "zona de captura" leva até ele. */}
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              disabled={loading}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3.5 text-sm font-bold text-white shadow-[0_4px_12px_rgba(27,77,153,0.25)] transition-[background-color,transform] hover:bg-brand-700 active:scale-[0.98] disabled:opacity-60"
+            >
+              {loading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
+              {loading ? "Enviando..." : jaTemFotoNaEtapaAtiva ? `Substituir foto de ${etapaAtiva}` : `Tirar foto de ${etapaAtiva}`}
+            </button>
+
+            {pendentesDoServico.length > 0 && (
+              <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-warning-700">
+                <WifiOff size={13} className="flex-none" />
+                {pendentesDoServico.length} foto{pendentesDoServico.length > 1 ? "s" : ""} guardada{pendentesDoServico.length > 1 ? "s" : ""} sem internet — envia sozinha quando voltar a conexão
+              </p>
+            )}
+
+            {ultimoResultado && <p className="mt-2 text-center text-xs font-semibold text-success-600">{ultimoResultado}</p>}
+            {erro && (
+              <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-danger-600">
+                <AlertCircle size={13} />
+                {erro}
+              </p>
+            )}
           </div>
-
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            disabled={loading}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3.5 text-sm font-bold text-white transition-colors hover:bg-brand-700 disabled:opacity-60"
-          >
-            {loading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
-            {loading ? "Enviando..." : jaTemFotoNaEtapaAtiva ? `Substituir foto de ${etapaAtiva}` : `Tirar foto de ${etapaAtiva}`}
-          </button>
-
-          {pendentesDoServico.length > 0 && (
-            <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-warning-700">
-              <WifiOff size={13} className="flex-none" />
-              {pendentesDoServico.length} foto{pendentesDoServico.length > 1 ? "s" : ""} guardada{pendentesDoServico.length > 1 ? "s" : ""} sem internet — envia sozinha quando voltar a conexão
-            </p>
-          )}
-
-          {ultimoResultado && <p className="mt-2 text-center text-xs font-semibold text-success-600">{ultimoResultado}</p>}
-          {erro && (
-            <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-danger-600">
-              <AlertCircle size={13} />
-              {erro}
-            </p>
-          )}
         </>
       )}
     </div>
@@ -849,6 +930,31 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
   // por serviço (a mais nova substitui), guardada no IndexedDB até a conexão
   // voltar. Ver lib/offline-nao-feito.ts.
   const [filaNaoFeitoPendente, setFilaNaoFeitoPendente] = useState<NaoFeitoPendente[]>([]);
+  const [enviandoNaoFeito, setEnviandoNaoFeito] = useState(false);
+  // Terceira fila, mesmo desenho: mudança de status pendente de salvar. Ver
+  // lib/offline-status.ts — cobre a lacuna que só fotos e "não será feito"
+  // tinham fechado antes (marcar status sem internet simplesmente falhava
+  // sem guardar nada).
+  const [filaStatusPendente, setFilaStatusPendente] = useState<StatusPendente[]>([]);
+  const [enviandoStatus, setEnviandoStatus] = useState(false);
+  // Bloco F: guarda SÍNCRONA (ref, não state) de "já tem uma sincronização
+  // desta fila em andamento". O `enviando*` acima é só pra tela (mostrar o
+  // spinner) — como setState é assíncrono, duas chamadas de tentarEnviarFila*
+  // disparadas quase juntas (o evento "online" e o intervalo de 20s, por
+  // exemplo) podiam ler `enviandoFila` como false as DUAS antes de qualquer
+  // re-render acontecer, e as duas processavam a mesma fila ao mesmo tempo —
+  // upload em dobro da mesma foto, dobro de chamada de servidor pro mesmo
+  // item. Ref é lida/escrita na hora, sem esperar o React re-renderizar, o
+  // que fecha essa janela de verdade (é o mesmo motivo de temDadosRef acima).
+  const enviandoFilaRef = useRef(false);
+  const enviandoNaoFeitoRef = useRef(false);
+  const enviandoStatusRef = useRef(false);
+  // navigator.onLine sozinho não conta a história toda (uma rede com portal
+  // cativo, ou wifi sem internet de verdade, ainda reporta "online") — mas é
+  // o mesmo sinal que o resto do app já usa (useConectividade, Bloco C), e
+  // trocar por algo mais sofisticado aqui seria uma segunda lógica de
+  // conectividade rodando ao lado da que já existe.
+  const online = useConectividade();
   // Histórico de "não será feito" de todos os relatórios — carregado uma vez
   // (não muda a cada 8s como o resto da tela) e cruzado localmente contra
   // cada serviço pra decidir se mostra o alerta.
@@ -910,11 +1016,21 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
     }
   }
 
+  // As três filas (fotos, "não será feito", status) processam do mesmo jeito
+  // — só muda COMO uma tentativa de item é feita. tentar() abaixo devolve:
+  // - exceção (fetch rejeitou) => "rede": sem conexão de verdade, o motor
+  //   (lib/offline-sync.ts) continua tentando sozinho, sem incomodar ninguém.
+  // - {ok:false} do servidor => "negocio": a chamada CHEGOU e foi recusada
+  //   (sessão expirada, serviço não existe mais, ou o teto de tentativas da
+  //   proteção de concorrência do Bloco A esgotado) — isso é informação real
+  //   que o técnico precisa ver, não repete sozinho a cada 20s pra sempre.
+
   // Tenta enviar tudo que ficou guardado no aparelho por falta de conexão.
   // Cada foto é tentada de forma independente — uma falhar não impede as
   // outras de irem, e o que não for enviado continua na fila pra próxima vez.
-  async function tentarEnviarFila() {
-    if (enviandoFila) return;
+  async function tentarEnviarFila(opcoes: { incluirComErro?: boolean } = {}) {
+    if (enviandoFilaRef.current) return;
+    enviandoFilaRef.current = true;
     setEnviandoFila(true);
     try {
       const itens = await listarFotosPendentes(id);
@@ -922,75 +1038,98 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
         setFilaPendente([]);
         return;
       }
-      const restantes: FotoPendente[] = [];
-      for (const item of itens) {
-        try {
-          const formData = new FormData();
-          formData.set("file", item.blob, item.nomeArquivo);
-          const upload = await uploadFoto(formData);
-          if (!upload.ok || !upload.url) {
-            restantes.push(item);
-            continue;
+      const { sincronizados, atualizados } = await processarFila<FotoPendente>(
+        itens,
+        async (item): Promise<ResultadoTentativa> => {
+          try {
+            const formData = new FormData();
+            formData.set("file", item.blob, item.nomeArquivo);
+            const upload = await uploadFoto(formData);
+            if (!upload.ok || !upload.url) return { ok: false, tipo: "negocio", erro: upload.erro || "Não foi possível enviar a foto." };
+            const resultado = await capturarFotoServico(id, item.servicoId, upload.url, item.etapa);
+            if (!resultado.ok) return { ok: false, tipo: "negocio", erro: resultado.erro || "Não foi possível registrar a foto." };
+            const campo = resultado.label === "Antes" ? "fotoAntes" : resultado.label === "Durante" ? "fotoDurante" : "fotoDepois";
+            const horarioCampo = resultado.label === "Antes" ? "fotoAntesHorario" : resultado.label === "Durante" ? "fotoDuranteHorario" : "fotoDepoisHorario";
+            handleCaptured(item.servicoId, {
+              [campo]: upload.url,
+              [horarioCampo]: resultado.horario,
+              ...(resultado.statusFechado ? { status: resultado.statusFechado } : {}),
+            } as Partial<Servico>);
+            return { ok: true };
+          } catch {
+            return { ok: false, tipo: "rede" };
           }
-          const resultado = await capturarFotoServico(id, item.servicoId, upload.url, item.etapa);
-          if (!resultado.ok) {
-            restantes.push(item);
-            continue;
-          }
-          await removerFotoPendente(item.id);
-          const campo = resultado.label === "Antes" ? "fotoAntes" : resultado.label === "Durante" ? "fotoDurante" : "fotoDepois";
-          const horarioCampo = resultado.label === "Antes" ? "fotoAntesHorario" : resultado.label === "Durante" ? "fotoDuranteHorario" : "fotoDepoisHorario";
-          handleCaptured(item.servicoId, {
-            [campo]: upload.url,
-            [horarioCampo]: resultado.horario,
-            ...(resultado.statusFechado ? { status: resultado.statusFechado } : {}),
-          } as Partial<Servico>);
-        } catch {
-          restantes.push(item);
-        }
-      }
-      setFilaPendente(restantes);
+        },
+        opcoes
+      );
+      await Promise.all(sincronizados.map((itemId) => removerFotoPendente(itemId)));
+      await Promise.all(atualizados.map((item) => salvarFotoPendente(item)));
+      setFilaPendente(atualizados);
     } finally {
+      enviandoFilaRef.current = false;
       setEnviandoFila(false);
     }
   }
 
   // Chamado pelo card de cada OS quando não dá pra enviar a foto na hora
   // (sem internet, ou o envio falhou) — guarda no aparelho e some da tela;
-  // essa mesma fila é reprocessada sozinha quando a conexão voltar.
+  // essa mesma fila é reprocessada sozinha quando a conexão voltar. Chave
+  // determinística (não um id aleatório): retirar a mesma foto de novo
+  // enquanto ainda offline SUBSTITUI a pendência anterior em vez de
+  // empilhar uma segunda (ver chaveFotoPendente).
   async function enfileirarFoto(servicoId: string, etapa: "Antes" | "Durante" | "Depois", blob: Blob, nomeArquivo: string) {
-    const item: FotoPendente = { id: crypto.randomUUID(), paradaId: id, servicoId, etapa, nomeArquivo, blob, criadoEm: Date.now() };
+    const item: FotoPendente = {
+      id: chaveFotoPendente(id, servicoId, etapa),
+      paradaId: id,
+      servicoId,
+      etapa,
+      nomeArquivo,
+      blob,
+      criadoEm: Date.now(),
+      sincronizacao: "pendente",
+      tentativas: 0,
+    };
     await salvarFotoPendente(item);
-    setFilaPendente((prev) => [...prev, item]);
+    setFilaPendente((prev) => [...prev.filter((p) => p.id !== item.id), item]);
     if (navigator.onLine) tentarEnviarFila();
   }
 
   // Mesma lógica de tentarEnviarFila, mas pra "não será feito" — cada item
   // já é o estado final desejado daquele serviço, então basta reaplicar.
-  async function tentarEnviarFilaNaoFeito() {
-    const itens = await listarNaoFeitoPendente(id);
-    if (itens.length === 0) {
-      setFilaNaoFeitoPendente([]);
-      return;
-    }
-    const restantes: NaoFeitoPendente[] = [];
-    for (const item of itens) {
-      try {
-        const resultado = await definirNaoFeito(id, item.servicoId, item.categoria, item.justificativa);
-        if (!resultado.ok) {
-          restantes.push(item);
-          continue;
-        }
-        await removerNaoFeitoPendente(item.id);
-        handleCaptured(item.servicoId, {
-          naoFeitoCategoria: (item.categoria || undefined) as MotivoNaoFeitoCategoria | undefined,
-          justificativaNaoFeito: item.justificativa || undefined,
-        });
-      } catch {
-        restantes.push(item);
+  async function tentarEnviarFilaNaoFeito(opcoes: { incluirComErro?: boolean } = {}) {
+    if (enviandoNaoFeitoRef.current) return;
+    enviandoNaoFeitoRef.current = true;
+    setEnviandoNaoFeito(true);
+    try {
+      const itens = await listarNaoFeitoPendente(id);
+      if (itens.length === 0) {
+        setFilaNaoFeitoPendente([]);
+        return;
       }
+      const { sincronizados, atualizados } = await processarFila<NaoFeitoPendente>(
+        itens,
+        async (item): Promise<ResultadoTentativa> => {
+          try {
+            const resultado = await definirNaoFeito(id, item.servicoId, item.categoria, item.justificativa);
+            if (!resultado.ok) return { ok: false, tipo: "negocio", erro: resultado.erro || "Não foi possível salvar." };
+            handleCaptured(item.servicoId, {
+              naoFeitoCategoria: (item.categoria || undefined) as MotivoNaoFeitoCategoria | undefined,
+              justificativaNaoFeito: item.justificativa || undefined,
+            });
+            return { ok: true };
+          } catch {
+            return { ok: false, tipo: "rede" };
+          }
+        },
+        opcoes
+      );
+      await Promise.all(sincronizados.map((itemId) => removerNaoFeitoPendente(itemId)));
+      await Promise.all(atualizados.map((item) => atualizarItemNaoFeito(item)));
+      setFilaNaoFeitoPendente(atualizados);
+    } finally {
+      enviandoNaoFeitoRef.current = false;
+      setEnviandoNaoFeito(false);
     }
-    setFilaNaoFeitoPendente(restantes);
   }
 
   // Chamado pelo card quando marcar/desmarcar "não será feito" falha (sem
@@ -1000,29 +1139,89 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
     await salvarNaoFeitoPendente(id, servicoId, categoria, justificativa);
     setFilaNaoFeitoPendente((prev) => [
       ...prev.filter((p) => p.servicoId !== servicoId),
-      { id: `${id}:${servicoId}`, paradaId: id, servicoId, categoria, justificativa, criadoEm: Date.now() },
+      { id: `${id}:${servicoId}`, paradaId: id, servicoId, categoria, justificativa, criadoEm: Date.now(), sincronizacao: "pendente", tentativas: 0 },
     ]);
     if (navigator.onLine) tentarEnviarFilaNaoFeito();
+  }
+
+  // Terceira fila: mudança de status. Mesmo desenho das duas acima.
+  async function tentarEnviarFilaStatus(opcoes: { incluirComErro?: boolean } = {}) {
+    if (enviandoStatusRef.current) return;
+    enviandoStatusRef.current = true;
+    setEnviandoStatus(true);
+    try {
+      const itens = await listarStatusPendente(id);
+      if (itens.length === 0) {
+        setFilaStatusPendente([]);
+        return;
+      }
+      const { sincronizados, atualizados } = await processarFila<StatusPendente>(
+        itens,
+        async (item): Promise<ResultadoTentativa> => {
+          try {
+            const resultado = await marcarStatusServico(id, item.servicoId, item.novoStatus);
+            if (!resultado.ok) return { ok: false, tipo: "negocio", erro: resultado.erro || "Não foi possível salvar o status." };
+            return { ok: true };
+          } catch {
+            return { ok: false, tipo: "rede" };
+          }
+        },
+        opcoes
+      );
+      await Promise.all(sincronizados.map((itemId) => removerStatusPendente(itemId)));
+      await Promise.all(atualizados.map((item) => atualizarItemStatus(item)));
+      setFilaStatusPendente(atualizados);
+    } finally {
+      enviandoStatusRef.current = false;
+      setEnviandoStatus(false);
+    }
+  }
+
+  // Chamado pelo card quando marcar status falha (sem internet ou erro) —
+  // guarda a intenção mais recente pra esse serviço (substitui qualquer
+  // pendência anterior ainda não enviada, já que só o valor final importa).
+  async function enfileirarStatus(servicoId: string, novoStatus: StatusItem) {
+    await salvarStatusPendente(id, servicoId, novoStatus);
+    setFilaStatusPendente((prev) => [
+      ...prev.filter((p) => p.servicoId !== servicoId),
+      { id: `${id}:${servicoId}`, paradaId: id, servicoId, novoStatus, criadoEm: Date.now(), sincronizacao: "pendente", tentativas: 0 },
+    ]);
+    if (navigator.onLine) tentarEnviarFilaStatus();
+  }
+
+  // "Tentar novamente": pedido explícito do usuário, cobrindo inclusive os
+  // itens marcados "erro" que o ciclo automático (abaixo) pula de propósito.
+  async function retentarTudo() {
+    await Promise.all([
+      tentarEnviarFila({ incluirComErro: true }),
+      tentarEnviarFilaNaoFeito({ incluirComErro: true }),
+      tentarEnviarFilaStatus({ incluirComErro: true }),
+    ]);
   }
 
   useEffect(() => {
     void (async () => {
       await tentarEnviarFila();
       await tentarEnviarFilaNaoFeito();
+      await tentarEnviarFilaStatus();
     })();
 
     function onOnline() {
       tentarEnviarFila();
       tentarEnviarFilaNaoFeito();
+      tentarEnviarFilaStatus();
     }
     window.addEventListener("online", onOnline);
     // Além do evento "online" (que alguns celulares disparam com atraso ou
     // não disparam de forma confiável em wi-fi instável), tenta de novo a
-    // cada 20s enquanto o navegador achar que está conectado.
+    // cada 20s enquanto o navegador achar que está conectado. Só os itens
+    // "pendente" — os "erro" esperam o toque em "Tentar novamente" (ver
+    // opcoes.incluirComErro em lib/offline-sync.ts).
     const intervaloFila = setInterval(() => {
       if (navigator.onLine) {
         tentarEnviarFila();
         tentarEnviarFilaNaoFeito();
+        tentarEnviarFilaStatus();
       }
     }, 20000);
 
@@ -1076,7 +1275,36 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
   const concluidasCount = data ? data.servicos.filter((s) => s.status === "concluido").length : 0;
   const emAndamentoCount = data ? data.servicos.filter((s) => s.status === "em_andamento").length : 0;
   const percConcluido = totalServicos > 0 ? Math.round((concluidasCount / totalServicos) * 100) : 0;
-  const percEmAndamento = totalServicos > 0 ? Math.round((emAndamentoCount / totalServicos) * 100) : 0;
+
+  // Consolidado das três filas offline (fotos, "não será feito", status) pro
+  // banner único do topo — ver JSX mais abaixo. Um item com sincronizacao
+  // "erro" continua contando em totalPendentesFila (ele não sai da fila só
+  // porque falhou), então totalPendentesFila só chega a 0 quando não sobra
+  // absolutamente nada — nem pendente, nem com erro.
+  const totalPendentesFila = filaPendente.length + filaNaoFeitoPendente.length + filaStatusPendente.length;
+  const totalComErro =
+    filaPendente.filter((i) => i.sincronizacao === "erro").length +
+    filaNaoFeitoPendente.filter((i) => i.sincronizacao === "erro").length +
+    filaStatusPendente.filter((i) => i.sincronizacao === "erro").length;
+  const sincronizandoAlgumaFila = enviandoFila || enviandoNaoFeito || enviandoStatus;
+
+  // "Sincronizado com sucesso": aparece só na TRANSIÇÃO de "tinha algo
+  // pendente" pra "não tem mais nada pendente" — nunca por uma tentativa só
+  // ter começado, e nunca se não havia nada pendente pra começo de conversa
+  // (senão apareceria toda vez que a tela abre com a fila vazia). Reage a uma
+  // mudança de estado ao longo do tempo, não inicializa nada — por isso é um
+  // useEffect de verdade, não um cálculo que poderia rodar na renderização.
+  const [mostrarSincronizado, setMostrarSincronizado] = useState(false);
+  const totalPendentesAnteriorRef = useRef(0);
+  useEffect(() => {
+    const anterior = totalPendentesAnteriorRef.current;
+    totalPendentesAnteriorRef.current = totalPendentesFila;
+    if (anterior > 0 && totalPendentesFila === 0) {
+      setMostrarSincronizado(true);
+      const t = setTimeout(() => setMostrarSincronizado(false), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [totalPendentesFila]);
 
   // "responsavel" costuma vir como dupla/trio ("ADELINO + JEBERSON") — quebra
   // em cada pessoa e pega só o primeiro nome, pra virar um chip curto que dá
@@ -1147,7 +1375,35 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
     });
   }
 
-  if (status === "loading") return <div className="min-h-screen bg-slate-50" />;
+  // Skeleton em vez de tela em branco — o layout dá pra antecipar (cabeçalho
+  // + lista de cards), então mostrar a forma do que está vindo é melhor do
+  // que uma tela vazia (que em campo, no sol, é fácil de confundir com "o
+  // celular travou") e melhor do que só um texto "Carregando...".
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-slate-50 pb-16">
+        <header className="border-b border-slate-200 bg-white px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 flex-none animate-pulse rounded-lg bg-slate-100" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="h-3.5 w-32 animate-pulse rounded bg-slate-100" />
+              <div className="h-3 w-48 animate-pulse rounded bg-slate-100" />
+            </div>
+          </div>
+        </header>
+        <main className="mx-auto max-w-lg space-y-3 px-4 py-5">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="h-2.5 w-20 animate-pulse rounded bg-slate-100" />
+              <div className="mt-2 h-4 w-3/4 animate-pulse rounded bg-slate-100" />
+              <div className="mt-2 h-3 w-1/2 animate-pulse rounded bg-slate-100" />
+              <div className="mt-4 h-11 animate-pulse rounded-lg bg-slate-100" />
+            </div>
+          ))}
+        </main>
+      </div>
+    );
+  }
 
   if (status === "not-found" || !data) {
     return (
@@ -1166,14 +1422,21 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-16">
+      {/* Cabeçalho de ferramenta de campo: o número de conclusão é a leitura
+          dominante (tipografia grande, sozinha), não mais duas barras finas
+          de peso igual dividindo a atenção — em campo, sob sol, o que
+          importa de relance é "quanto falta", não duas métricas ao mesmo
+          tempo. Continua em fundo claro (não escuro) de propósito: contraste
+          alto é o que se lê melhor ao ar livre, um hero escuro aqui
+          trabalharia contra a própria leitura em campo. */}
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="flex items-center gap-3 px-4 py-4">
+        <div className="flex items-center gap-3 px-4 pt-4">
           <Link href={`/parada/${id}`} className="flex h-9 w-9 flex-none items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700">
             <ArrowLeft size={18} />
           </Link>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-bold text-slate-900">Captura Rápida</p>
-            <p className="truncate text-xs font-medium text-slate-400">{data.resumo.nome}</p>
+            <p className="label-tecnico text-[10px] font-bold text-brand-500">Captura Rápida</p>
+            <p className="truncate text-sm font-bold leading-tight text-slate-900">{data.resumo.nome}</p>
           </div>
           {pendentesCount > 0 && (
             <span className="flex-none rounded-full bg-warning-100 px-3 py-1.5 text-xs font-bold text-warning-600">
@@ -1182,44 +1445,39 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
           )}
         </div>
         {totalServicos > 0 && (
-          <div className="space-y-2 px-4 pb-3">
-            <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] font-bold text-slate-500">
-                <span>
-                  {concluidasCount}/{totalServicos} OS concluídas
-                </span>
-                <span>{percConcluido}%</span>
+          <div className="px-4 pb-3 pt-4">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className="label-tecnico text-[10px] font-bold text-slate-400">Concluído</p>
+                <p className="font-display text-3xl font-bold leading-none tracking-tight text-slate-900">{percConcluido}%</p>
               </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full rounded-full bg-success-600 transition-all" style={{ width: `${percConcluido}%` }} />
+              <div className="flex flex-col items-end gap-1 pb-0.5">
+                <span className="text-xs font-bold text-slate-500">
+                  {concluidasCount}/{totalServicos} OS
+                </span>
+                {/* Segunda métrica ("em andamento") vira uma linha pequena, não
+                    outra barra do mesmo tamanho — continua visível, mas some
+                    quando não há nada nesse status, sem deixar ruído. */}
+                {emAndamentoCount > 0 && (
+                  <span className="flex items-center gap-1.5 text-[11px] font-bold text-brand-600">
+                    <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
+                    {emAndamentoCount} em andamento
+                  </span>
+                )}
               </div>
             </div>
-            {/* Barra própria pra "em andamento", separada da de concluído — só
-                aparece quando tem algo nesse status, senão vira uma segunda
-                barra vazia (ruído) assim que a parada começa e nada ainda foi
-                tocado no celular. */}
-            {emAndamentoCount > 0 && (
-              <div>
-                <div className="mb-1 flex items-center justify-between text-[11px] font-bold text-brand-600">
-                  <span>
-                    {emAndamentoCount}/{totalServicos} OS em andamento
-                  </span>
-                  <span>{percEmAndamento}%</span>
-                </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-brand-500 transition-all" style={{ width: `${percEmAndamento}%` }} />
-                </div>
-              </div>
-            )}
+            <div className="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-success-600 transition-all" style={{ width: `${percConcluido}%` }} />
+            </div>
           </div>
         )}
         <button
           type="button"
           onClick={() => atualizarComSpinner()}
           disabled={atualizando}
-          className="flex min-h-11 w-full items-center justify-center gap-2 border-t border-slate-100 bg-slate-50 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-60"
+          className="label-tecnico flex min-h-10 w-full items-center justify-center gap-2 border-t border-slate-100 bg-slate-50 text-[10px] font-bold text-slate-500 transition-colors hover:bg-slate-100 disabled:opacity-60"
         >
-          <RefreshCw size={14} className={atualizando ? "animate-spin" : undefined} />
+          <RefreshCw size={13} className={atualizando ? "animate-spin" : undefined} />
           {atualizando
             ? "Atualizando..."
             : segundosAtras === null
@@ -1231,32 +1489,66 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
       </header>
 
       {usandoCache !== null && (
-        // Diferente das filas de foto/"não será feito" (uma ação pendente de
-        // enviar), isso aqui avisa que a TELA INTEIRA é uma versão salva —
-        // o que está sendo mostrado pode já estar desatualizado em relação
-        // ao que outra pessoa mudou nesse relatório enquanto sem sinal.
+        // Diferente da fila de sincronização (uma ação pendente de enviar),
+        // isso aqui avisa que a TELA INTEIRA é uma versão salva — o que está
+        // sendo mostrado pode já estar desatualizado em relação ao que outra
+        // pessoa mudou nesse relatório enquanto sem sinal.
         <div className="flex items-center gap-2.5 border-b border-warning-200 bg-warning-50 px-4 py-2.5 text-xs font-bold text-warning-700">
           <CloudOff size={14} className="flex-none" />
           Sem internet — mostrando dados salvos às {new Date(usandoCache).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
         </div>
       )}
 
-      {filaPendente.length > 0 && (
-        // Fica visível o tempo todo — é a garantia de que a foto não foi
-        // perdida, só está esperando internet pra subir sozinha.
-        <div className="flex items-center gap-2.5 border-b border-warning-200 bg-warning-50 px-4 py-2.5 text-xs font-bold text-warning-700">
-          {enviandoFila ? <Loader2 size={14} className="flex-none animate-spin" /> : <CloudOff size={14} className="flex-none" />}
-          {enviandoFila
-            ? `Enviando ${filaPendente.length} foto${filaPendente.length > 1 ? "s" : ""} guardada${filaPendente.length > 1 ? "s" : ""}...`
-            : `${filaPendente.length} foto${filaPendente.length > 1 ? "s" : ""} guardada${filaPendente.length > 1 ? "s" : ""} no aparelho, aguardando internet para enviar`}
-        </div>
-      )}
+      {/* Indicador único de sincronização — consolidado das três filas
+          (fotos, "não será feito", status) em vez de um banner por fila, que
+          empilhava até três avisos repetindo a mesma ideia. Aparece quando: há
+          algo pendente, a conexão caiu (mesmo sem nada na fila ainda — sem
+          isso, abrir a tela já offline não avisava nada até a primeira ação
+          falhar), ou acabou de terminar de sincronizar tudo.
 
-      {filaNaoFeitoPendente.length > 0 && (
-        <div className="flex items-center gap-2.5 border-b border-warning-200 bg-warning-50 px-4 py-2.5 text-xs font-bold text-warning-700">
-          <CloudOff size={14} className="flex-none" />
-          {filaNaoFeitoPendente.length} marcação{filaNaoFeitoPendente.length > 1 ? "ões" : ""} de &quot;não será feito&quot; guardada
-          {filaNaoFeitoPendente.length > 1 ? "s" : ""} no aparelho, aguardando internet para enviar
+          Formato de chip flutuante (recuado das bordas, cantos totalmente
+          arredondados, sombra) em vez de barra full-width — lê como um
+          aviso pontual que se pode ignorar, não como uma trava na tela. */}
+      {(!online || totalPendentesFila > 0 || mostrarSincronizado) && (
+        <div className="px-4 pt-3">
+          <div
+            className={cn(
+              "flex flex-wrap items-center gap-2.5 rounded-full border px-4 py-2.5 text-xs font-bold shadow-sm",
+              totalComErro > 0 ? "border-danger-200 bg-danger-50 text-danger-700" : "border-warning-200 bg-warning-50 text-warning-700"
+            )}
+          >
+            {sincronizandoAlgumaFila ? (
+              <Loader2 size={14} className="flex-none animate-spin" />
+            ) : totalComErro > 0 ? (
+              <AlertCircle size={14} className="flex-none" />
+            ) : !online ? (
+              <WifiOff size={14} className="flex-none" />
+            ) : totalPendentesFila > 0 ? (
+              <CloudOff size={14} className="flex-none" />
+            ) : (
+              <CheckCircle2 size={14} className="flex-none text-success-600" />
+            )}
+            <span className="flex-1">
+              {sincronizandoAlgumaFila
+                ? `Sincronizando ${totalPendentesFila} ${totalPendentesFila === 1 ? "item" : "itens"}...`
+                : totalComErro > 0
+                  ? `${totalComErro} ${totalComErro === 1 ? "item não sincronizou" : "itens não sincronizaram"} — servidor recusou a alteração`
+                  : totalPendentesFila > 0
+                    ? `Salvo neste aparelho. ${totalPendentesFila} ${totalPendentesFila === 1 ? "item" : "itens"} — será${totalPendentesFila === 1 ? "" : "ão"} sincronizado${totalPendentesFila === 1 ? "" : "s"} quando a conexão voltar.`
+                    : !online
+                      ? "Sem conexão — o que você registrar agora fica salvo neste aparelho."
+                      : "Sincronizado com sucesso."}
+            </span>
+            {totalComErro > 0 && (
+              <button
+                type="button"
+                onClick={() => void retentarTudo()}
+                className="flex-none rounded-full bg-danger-600 px-3 py-1.5 text-[11px] font-bold text-white transition-transform active:scale-[0.98]"
+              >
+                Tentar novamente
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -1347,6 +1639,8 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
               onEnfileirar={enfileirarFoto}
               pendenteNaoFeito={filaNaoFeitoPendente.some((f) => f.servicoId === servico.id)}
               onEnfileirarNaoFeito={enfileirarNaoFeito}
+              pendenteStatus={filaStatusPendente.some((f) => f.servicoId === servico.id)}
+              onEnfileirarStatus={enfileirarStatus}
               historicoNaoFeito={encontrarUltimoNaoFeito(servico, id, historico)}
             />
           ))

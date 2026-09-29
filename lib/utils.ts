@@ -62,6 +62,24 @@ export function formatDateCompact(iso: string): string {
   return `${String(d.getDate()).padStart(2, "0")} ${mes} ${d.getFullYear()}`;
 }
 
+// "Há quanto tempo" a partir de uma data (formato "AAAA-MM-DD", como as
+// paradas guardam). Usado no Histórico para dar contexto de idade a uma
+// parada ou a uma pendência — "3 pendências" não diz se é de ontem ou de
+// dois meses atrás, e é essa diferença que muda a urgência.
+export function formatIdadeRelativa(iso: string): string {
+  const data = new Date(iso + "T00:00:00");
+  if (Number.isNaN(data.getTime())) return "";
+  const dias = Math.floor((Date.now() - data.getTime()) / 86_400_000);
+  if (dias < 0) return "no futuro";
+  if (dias === 0) return "hoje";
+  if (dias === 1) return "há 1 dia";
+  if (dias < 30) return `há ${dias} dias`;
+  const meses = Math.round(dias / 30);
+  if (meses < 12) return meses === 1 ? "há 1 mês" : `há ${meses} meses`;
+  const anos = Math.round(dias / 365);
+  return anos === 1 ? "há 1 ano" : `há ${anos} anos`;
+}
+
 // Agrupa relatórios pela máquina de verdade, não pelo texto exato digitado —
 // "Máquina de Papel 09" e "Maquina de Papel 09" (com/sem acento, digitado em
 // momentos diferentes por pessoas diferentes) precisam cair na mesma aba, e

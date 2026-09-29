@@ -250,6 +250,11 @@ function sanearResultado(bruto: unknown): ResultadoFinal {
     pendenciasAbertas: numero(r.pendenciasAbertas, { max: 100_000 }),
     selo: umDe(r.selo, STATUS_GERAL, "em_andamento"),
     resumo: texto(r.resumo, LIMITE_TEXTO_LONGO),
+    // Valor ausente/inválido vira `false` (não `undefined`): o formulário usa
+    // este campo pra decidir se mostra o resumo no campo editável ou deixa em
+    // branco (regeneração automática) — tratar "não sei" como "não é
+    // automático" nunca some com um texto que a pessoa escreveu.
+    resumoAutomatico: typeof r.resumoAutomatico === "boolean" ? r.resumoAutomatico : false,
   };
 }
 

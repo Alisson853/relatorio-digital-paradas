@@ -18,15 +18,21 @@ interface CollapsibleSectionProps {
 export function CollapsibleSection({ numero, titulo, descricao, badge, defaultOpen = false, children }: CollapsibleSectionProps) {
   const [open, setOpen] = useState(defaultOpen);
 
+  // Mesma faixa de cabeçalho tingida do FormSection (app/novo/page.tsx) —
+  // as duas variantes de seção (fixa e recolhível) precisam ler como o
+  // mesmo sistema, não dois estilos concorrendo na mesma tela.
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-start justify-between gap-3 p-6 text-left sm:p-8"
+        className={cn(
+          "flex w-full items-start justify-between gap-3 bg-slate-50/70 px-6 py-5 text-left transition-colors hover:bg-slate-100/70 sm:px-8",
+          open && "border-b border-slate-100"
+        )}
       >
         <div className="flex items-start gap-3">
-          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-brand-600 text-xs font-bold text-white">
+          <span className="label-tecnico flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white">
             {String(numero).padStart(2, "0")}
           </span>
           <div>
@@ -53,7 +59,7 @@ export function CollapsibleSection({ numero, titulo, descricao, badge, defaultOp
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             className="overflow-hidden"
           >
-            <div className="px-6 pb-8 sm:px-8">{children}</div>
+            <div className="p-6 sm:p-8">{children}</div>
           </motion.div>
         )}
       </AnimatePresence>

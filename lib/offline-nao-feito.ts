@@ -19,9 +19,20 @@ export interface NaoFeitoPendente {
   categoria: string;
   justificativa: string;
   criadoEm: number;
+  // Mesmo significado de FotoPendente.sincronizacao (lib/offline-fotos.ts):
+  // "pendente" tenta de novo sozinho, "erro" só com "Tentar novamente".
+  // Sempre presente depois de listarNaoFeitoPendente (ver ali o padrão pra
+  // linhas gravadas antes deste campo existir).
+  sincronizacao: "pendente" | "erro";
+  tentativas: number;
+  ultimoErro?: string;
 }
 
-function chaveNaoFeito(paradaId: string, servicoId: string): string {
+// Exportada (só visibilidade, mesmo comportamento de sempre) pra poder testar
+// a determinicidade da chave sem precisar simular IndexedDB — é ela que
+// garante que uma segunda decisão pro mesmo serviço SUBSTITUI a pendência
+// anterior em vez de duplicar.
+export function chaveNaoFeito(paradaId: string, servicoId: string): string {
   return `${paradaId}:${servicoId}`;
 }
 
@@ -38,8 +49,11 @@ function abrirDb(): Promise<IDBDatabase> {
   });
 }
 
-export async function salvarNaoFeitoPendente(paradaId: string, servicoId: string, categoria: string, justificativa: string): Promise<void> {
-  const item: NaoFeitoPendente = { id: chaveNaoFeito(paradaId, servicoId), paradaId, servicoId, categoria, justificativa, criadoEm: Date.now() };
+// Grava a linha exatamente como recebida — usado tanto para uma decisão NOVA
+// do usuário (via salvarNaoFeitoPendente abaixo) quanto para o motor de
+// sincronização regravar sincronizacao/tentativas/ultimoErro depois de uma
+// tentativa, sem mexer em categoria/justificativa/criadoEm.
+export async function atualizarItemNaoFeito(item: NaoFeitoPendente): Promise<void> {
   const db = await abrirDb();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
@@ -50,12 +64,32 @@ export async function salvarNaoFeitoPendente(paradaId: string, servicoId: string
   db.close();
 }
 
+// Uma decisão NOVA do usuário — sempre reseta sincronizacao/tentativas,
+// porque uma escolha diferente (nova categoria, ou desmarcar) é uma intenção
+// nova, não uma retentativa da anterior.
+export async function salvarNaoFeitoPendente(paradaId: string, servicoId: string, categoria: string, justificativa: string): Promise<void> {
+  const item: NaoFeitoPendente = {
+    id: chaveNaoFeito(paradaId, servicoId),
+    paradaId,
+    servicoId,
+    categoria,
+    justificativa,
+    criadoEm: Date.now(),
+    sincronizacao: "pendente",
+    tentativas: 0,
+  };
+  await atualizarItemNaoFeito(item);
+}
+
 export async function listarNaoFeitoPendente(paradaId?: string): Promise<NaoFeitoPendente[]> {
   const db = await abrirDb();
   const itens = await new Promise<NaoFeitoPendente[]>((resolve, reject) => {
     const tx = db.transaction(STORE, "readonly");
     const req = tx.objectStore(STORE).getAll();
-    req.onsuccess = () => resolve(req.result as NaoFeitoPendente[]);
+    // Espalha primeiro, sobrescreve depois com fallback — ver o mesmo
+    // comentário em lib/offline-fotos.ts (listarFotosPendentes).
+    req.onsuccess = () =>
+      resolve((req.result as NaoFeitoPendente[]).map((i) => ({ ...i, sincronizacao: i.sincronizacao ?? "pendente", tentativas: i.tentativas ?? 0 })));
     req.onerror = () => reject(req.error);
   });
   db.close();

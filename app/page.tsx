@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Activity, ClipboardList, Gauge, LineChart, Plus } from "lucide-react";
+import { Activity, ClipboardList, LineChart, Plus } from "lucide-react";
 import { listParadasResumo } from "@/lib/actions/paradas";
 import { ParadaGrid } from "@/components/dashboard/ParadaGrid";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
@@ -8,6 +8,7 @@ import { BackupControls } from "@/components/dashboard/BackupControls";
 import { RecorrenciasNaoFeito } from "@/components/dashboard/RecorrenciasNaoFeito";
 import { EditorOnly } from "@/components/shared/EditorOnly";
 import { EditorToggle } from "@/components/shared/EditorToggle";
+import { StatusConexao } from "@/components/shared/StatusConexao";
 
 export const dynamic = "force-dynamic";
 
@@ -64,33 +65,52 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-12 sm:px-10">
-        <div className="mb-12 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <span className="mb-3 inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-brand-600">
-              Manutenção Industrial
-            </span>
-            <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-              Relatório de Paradas de Manutenção
-            </h1>
-            <p className="mt-4 max-w-2xl text-base leading-relaxed text-slate-500">
-              Acompanhe cada parada de máquina em uma apresentação digital completa — indicadores, cronograma,
-              serviços executados e resultados, prontos para reuniões de gestão.
-            </p>
+      <StatusConexao />
+
+      {/* Faixa escura com textura de prancha técnica — a mesma linguagem
+          visual da capa da apresentação (CoverSection), agora também na
+          primeira coisa que se vê ao abrir o sistema. Antes o dashboard
+          inteiro vivia sobre o mesmo cinza-claro de fundo, sem nada que
+          sinalizasse "isto é um sistema industrial" antes de rolar a tela.
+
+          Composição em duas faixas empilhadas (título sozinho, resumo
+          operacional abaixo) em vez do título dividindo a linha com os
+          números — as duas coisas não têm o mesmo peso: uma é identidade da
+          tela, a outra é leitura de instrumento. Dar a cada uma sua própria
+          faixa, separadas por regra, é o que evita uma faixa homogênea de
+          dois blocos do mesmo tamanho. */}
+      <div className="bg-blueprint relative overflow-hidden bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800 px-6 py-14 sm:px-10 sm:py-16">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-brand-500/15 blur-3xl" />
+        <div className="relative mx-auto max-w-7xl">
+          <span className="label-tecnico mb-4 inline-flex items-center gap-2 rounded-sm border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[11px] font-bold text-brand-200">
+            <span className="h-1.5 w-1.5 rounded-full bg-signal-500" />
+            Manutenção Industrial
+          </span>
+          <h1 className="font-display max-w-2xl text-4xl font-semibold uppercase leading-[0.98] tracking-tight text-white sm:text-5xl">
+            Relatório de Paradas de Manutenção
+          </h1>
+          <p className="mt-5 max-w-2xl text-base leading-relaxed text-brand-200">
+            Acompanhe cada parada de máquina em uma apresentação digital completa — indicadores, cronograma,
+            serviços executados e resultados, prontos para reuniões de gestão.
+          </p>
+
+          <div className="mt-10 border-t border-white/10 pt-8">
+            <DashboardStats paradas={paradas} />
           </div>
-
-          <DashboardStats paradas={paradas} />
         </div>
+      </div>
 
+      <main className="mx-auto max-w-7xl px-6 py-12 sm:px-10">
         <RecorrenciasNaoFeito />
 
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
-            <Gauge size={16} className="text-brand-500" />
-            Todas as paradas
-            <span className="text-slate-300">•</span>
-            <Activity size={16} className="text-brand-500" />
-            Atualizado em tempo real
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-4">
+          <div>
+            <p className="label-tecnico text-[10px] font-bold text-brand-500">Registros</p>
+            <h2 className="mt-1 text-xl font-bold text-slate-900">Lista de Paradas</h2>
+            <p className="mt-0.5 flex items-center gap-1.5 text-xs font-semibold text-slate-400">
+              <Activity size={13} className="text-brand-500" />
+              Atualizado em tempo real
+            </p>
           </div>
           <EditorOnly>
             {/* O link tinha a altura do proprio texto: 20px de alvo. O padding
