@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import sharp from "sharp";
 import imageSize from "image-size";
 import { ehEditor } from "@/lib/auth/session";
+import { consumirLimite, identificarRequisitante, limiteExcedidoMsg } from "@/lib/rate-limit";
 import { SITE_URL, gerarQrCodeBuffer } from "@/lib/qrcode";
 import { C_BRAND, C_NAVY, C_SLATE, envelopeRtf, hyperlink, para, paraRaw, run, tabela } from "@/lib/rtf";
 
@@ -26,6 +27,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ codi
   // aqui dentro da rota.
   if (!(await ehEditor())) {
     return new Response("Não autorizado.", { status: 401 });
+  }
+
+  // Bloco H: ver o mesmo comentário em app/api/export/rtf/[id]/route.ts.
+  const limite = await consumirLimite(`export:${await identificarRequisitante()}`, 10, 60);
+  if (!limite.permitido) {
+    return new Response(limiteExcedidoMsg(), { status: 429 });
   }
 
   const { codigo: codigoBruto } = await params;

@@ -21,6 +21,7 @@ import {
 } from "docx";
 import { getParadaCompleta } from "@/lib/actions/paradas";
 import { ehEditor } from "@/lib/auth/session";
+import { consumirLimite, identificarRequisitante, limiteExcedidoMsg } from "@/lib/rate-limit";
 import { sanearId } from "@/lib/validation";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { servicosComFoto } from "@/lib/derive";
@@ -130,6 +131,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   // do app assim que e salvo.
   if (!(await ehEditor())) {
     return new Response("Nao autorizado.", { status: 401 });
+  }
+
+  // Bloco H: ver o mesmo comentário em app/api/export/rtf/[id]/route.ts.
+  const limite = await consumirLimite(`export:${await identificarRequisitante()}`, 10, 60);
+  if (!limite.permitido) {
+    return new Response(limiteExcedidoMsg(), { status: 429 });
   }
 
   // Id vem da URL: passa pelo mesmo saneamento das actions antes de virar

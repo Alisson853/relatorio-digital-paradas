@@ -14,7 +14,25 @@ const nextConfig: NextConfig = {
   // como dependência externa resolvida em runtime) quebra silenciosamente o
   // export de RTF com fotos.
   serverExternalPackages: ["sharp"],
+  // Bloco H: `next` 16.3.0 (a versão instalada) tem uma vulnerabilidade crítica
+  // de RCE não autenticado na própria API de Otimização de Imagem do framework,
+  // disparada por um AVIF malicioso (GHSA-2xp9-vwfh-vxw4, npm audit). A rota
+  // /_next/image é pública por padrão e o remotePatterns abaixo (necessário pras
+  // fotos do Blob) combinado com essa falha do Next dá um caminho de exploração
+  // real: qualquer pessoa com uma conta Vercel gratuita própria pode hospedar um
+  // AVIF malicioso no PRÓPRIO blob store dela (o hostname com wildcard
+  // "*.public.blob.vercel-storage.com" não distingue o nosso store do de
+  // qualquer outro cliente Vercel) e apontar a rota de otimização deste app pra
+  // ele. `unoptimized: true` desliga a rota inteira — confirmado lendo o código
+  // do próprio Next (node_modules/next/dist/server/next-server.js): com essa
+  // flag, o handler devolve 404 ANTES de validar parâmetro, buscar a URL
+  // upstream ou decodificar qualquer coisa. Sem perda funcional real aqui: toda
+  // foto já chega comprimida do cliente (lib/image-utils.ts, 1600px/qualidade
+  // 0.8) antes do upload, então a otimização do Next só faria uma segunda
+  // compressão marginal. `remotePatterns` continua declarado por documentação —
+  // não tem efeito enquanto unoptimized estiver ligado.
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",

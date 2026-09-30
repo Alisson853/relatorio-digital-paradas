@@ -3,6 +3,7 @@ import sharp from "sharp";
 import imageSize from "image-size";
 import { getParadaCompleta } from "@/lib/actions/paradas";
 import { ehEditor } from "@/lib/auth/session";
+import { consumirLimite, identificarRequisitante, limiteExcedidoMsg } from "@/lib/rate-limit";
 import { sanearId } from "@/lib/validation";
 import { servicosComFoto } from "@/lib/derive";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
@@ -322,6 +323,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // do app assim que e salvo.
   if (!(await ehEditor())) {
     return new Response("Nao autorizado.", { status: 401 });
+  }
+
+  // Bloco H: export é uma das operações mais caras do app (busca fotos, roda
+  // sharp pra redimensionar/recomprimir cada uma, monta o documento inteiro)
+  // e, diferente de upload/escrita/login, não tinha nenhum teto — uma sessão
+  // válida (ou um cookie vazado/reaproveitado) podia disparar isso em loop.
+  const limite = await consumirLimite(`export:${await identificarRequisitante()}`, 10, 60);
+  if (!limite.permitido) {
+    return new Response(limiteExcedidoMsg(), { status: 429 });
   }
 
   // Id vem da URL: passa pelo mesmo saneamento das actions antes de virar
