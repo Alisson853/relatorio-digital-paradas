@@ -163,6 +163,18 @@ export function Sidebar({ sections, activeId, onNavigate, onPresent, titulo, par
         </div>
       </div>
 
+      {/* No celular não existe a barra lateral (onde fica a seta de voltar),
+          então não havia nenhuma saída do relatório — só a navegação entre
+          seções. Botão flutuante fixo no canto, sempre visível. */}
+      <Link
+        href="/"
+        aria-label="Voltar para a tela principal dos relatórios"
+        className="fixed left-3 top-3 z-30 flex h-11 items-center gap-1.5 rounded-full border border-slate-200 bg-white/95 px-4 text-xs font-bold text-slate-700 shadow-md backdrop-blur lg:hidden"
+      >
+        <ArrowLeft size={16} />
+        Relatórios
+      </Link>
+
       <AnimatePresence>
         {maisAbertoMobile && (
           <>
