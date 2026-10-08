@@ -7,7 +7,7 @@ import { sufixoAleatorio } from "@/lib/utils";
 import { paradas } from "@/lib/db/schema";
 import type { CaminhoCriticoItem, Equipe, Kpis, MotivoNaoFeitoCategoria, ParadaCompleta, ParadaResumo, Servico, StatusItem, TimelineEvento } from "@/lib/types";
 import type { HistoricoNaoFeitoItem } from "@/lib/historico-nao-feito";
-import { calcularPorEquipe, deriveFotoCapa, deriveFotos, deriveGraficos, deriveKpis, gerarDescricaoExecucao, parseHoras, textoResultadoPadrao } from "@/lib/derive";
+import { calcularHorasPorSetor, calcularPorEquipe, deriveFotoCapa, deriveFotos, deriveGraficos, deriveKpis, gerarDescricaoExecucao, parseHoras, textoResultadoPadrao } from "@/lib/derive";
 import type { EquipePorParada } from "@/lib/derive";
 import { gerarResultadoFinal } from "@/lib/mock-data";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
@@ -103,7 +103,13 @@ function rowParaCompleta(row: typeof paradas.$inferSelect): ParadaCompleta {
     // Relatórios salvos antes de um campo novo existir (ex: horasPorServico)
     // não têm ele no JSON persistido — sem esse fallback, a tela quebra ao
     // tentar .map() em undefined assim que um campo novo é adicionado ao tipo.
-    graficos: { ...row.graficos, horasPorServico: row.graficos.horasPorServico ?? [] },
+    // horasPorSetor é recalculado na leitura (por equipe) pra corrigir também
+    // relatórios já salvos, cujo gráfico foi gravado agrupando por "area".
+    graficos: {
+      ...row.graficos,
+      horasPorServico: row.graficos.horasPorServico ?? [],
+      horasPorSetor: calcularHorasPorSetor(row.servicos, parseHoras(row.duracaoRealizada) || parseHoras(row.duracaoPlanejada) || undefined),
+    },
     resultadoFinal: row.resultadoFinal,
   };
 }

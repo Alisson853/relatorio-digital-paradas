@@ -220,6 +220,18 @@ export function deriveFotos(servicos: Servico[]): FotoGaleria[] {
   return fotos;
 }
 
+// Setor = equipe (Mecânica, Elétrica...). Agrupar pelo campo "area" misturava
+// o nome da máquina/local ("MAQUINA DE PAPEL 11", "Porão...") com as equipes,
+// já que OS abertas em campo guardam a máquina ali.
+export function calcularHorasPorSetor(servicos: Servico[], duracaoMaximaHoras?: number): Array<{ setor: string; horas: number }> {
+  const mapa = new Map<string, number>();
+  servicos.forEach((s) => mapa.set(s.equipe, (mapa.get(s.equipe) ?? 0) + parseHoras(s.tempoGasto)));
+  return Array.from(mapa.entries()).map(([setor, horas]) => ({
+    setor,
+    horas: duracaoMaximaHoras ? Math.min(Math.round(horas), duracaoMaximaHoras) : Math.round(horas),
+  }));
+}
+
 export function deriveGraficos(
   servicos: Servico[],
   caminhoCritico: CaminhoCriticoItem[],
@@ -238,12 +250,7 @@ export function deriveGraficos(
   // de todas as OS de um setor sem limite estoura a duração real da parada.
   // Sem dados de horário por pessoa, o teto mais honesto é a duração da
   // própria parada: nenhum setor trabalhou mais tempo do que ela durou.
-  const areaMap = new Map<string, number>();
-  servicos.forEach((s) => areaMap.set(s.area, (areaMap.get(s.area) ?? 0) + parseHoras(s.tempoGasto)));
-  const horasPorSetor = Array.from(areaMap.entries()).map(([setor, horas]) => ({
-    setor,
-    horas: duracaoMaximaHoras ? Math.min(Math.round(horas), duracaoMaximaHoras) : Math.round(horas),
-  }));
+  const horasPorSetor = calcularHorasPorSetor(servicos, duracaoMaximaHoras);
 
   // Diferente de horasPorSetor, aqui não soma nada entre si — é só o tempo
   // de cada OS individual, então não corre o risco de estourar a duração da

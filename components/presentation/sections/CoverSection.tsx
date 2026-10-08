@@ -7,17 +7,19 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { cn, formatDateCompact } from "@/lib/utils";
 
 export function CoverSection({ resumo }: { resumo: ParadaResumo }) {
+  // Durações salvas como número puro ("6") ficavam sem unidade na capa.
+  const comHoras = (d: string) => (/^\s*\d+([.,]\d+)?\s*$/.test(d) ? `${d.trim()}h` : d);
   const campos = [
     { label: "Data da Parada", value: formatDateCompact(resumo.data) },
-    { label: "Tempo Planejado", value: resumo.duracaoPlanejada },
-    { label: "Tempo Realizado", value: resumo.duracaoRealizada },
+    { label: "Tempo Planejado", value: comHoras(resumo.duracaoPlanejada) },
+    { label: "Tempo Realizado", value: comHoras(resumo.duracaoRealizada) },
     { label: "Responsável", value: resumo.responsavel },
   ];
 
   return (
     <section
       id="capa"
-      className="section-screen relative flex items-center overflow-hidden bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800 px-6 py-16 sm:px-10 sm:py-20 lg:py-24"
+      className="section-screen relative flex items-center overflow-hidden bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800 px-6 pb-16 pt-[calc(4rem+env(safe-area-inset-top))] sm:px-10 sm:py-20 lg:py-24"
     >
       {/* Fundo tipo prancha técnica: malha fina de desenho industrial */}
       <div className="pointer-events-none absolute inset-0 opacity-[0.35]">
@@ -37,7 +39,7 @@ export function CoverSection({ resumo }: { resumo: ParadaResumo }) {
         alt="Santher"
         width={190}
         height={48}
-        className="absolute left-6 top-6 h-10 w-auto sm:left-10 sm:top-10 sm:h-12"
+        className="absolute left-6 top-[calc(1.5rem+env(safe-area-inset-top))] h-10 w-auto sm:left-10 sm:top-10 sm:h-12"
         priority
       />
 
