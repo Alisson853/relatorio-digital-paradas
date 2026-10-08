@@ -1287,14 +1287,14 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
 
   async function copiarRelatorio() {
     if (!data) return;
-    const linhas = [`${data.resumo.nome} — o que falta`];
+    const linhas = [data.resumo.nome.toUpperCase(), "O QUE FALTA"];
     for (const [st, titulo] of [["em_andamento", "EM ANDAMENTO"], ["pendente", "PENDENTE"]] as const) {
       const itens = pendentesRelatorio.filter((s) => s.status === st);
       if (itens.length === 0) continue;
-      linhas.push("", `${titulo} (${itens.length})`);
+      linhas.push("", "==============================", `${titulo} (${itens.length})`, "==============================");
       for (const s of itens) {
-        const resp = s.responsavel && pareceNomeDePessoa(s.responsavel) ? ` [${s.responsavel}]` : "";
-        linhas.push(`- OS ${s.numeroOS}: ${s.problemaIdentificado} (${s.equipamento})${resp}`);
+        linhas.push("", `OS ${s.numeroOS}`, s.problemaIdentificado, `Equipamento: ${s.equipamento}`);
+        if (s.responsavel && pareceNomeDePessoa(s.responsavel)) linhas.push(`Responsável: ${s.responsavel}`);
       }
     }
     try {
