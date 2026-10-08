@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { AlertTriangle, CheckCircle2, ClipboardList, Gauge, HardHat, Radar, ShieldCheck, Tag, Timer, Users } from "lucide-react";
-import type { Kpis } from "@/lib/types";
+import type { Kpis, Servico } from "@/lib/types";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 
@@ -22,6 +23,7 @@ export type SummaryCardLabel =
 
 interface Props {
   kpis: Kpis;
+  servicos?: Servico[];
   // Quase todo indicador aqui é um resumo de algo detalhado em outra
   // seção — um único callback (em vez de um por card) leva a apresentação
   // até lá, escolhendo o destino pelo rótulo de quem foi clicado. Opcional
@@ -30,7 +32,22 @@ interface Props {
   onCardClick?: (label: SummaryCardLabel) => void;
 }
 
-export function SummarySection({ kpis, onCardClick }: Props) {
+export function SummarySection({ kpis, servicos = [], onCardClick }: Props) {
+  // Serviços de "Oportunidade" (sem nº de OS, abertos na hora) entram na %
+  // por padrão; marcar a caixinha recalcula só em cima do que foi programado.
+  const [soProgramadas, setSoProgramadas] = useState(false);
+  const oportunidades = servicos.filter((s) => s.numeroOS === "Oportunidade").length;
+  const programadas = servicos.filter((s) => s.numeroOS !== "Oportunidade");
+  const progConcluidas = programadas.filter((s) => s.status === "concluido").length;
+  if (soProgramadas && oportunidades > 0) {
+    kpis = {
+      ...kpis,
+      osPlanejadas: programadas.length,
+      osConcluidas: progConcluidas,
+      eficiencia: programadas.length > 0 ? Math.round((progConcluidas / programadas.length) * 1000) / 10 : 0,
+      pendencias: programadas.length - progConcluidas,
+    };
+  }
   const cards = [
     { label: "OS Planejadas" as const, value: kpis.osPlanejadas, icon: ClipboardList, accent: "brand" as const },
     { label: "OS Concluídas" as const, value: kpis.osConcluidas, icon: CheckCircle2, accent: "success" as const },
@@ -58,6 +75,12 @@ export function SummarySection({ kpis, onCardClick }: Props) {
           title="Indicadores Gerais da Parada"
           description="Panorama consolidado do desempenho da parada, pronto para apresentação em reuniões de gestão."
         />
+        {oportunidades > 0 && (
+          <label className="mb-5 flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600">
+            <input type="checkbox" checked={soProgramadas} onChange={(e) => setSoProgramadas(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-brand-600" />
+            Só OS programadas (sem as {oportunidades} de oportunidade)
+          </label>
+        )}
         <div className="grid grid-cols-2 gap-5 sm:grid-cols-4">
           {cards.map(({ semLink, ...card }, i) => (
             <KpiCard

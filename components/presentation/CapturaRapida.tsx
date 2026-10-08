@@ -1275,7 +1275,6 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
   const pendentesCount = data ? data.servicos.filter(faltaFoto).length : 0;
   const totalServicos = data?.servicos.length ?? 0;
   const concluidasCount = data ? data.servicos.filter((s) => s.status === "concluido").length : 0;
-  const emAndamentoCount = data ? data.servicos.filter((s) => s.status === "em_andamento").length : 0;
   const [relatorioAberto, setRelatorioAberto] = useState(false);
   const [relatorioCopiado, setRelatorioCopiado] = useState(false);
   // "Não será feito" fica de fora: já é uma decisão fechada, não algo que
@@ -1305,7 +1304,16 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
       window.alert("Não foi possível copiar. Selecione o texto da lista e copie manualmente.");
     }
   }
-  const percConcluido = totalServicos > 0 ? Math.round((concluidasCount / totalServicos) * 100) : 0;
+  // A % do topo pode ignorar os serviços de "Oportunidade" (sem nº de OS,
+  // abertos na hora em campo) pra mostrar só o andamento do que foi
+  // programado. Só a barra muda — a lista de OS continua mostrando tudo.
+  const [soProgramadas, setSoProgramadas] = useState(false);
+  const baseBarra = data ? (soProgramadas ? data.servicos.filter((s) => s.numeroOS !== "Oportunidade") : data.servicos) : [];
+  const oportunidadesCount = data ? data.servicos.filter((s) => s.numeroOS === "Oportunidade").length : 0;
+  const barraTotal = baseBarra.length;
+  const barraConcluidas = baseBarra.filter((s) => s.status === "concluido").length;
+  const barraEmAndamento = baseBarra.filter((s) => s.status === "em_andamento").length;
+  const percConcluido = barraTotal > 0 ? Math.round((barraConcluidas / barraTotal) * 100) : 0;
 
   // Consolidado das três filas offline (fotos, "não será feito", status) pro
   // banner único do topo — ver JSX mais abaixo. Um item com sincronizacao
@@ -1484,15 +1492,15 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
               </div>
               <div className="flex flex-col items-end gap-1 pb-0.5">
                 <span className="text-xs font-bold text-slate-500">
-                  {concluidasCount}/{totalServicos} OS
+                  {barraConcluidas}/{barraTotal} {soProgramadas ? "OS programadas" : "OS"}
                 </span>
                 {/* Segunda métrica ("em andamento") vira uma linha pequena, não
                     outra barra do mesmo tamanho — continua visível, mas some
                     quando não há nada nesse status, sem deixar ruído. */}
-                {emAndamentoCount > 0 && (
+                {barraEmAndamento > 0 && (
                   <span className="flex items-center gap-1.5 text-[11px] font-bold text-brand-600">
                     <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                    {emAndamentoCount} em andamento
+                    {barraEmAndamento} em andamento
                   </span>
                 )}
               </div>
@@ -1500,6 +1508,17 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
             <div className="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
               <div className="h-full rounded-full bg-success-600 transition-all" style={{ width: `${percConcluido}%` }} />
             </div>
+            {oportunidadesCount > 0 && (
+              <label className="mt-2.5 flex items-center gap-2 text-[11px] font-bold text-slate-500">
+                <input
+                  type="checkbox"
+                  checked={soProgramadas}
+                  onChange={(e) => setSoProgramadas(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-brand-600"
+                />
+                Só OS programadas (sem as {oportunidadesCount} de oportunidade)
+              </label>
+            )}
           </div>
         )}
         <button

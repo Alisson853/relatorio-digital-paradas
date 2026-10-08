@@ -131,7 +131,7 @@ export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qr
       },
       {
         id: "resumo",
-        node: <SummarySection key="resumo" kpis={data.kpis} onCardClick={handleKpiClick} />,
+        node: <SummarySection key="resumo" kpis={data.kpis} servicos={data.servicos} onCardClick={handleKpiClick} />,
         bg: "bg-slate-50",
       },
       data.timeline.length > 0 && {
