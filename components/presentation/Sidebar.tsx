@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Camera, FileDown, FileText, Maximize2, MoreHorizontal, Presentation, ScrollText, X } from "lucide-react";
+import { ArrowLeft, Camera, FileDown, FileText, Home, Maximize2, MoreHorizontal, Presentation, ScrollText, X } from "lucide-react";
 import type { SectionMeta } from "@/lib/sections";
 import { cn } from "@/lib/utils";
 import { useEditorMode } from "@/lib/useEditorMode";
@@ -169,10 +169,9 @@ export function Sidebar({ sections, activeId, onNavigate, onPresent, titulo, par
       <Link
         href="/"
         aria-label="Voltar para a tela principal dos relatórios"
-        className="fixed left-3 top-3 z-30 flex h-11 items-center gap-1.5 rounded-full border border-slate-200 bg-white/95 px-4 text-xs font-bold text-slate-700 shadow-md backdrop-blur lg:hidden"
+        className="fixed right-3 top-3 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-slate-900/60 text-white shadow-md backdrop-blur-md active:bg-slate-900/80 lg:hidden"
       >
-        <ArrowLeft size={16} />
-        Relatórios
+        <Home size={18} />
       </Link>
 
       <AnimatePresence>
