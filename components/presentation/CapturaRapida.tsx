@@ -26,6 +26,8 @@ import {
   User,
   WifiOff,
   X,
+  ClipboardList,
+  Copy,
 } from "lucide-react";
 import { MOTIVOS_NAO_FEITO, type Equipe, type MotivoNaoFeitoCategoria, type ParadaCompleta, type Servico, type StatusItem, type TimelineEvento } from "@/lib/types";
 import {
@@ -1274,6 +1276,35 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
   const totalServicos = data?.servicos.length ?? 0;
   const concluidasCount = data ? data.servicos.filter((s) => s.status === "concluido").length : 0;
   const emAndamentoCount = data ? data.servicos.filter((s) => s.status === "em_andamento").length : 0;
+  const [relatorioAberto, setRelatorioAberto] = useState(false);
+  const [relatorioCopiado, setRelatorioCopiado] = useState(false);
+  // "Não será feito" fica de fora: já é uma decisão fechada, não algo que
+  // ainda falta fazer.
+  const pendentesRelatorio = useMemo(
+    () => (data ? data.servicos.filter((s) => (s.status === "em_andamento" || s.status === "pendente") && !s.naoFeitoCategoria) : []),
+    [data]
+  );
+
+  async function copiarRelatorio() {
+    if (!data) return;
+    const linhas = [`${data.resumo.nome} — o que falta`];
+    for (const [st, titulo] of [["em_andamento", "EM ANDAMENTO"], ["pendente", "PENDENTE"]] as const) {
+      const itens = pendentesRelatorio.filter((s) => s.status === st);
+      if (itens.length === 0) continue;
+      linhas.push("", `${titulo} (${itens.length})`);
+      for (const s of itens) {
+        const resp = s.responsavel && pareceNomeDePessoa(s.responsavel) ? ` [${s.responsavel}]` : "";
+        linhas.push(`- OS ${s.numeroOS}: ${s.problemaIdentificado} (${s.equipamento})${resp}`);
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(linhas.join("\n"));
+      setRelatorioCopiado(true);
+      setTimeout(() => setRelatorioCopiado(false), 2000);
+    } catch {
+      window.alert("Não foi possível copiar. Selecione o texto da lista e copie manualmente.");
+    }
+  }
   const percConcluido = totalServicos > 0 ? Math.round((concluidasCount / totalServicos) * 100) : 0;
 
   // Consolidado das três filas offline (fotos, "não será feito", status) pro
@@ -1486,7 +1517,67 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
                 ? "Atualizado agora — toque para atualizar"
                 : `Atualizado há ${segundosAtras}s — toque para atualizar`}
         </button>
+        <button
+          type="button"
+          onClick={() => setRelatorioAberto(true)}
+          className="flex min-h-11 w-full items-center justify-center gap-2 border-t border-slate-100 bg-white text-xs font-bold text-brand-700 transition-colors hover:bg-brand-50"
+        >
+          <ClipboardList size={14} />
+          Relatório do que falta ({pendentesRelatorio.length})
+        </button>
       </header>
+
+      {relatorioAberto && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 sm:items-center" onClick={() => setRelatorioAberto(false)}>
+          <div
+            className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-t-2xl bg-white shadow-xl sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <p className="text-sm font-bold text-slate-900">Em andamento e pendentes</p>
+              <button type="button" onClick={() => setRelatorioAberto(false)} aria-label="Fechar" className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3">
+              {pendentesRelatorio.length === 0 && <p className="py-8 text-center text-sm text-slate-400">Nenhuma OS em andamento ou pendente.</p>}
+              {(["em_andamento", "pendente"] as const).map((st) => {
+                const itens = pendentesRelatorio.filter((s) => s.status === st);
+                if (itens.length === 0) return null;
+                return (
+                  <div key={st}>
+                    <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                      {st === "em_andamento" ? "Em andamento" : "Pendente"} ({itens.length})
+                    </p>
+                    <ul className="space-y-1.5">
+                      {itens.map((s) => (
+                        <li key={s.id} className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                          <span className="font-bold text-brand-700">OS {s.numeroOS}</span> — {s.problemaIdentificado}
+                          <span className="block text-slate-400">
+                            {s.equipamento}
+                            {s.responsavel && pareceNomeDePessoa(s.responsavel) ? ` · ${s.responsavel}` : ""}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="border-t border-slate-100 p-3">
+              <button
+                type="button"
+                onClick={copiarRelatorio}
+                disabled={pendentesRelatorio.length === 0}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
+              >
+                <Copy size={16} />
+                {relatorioCopiado ? "Copiado!" : "Copiar texto (WhatsApp / Mantec)"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {usandoCache !== null && (
         // Diferente da fila de sincronização (uma ação pendente de enviar),
