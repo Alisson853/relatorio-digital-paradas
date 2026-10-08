@@ -169,7 +169,7 @@ export function Sidebar({ sections, activeId, onNavigate, onPresent, titulo, par
       <Link
         href="/"
         aria-label="Voltar para a tela principal dos relatórios"
-        className="fixed right-3 top-3 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-slate-900/60 text-white shadow-md backdrop-blur-md active:bg-slate-900/80 lg:hidden"
+        className="fixed right-3 top-[max(0.75rem,calc(env(safe-area-inset-top)+0.25rem))] z-30 flex h-10 w-10 items-center justify-center rounded-full bg-slate-900/60 text-white shadow-md backdrop-blur-md active:bg-slate-900/80 lg:hidden"
       >
         <Home size={18} />
       </Link>

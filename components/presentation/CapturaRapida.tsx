@@ -1468,7 +1468,7 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
           tempo. Continua em fundo claro (não escuro) de propósito: contraste
           alto é o que se lê melhor ao ar livre, um hero escuro aqui
           trabalharia contra a própria leitura em campo. */}
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur">
         <div className="flex items-center gap-3 px-4 pt-4">
           <Link href={`/parada/${id}`} className="flex h-9 w-9 flex-none items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700">
             <ArrowLeft size={18} />
