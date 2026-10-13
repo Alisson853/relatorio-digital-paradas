@@ -686,7 +686,7 @@ function NovaParadaForm() {
           tempoGasto: s.tempoGasto.trim() || "1h",
           problemaIdentificado,
           servicoExecutado: gerarDescricaoExecucao(problemaIdentificado, s.status),
-          resultado: textoResultadoPadrao(s.status),
+          resultado: textoResultadoPadrao(s.status, problemaIdentificado),
           status: s.status,
           fotoAntes: s.fotoAntes || NO_PHOTO_PLACEHOLDER,
           fotoDurante: s.fotoDurante || undefined,

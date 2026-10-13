@@ -85,7 +85,7 @@ export function aplicarCapturaFoto(row: ParadaRow, input: CapturaFotoInput): Res
       ...servicoAtualizado,
       status: "concluido",
       servicoExecutado: gerarDescricaoExecucao(servicoAtualizado.problemaIdentificado, "concluido"),
-      resultado: textoResultadoPadrao("concluido"),
+      resultado: textoResultadoPadrao("concluido", servicoAtualizado.problemaIdentificado),
     };
   }
 
@@ -135,7 +135,7 @@ export function aplicarMarcarStatus(row: ParadaRow, input: MarcarStatusInput): R
     ...servico,
     status: input.status,
     servicoExecutado: gerarDescricaoExecucao(servico.problemaIdentificado, input.status),
-    resultado: textoResultadoPadrao(input.status),
+    resultado: textoResultadoPadrao(input.status, servico.problemaIdentificado),
   };
   const servicosAtualizados = [...row.servicos];
   servicosAtualizados[idx] = servicoAtualizado;
@@ -243,7 +243,7 @@ export function aplicarNovoServicoRapido(row: ParadaRow, input: NovoServicoRapid
     tempoGasto: "1h",
     problemaIdentificado,
     servicoExecutado: gerarDescricaoExecucao(problemaIdentificado, "concluido"),
-    resultado: textoResultadoPadrao("concluido"),
+    resultado: textoResultadoPadrao("concluido", problemaIdentificado),
     status: "concluido",
     fotoAntes: NO_PHOTO_PLACEHOLDER,
     fotoDepois: NO_PHOTO_PLACEHOLDER,
