@@ -21,6 +21,7 @@ import { PrintReport } from "./PrintReport";
 
 export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qrDataUrl?: string }) {
   const [presentationMode, setPresentationMode] = useState(false);
+  const [sidebarCompacta, setSidebarCompacta] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   // Setado quando um card do Resumo Executivo com uma lista de OS por trás
   // é clicado — estreita o carrossel de Serviços a essa condição (categoria,
@@ -325,8 +326,16 @@ export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qr
           onPresent={enterPresentation}
           titulo={data.resumo.nome}
           paradaId={data.resumo.id}
+          compacta={sidebarCompacta}
+          onCompacta={() => setSidebarCompacta((atual) => !atual)}
         />
-        <main className="presentation-scroll pb-20 lg:pb-0 lg:pl-72">{sectionNodes}</main>
+        <main className={cn("presentation-scroll pb-20 transition-[padding] duration-300 lg:pb-0", sidebarCompacta ? "lg:pl-20" : "lg:pl-72")}>
+          <div className="sticky top-0 z-20 hidden items-center justify-between border-b border-slate-200 bg-white/90 px-8 py-2.5 text-xs backdrop-blur lg:flex">
+            <div className="flex items-center gap-3 text-slate-500"><b className="text-slate-800">{data.resumo.maquina}</b><span>{new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium" }).format(new Date(`${data.resumo.data}T12:00:00`))}</span></div>
+            <span className={cn("rounded-full px-3 py-1 font-bold", data.resumo.status === "concluida" ? "bg-success-50 text-success-700" : data.resumo.status === "ressalvas" ? "bg-warning-50 text-warning-800" : "bg-brand-50 text-brand-700")}>{data.resumo.status === "concluida" ? "Concluída" : data.resumo.status === "ressalvas" ? "Com ressalvas" : "Em andamento"}</span>
+          </div>
+          {sectionNodes}
+        </main>
       </div>
       <PrintReport data={data} qrDataUrl={qrDataUrl} />
     </div>

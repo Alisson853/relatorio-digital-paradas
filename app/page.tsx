@@ -79,7 +79,7 @@ export default async function DashboardPage() {
           tela, a outra é leitura de instrumento. Dar a cada uma sua própria
           faixa, separadas por regra, é o que evita uma faixa homogênea de
           dois blocos do mesmo tamanho. */}
-      <div className="bg-blueprint relative overflow-hidden bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800 px-6 py-14 sm:px-10 sm:py-16">
+      <div className="bg-blueprint relative overflow-hidden bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800 px-6 py-10 sm:px-10 sm:py-12">
         <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-brand-500/15 blur-3xl" />
         <div className="relative mx-auto max-w-7xl">
           <span className="label-tecnico mb-4 inline-flex items-center gap-2 rounded-sm border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[11px] font-bold text-brand-200">

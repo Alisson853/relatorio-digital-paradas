@@ -21,6 +21,15 @@ export function GallerySection({ fotos }: { fotos: FotoGaleria[] }) {
     acc[f.servico] = (acc[f.servico] ?? 0) + 1;
     return acc;
   }, {});
+  const comparacoes = Object.values(
+    fotos.reduce<Record<string, { antes?: FotoGaleria; depois?: FotoGaleria }>>((acc, foto) => {
+      const atual = acc[foto.servico] ?? {};
+      if (foto.categoria === "antes") atual.antes = foto;
+      if (foto.categoria === "depois") atual.depois = foto;
+      acc[foto.servico] = atual;
+      return acc;
+    }, {})
+  ).filter((par) => par.antes && par.depois);
 
   return (
     <section id="fotos" className="section-screen flex items-center bg-white px-6 py-24 sm:px-10">
@@ -46,6 +55,22 @@ export function GallerySection({ fotos }: { fotos: FotoGaleria[] }) {
             ))}
           </div>
         </div>
+
+        {filtro === "todas" && comparacoes.length > 0 && (
+          <div className="mb-8 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+            <div className="mb-4 flex items-center justify-between"><p className="text-sm font-extrabold text-slate-900">Comparativo Antes ↔ Depois</p><span className="text-xs font-bold text-slate-400">{comparacoes.length} serviço(s) com evidência completa</span></div>
+            <div className="grid gap-4 md:grid-cols-2">
+              {comparacoes.slice(0, 4).map((par) => (
+                <div key={par.antes!.servico} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                  <p className="truncate px-3 py-2 text-xs font-bold text-slate-700">{par.antes!.servico}</p>
+                  <div className="grid grid-cols-2 gap-px bg-slate-200">
+                    {[par.antes!, par.depois!].map((foto) => <button key={foto.id} onClick={() => setActiveIndex(filtradas.findIndex((f) => f.id === foto.id))} className="relative aspect-[4/3] bg-slate-100 text-left"><Image src={foto.url} alt={`${foto.categoria}: ${foto.servico}`} fill sizes="360px" className="object-cover" unoptimized={foto.url.startsWith("data:")} /><span className={`absolute left-2 top-2 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase text-white ${foto.categoria === "antes" ? "bg-slate-800/85" : "bg-brand-600/90"}`}>{foto.categoria}</span></button>)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {filtradas.map((foto, i) => (

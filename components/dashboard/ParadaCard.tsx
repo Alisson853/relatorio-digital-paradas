@@ -116,8 +116,9 @@ export function ParadaCard({ parada, index, onDelete, onExport, onClone }: Parad
           </div>
           <div className="flex items-center gap-2 text-slate-600">
             <Clock size={15} className="text-slate-400" />
-            {parada.duracaoRealizada}
+            <span><b className="text-slate-700">Real:</b> {parada.duracaoRealizada}</span>
           </div>
+          <div className="col-span-2 flex items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-2 text-xs text-slate-600"><Clock size={14} className="text-brand-500" /><span>Planejado: <b>{parada.duracaoPlanejada}</b></span><span className="ml-auto font-bold text-brand-700">{parada.status === "em_andamento" ? "Em execução" : "Relatório finalizado"}</span></div>
           <div className="col-span-2 flex items-center gap-2 text-slate-600">
             <User size={15} className="text-slate-400" />
             {parada.responsavel}

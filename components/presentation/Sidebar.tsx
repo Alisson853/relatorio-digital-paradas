@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Camera, FileDown, FileText, Home, Maximize2, MoreHorizontal, Presentation, ScrollText, X } from "lucide-react";
+import { ArrowLeft, Camera, FileDown, FileText, Home, Maximize2, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Presentation, ScrollText, X } from "lucide-react";
 import type { SectionMeta } from "@/lib/sections";
 import { cn } from "@/lib/utils";
 import { useEditorMode } from "@/lib/useEditorMode";
@@ -16,9 +16,11 @@ interface SidebarProps {
   onPresent: () => void;
   titulo: string;
   paradaId: string;
+  compacta: boolean;
+  onCompacta: () => void;
 }
 
-export function Sidebar({ sections, activeId, onNavigate, onPresent, titulo, paradaId }: SidebarProps) {
+export function Sidebar({ sections, activeId, onNavigate, onPresent, titulo, paradaId, compacta, onCompacta }: SidebarProps) {
   const { isEditor } = useEditorMode();
   // No celular, "Apresentar" + as quatro exportações + Captura Rápida viviam
   // na MESMA fila de rolagem que as seis abas de conteúdo — doze alvos de
@@ -30,18 +32,19 @@ export function Sidebar({ sections, activeId, onNavigate, onPresent, titulo, par
   const [maisAbertoMobile, setMaisAbertoMobile] = useState(false);
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 flex-col border-r border-slate-200 bg-white lg:flex">
-        <div className="border-b border-slate-100 px-6 py-5">
+      <aside className={cn("fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-slate-200 bg-white transition-[width] duration-300 lg:flex", compacta ? "w-20" : "w-72")}>
+        <div className={cn("flex items-center border-b border-slate-100 py-5", compacta ? "justify-center px-3" : "justify-between px-6")}>
           <Image src="/santher-logo-azul.png" alt="Santher" width={120} height={32} className="h-6 w-auto" />
+          <button onClick={onCompacta} aria-label={compacta ? "Expandir menu" : "Recolher menu"} className={cn("flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100", compacta && "absolute -right-4 top-4 border border-slate-200 bg-white shadow-sm")}><>{compacta ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}</></button>
         </div>
-        <div className="flex items-center gap-2 border-b border-slate-100 px-6 py-4">
+        <div className={cn("flex items-center gap-2 border-b border-slate-100 py-4", compacta ? "justify-center px-3" : "px-6")}>
           <Link href="/" className="flex h-8 w-8 flex-none items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700">
             <ArrowLeft size={16} />
           </Link>
-          <div className="min-w-0">
+          {!compacta && <div className="min-w-0">
             <p className="truncate text-sm font-bold text-slate-900">{titulo}</p>
             <p className="text-[11px] font-medium text-slate-400">Relatório Digital</p>
-          </div>
+          </div>}
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-5">
@@ -52,25 +55,27 @@ export function Sidebar({ sections, activeId, onNavigate, onPresent, titulo, par
               <button
                 key={section.id}
                 onClick={() => onNavigate(section.id)}
+                title={compacta ? section.label : undefined}
                 className={cn(
-                  "flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-colors",
+                  "flex w-full items-center gap-3 rounded-xl py-2.5 text-sm font-semibold transition-colors",
+                  compacta ? "justify-center px-2" : "px-3.5",
                   active ? "bg-brand-600 text-white shadow-sm" : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
                 )}
               >
                 <Icon size={17} strokeWidth={2.2} />
-                {section.label}
+                {!compacta && section.label}
               </button>
             );
           })}
         </nav>
 
-        <div className="space-y-2 border-t border-slate-100 p-4">
+        <div className={cn("space-y-2 border-t border-slate-100", compacta ? "p-2" : "p-4")}>
           <button
             onClick={onPresent}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-950 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-slate-900"
           >
             <Maximize2 size={16} />
-            Modo Apresentação
+            {!compacta && "Modo Apresentação"}
           </button>
           {isEditor && (
             <>
@@ -79,7 +84,7 @@ export function Sidebar({ sections, activeId, onNavigate, onPresent, titulo, par
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-bold text-brand-700 transition-colors hover:bg-brand-100"
               >
                 <Camera size={16} />
-                Captura Rápida (Celular)
+                {!compacta && "Captura Rápida (Celular)"}
               </Link>
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -173,6 +178,13 @@ export function Sidebar({ sections, activeId, onNavigate, onPresent, titulo, par
       >
         <Home size={18} />
       </Link>
+      {isEditor && <Link
+        href={`/parada/${paradaId}/fotos`}
+        aria-label="Abrir Captura Rápida no celular"
+        className="fixed left-3 top-[max(0.75rem,calc(env(safe-area-inset-top)+0.25rem))] z-30 flex h-10 items-center gap-1.5 rounded-full bg-brand-600 px-3 text-xs font-bold text-white shadow-md lg:hidden"
+      >
+        <Camera size={16} /> Capturar
+      </Link>}
 
       <AnimatePresence>
         {maisAbertoMobile && (

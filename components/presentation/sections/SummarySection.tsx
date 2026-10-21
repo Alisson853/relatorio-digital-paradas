@@ -66,6 +66,8 @@ export function SummarySection({ kpis, servicos = [], onCardClick }: Props) {
     { label: "Etiqueta Vermelha" as const, value: kpis.etiquetaVermelha, icon: Tag, accent: "danger" as const },
     { label: "Etiqueta Amarela" as const, value: kpis.etiquetaAmarela, icon: Tag, accent: "warning" as const },
   ];
+  const nivelRisco = kpis.pendencias > 0 || kpis.etiquetaVermelha > 0 ? "Atenção necessária" : kpis.eficiencia >= 90 ? "Operação sob controle" : "Acompanhar execução";
+  const corRisco = kpis.pendencias > 0 || kpis.etiquetaVermelha > 0 ? "border-warning-200 bg-warning-50 text-warning-900" : kpis.eficiencia >= 90 ? "border-success-200 bg-success-50 text-success-900" : "border-brand-200 bg-brand-50 text-brand-900";
 
   return (
     <section id="resumo" className="section-screen flex items-center bg-slate-50 px-6 py-24 sm:px-10">
@@ -75,6 +77,11 @@ export function SummarySection({ kpis, servicos = [], onCardClick }: Props) {
           title="Indicadores Gerais da Parada"
           description="Panorama consolidado do desempenho da parada, pronto para apresentação em reuniões de gestão."
         />
+        <div className={`mb-6 grid gap-4 rounded-2xl border p-4 sm:grid-cols-3 ${corRisco}`}>
+          <div><p className="text-[11px] font-bold uppercase tracking-wide opacity-70">Situação da parada</p><p className="mt-1 text-base font-extrabold">{nivelRisco}</p></div>
+          <div className="border-current/10 sm:border-l sm:pl-4"><p className="text-[11px] font-bold uppercase tracking-wide opacity-70">Pontos de atenção</p><p className="mt-1 text-sm font-bold">{kpis.pendencias} pendência(s) · {kpis.etiquetaVermelha} etiqueta(s) vermelha(s)</p></div>
+          <div className="border-current/10 sm:border-l sm:pl-4"><p className="text-[11px] font-bold uppercase tracking-wide opacity-70">Conclusão</p><p className="mt-1 text-sm font-bold">{kpis.osConcluidas} de {kpis.osPlanejadas} OS · {kpis.eficiencia}%</p></div>
+        </div>
         {oportunidades > 0 && (
           <label className="mb-5 flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600">
             <input type="checkbox" checked={soProgramadas} onChange={(e) => setSoProgramadas(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-brand-600" />

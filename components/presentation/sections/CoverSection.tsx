@@ -133,7 +133,7 @@ export function CoverSection({ resumo }: { resumo: ParadaResumo }) {
           {resumo.fotosMaquina?.length ? (
             <div className="relative h-full w-full">
               <div className="absolute inset-0 overflow-hidden rounded-lg border border-white/20 shadow-2xl">
-                <Image src={resumo.fotosMaquina[0]} alt={resumo.maquina} fill sizes="480px" className="object-cover" priority />
+                <Image src={resumo.fotosMaquina[0]} alt={resumo.maquina} fill sizes="480px" className="object-cover object-center" priority />
                 <div className="absolute inset-0 bg-gradient-to-t from-brand-950/50 via-transparent to-transparent" />
               </div>
               <span className="absolute -bottom-px -left-px h-3 w-3 border-b-2 border-l-2 border-signal-500" />
