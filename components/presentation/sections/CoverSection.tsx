@@ -3,155 +3,71 @@
 import Image from "next/image";
 import type { ParadaResumo } from "@/lib/types";
 import { MachineIllustration } from "@/components/ui/MachineIllustration";
-import { StatusBadge } from "@/components/ui/StatusBadge";
-import { cn, formatDateCompact } from "@/lib/utils";
+import { formatDateCompact } from "@/lib/utils";
 
-export function CoverSection({ resumo }: { resumo: ParadaResumo }) {
-  // Durações salvas como número puro ("6") ficavam sem unidade na capa.
-  const comHoras = (d: string) => (/^\s*\d+([.,]\d+)?\s*$/.test(d) ? `${d.trim()}h` : d);
+export function CoverSection({ resumo, atividades }: { resumo: ParadaResumo; atividades: { planejadas: number; concluidas: number } }) {
+  const comHoras = (duracao: string) => (/^\s*\d+([.,]\d+)?\s*$/.test(duracao) ? `${duracao.trim()}h` : duracao);
+  const progresso = atividades.planejadas ? Math.round((atividades.concluidas / atividades.planejadas) * 100) : 0;
+  const status = resumo.status === "concluida" ? "Parada concluída" : resumo.status === "ressalvas" ? "Com ressalvas" : "Parada em andamento";
   const campos = [
-    { label: "Data da Parada", value: formatDateCompact(resumo.data) },
-    { label: "Tempo Planejado", value: comHoras(resumo.duracaoPlanejada) },
-    { label: "Tempo Realizado", value: comHoras(resumo.duracaoRealizada) },
+    { label: "Data da parada", value: formatDateCompact(resumo.data) },
+    { label: "Tempo", value: comHoras(resumo.duracaoPlanejada) },
     { label: "Responsável", value: resumo.responsavel },
   ];
 
   return (
-    <section
-      id="capa"
-      className="section-screen relative flex items-center overflow-hidden bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800 px-6 pb-16 pt-[calc(4rem+env(safe-area-inset-top))] sm:px-10 sm:py-20 lg:py-24"
-    >
-      {/* Fundo tipo prancha técnica: malha fina de desenho industrial */}
-      <div className="pointer-events-none absolute inset-0 opacity-[0.35]">
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px)",
-            backgroundSize: "48px 48px",
-          }}
-        />
-      </div>
+    <section id="capa" className="section-screen relative flex items-center overflow-hidden bg-brand-950 px-6 pb-16 pt-[calc(4rem+env(safe-area-inset-top))] sm:px-10 sm:py-20 lg:px-14 lg:py-20">
+      <div className="pointer-events-none absolute inset-0 opacity-70" style={{ backgroundImage: "linear-gradient(rgba(107,173,250,0.11) 1px, transparent 1px), linear-gradient(90deg, rgba(107,173,250,0.11) 1px, transparent 1px)", backgroundSize: "72px 72px" }} />
       <div className="pointer-events-none absolute -right-32 -top-32 h-[520px] w-[520px] rounded-full bg-brand-500/15 blur-3xl" />
+      <Image src="/santher-logo-branco.png" alt="Santher" width={190} height={48} className="absolute left-6 top-[calc(1.5rem+env(safe-area-inset-top))] h-10 w-auto sm:left-10 sm:top-10 sm:h-12" priority />
 
-      <Image
-        src="/santher-logo-branco.png"
-        alt="Santher"
-        width={190}
-        height={48}
-        className="absolute left-6 top-[calc(1.5rem+env(safe-area-inset-top))] h-10 w-auto sm:left-10 sm:top-10 sm:h-12"
-        priority
-      />
-
-      <div className="relative mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-8 lg:grid-cols-[1.15fr_1fr] lg:gap-16">
+      <div className="relative mx-auto grid w-full max-w-[1340px] grid-cols-1 items-center gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
         <div>
-          <div className="revelar mb-6 flex flex-wrap items-center gap-3">
-            <StatusBadge
-              status={resumo.status}
-              className="rounded-sm border border-white/25 bg-white/[0.06] font-mono text-[11px] tracking-[0.08em] text-white [&>span]:bg-current"
-            />
-            {/* O id ganhou sufixo aleatorio e ficou longo demais pra caber
-                aqui inteiro. Cortar no meio ("parada-mp11-util…") nao serve
-                nem pra conferir nem pra ler; o que identifica de fato e o
-                final, entao a etiqueta mostra so ele. O id completo continua
-                no title, pra quem precisar. */}
-            <span
-              className="rounded-sm border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-brand-300"
-              title={resumo.id}
-            >
-              Nº Registro {resumo.id.slice(-8)}
-            </span>
-          </div>
-
-          <div className="revelar flex items-stretch gap-4" style={{ animationDelay: "0.15s" }}>
-            <span className="mt-1 w-[3px] flex-none rounded-full bg-signal-500" />
+          <div className="revelar flex items-stretch gap-5" style={{ animationDelay: "0.1s" }}>
+            <span className="mt-1 w-[5px] flex-none rounded-full bg-signal-500" />
             <div className="min-w-0">
-              {/* O espacamento entre letras de 0.32em e o que da o ar de
-                  prancha tecnica, mas no celular ele estica a linha a ponto de
-                  ela quebrar deixando "DIGITAL" sozinho embaixo. Menos
-                  espacamento no estreito mantem a intencao sem a quebra feia. */}
-              <p className="mb-2 font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-brand-300 sm:tracking-[0.32em]">
-                {resumo.area} · Relatório Digital
-              </p>
-              <h1 className="font-display text-4xl font-semibold uppercase leading-[0.98] tracking-tight text-white sm:text-5xl lg:text-[3.4rem]">
-                {resumo.nome}
-              </h1>
-              <p className="mt-4 text-lg font-medium text-brand-200">{resumo.maquina}</p>
+              <p className="font-mono text-[11px] font-bold uppercase tracking-[0.15em] text-brand-300 sm:tracking-[0.22em]">{resumo.area} / Unidade Guaíba</p>
+              <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.1em] text-brand-300">Parada programada · Relatório executivo</p>
+              <h1 className="mt-9 font-display text-[3rem] font-semibold uppercase leading-[0.95] tracking-tight text-white sm:text-6xl lg:text-[4.45rem]">{resumo.nome}</h1>
+              <p className="mt-3 text-xl font-semibold text-brand-100">{resumo.maquina}</p>
             </div>
           </div>
 
-          <div
-            className="revelar mt-10 grid grid-cols-2 overflow-hidden rounded-md border border-white/15 bg-white/[0.03] sm:grid-cols-4"
-            style={{ animationDelay: "0.3s" }}
-          >
-            {campos.map(({ label, value }, i) => (
-              <div
-                key={label}
-                className={cn(
-                  "min-w-0 border-white/10 px-4 py-3.5 align-top",
-                  i % 2 === 1 && "max-sm:border-l",
-                  i >= 2 && "max-sm:border-t",
-                  i > 0 && "sm:border-l"
-                )}
-              >
+          <div className="revelar mt-9 inline-flex items-center gap-3 rounded-2xl bg-brand-700 px-5 py-4" style={{ animationDelay: "0.2s" }}>
+            <span className="h-2.5 w-2.5 rounded-full bg-signal-500" />
+            <div>
+              <p className="font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-brand-100">{status}</p>
+              <p className="mt-1 text-xs font-semibold text-white">{formatDateCompact(resumo.data)} · {comHoras(resumo.duracaoPlanejada)} planejadas</p>
+            </div>
+          </div>
+
+          <div className="revelar mt-8 grid overflow-hidden rounded-2xl border border-brand-400/40 bg-brand-900/90 sm:grid-cols-3" style={{ animationDelay: "0.3s" }}>
+            {campos.map(({ label, value }, index) => (
+              <div key={label} className={`min-w-0 px-5 py-5 align-top ${index > 0 ? "border-t border-brand-400/30 sm:border-l sm:border-t-0" : ""}`}>
                 <p className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-brand-300">{label}</p>
-                {/* Quebra em vez de truncar: um nome cortado ("Madson Ferna…")
-                    nao informa nada, e a faixa tem altura de sobra pra duas
-                    linhas. As celulas se alinham pelo topo, entao uma que
-                    quebre nao desalinha as vizinhas. */}
-                <p className="mt-1 font-mono text-sm font-semibold leading-snug text-white [overflow-wrap:anywhere]">
-                  {value}
-                </p>
+                <p className="mt-2 text-base font-bold leading-snug text-white [overflow-wrap:anywhere]">{value}</p>
               </div>
             ))}
           </div>
+          <p className="revelar mt-12 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-brand-300" style={{ animationDelay: "0.4s" }}>Relatório digital · Versão para apresentação</p>
         </div>
 
-        <div
-          // A foto vinha ANTES do titulo no celular (-order-1). O efeito era
-          // que quem abre o QR code no aparelho recebia uma foto ocupando a
-          // tela inteira e precisava rolar pra descobrir de que relatorio se
-          // trata — medido: o titulo comecava em 507px. Numa capa, o nome vem
-          // primeiro; a foto ilustra o que o nome ja disse. Em telas largas as
-          // duas colunas aparecem lado a lado e a ordem nao muda nada.
-          // No celular a foto ocupa a largura toda, alinhada com o titulo e com
-          // a faixa de campos acima dela. Antes era mx-auto com teto de 320px:
-          // uma caixa estreita centralizada, enquanto TODO o resto da capa
-          // encosta a esquerda. O desencontro entre um bloco centralizado e
-          // tudo o mais alinhado a esquerda e o que faz a capa parecer torta.
-          //
-          // Em telas largas ela volta a ser um quadrado centralizado na propria
-          // coluna, porque ali a capa tem duas colunas lado a lado e o
-          // enquadramento quadrado equilibra o bloco de texto.
-          //
-          // A proporcao tambem muda: 4/3 no estreito em vez de quadrado, senao
-          // uma foto de largura total viraria um bloco altissimo e empurraria o
-          // resto da capa pra fora da tela.
-          className="revelar-foto relative aspect-[4/3] w-full lg:mx-auto lg:aspect-square lg:max-w-md"
-          style={{ animationDelay: "0.3s" }}
-        >
+        <div className="revelar-foto relative aspect-[5/6] w-full max-w-[570px] justify-self-center rounded-[26px] border-2 border-signal-500/90 bg-brand-800 p-5" style={{ animationDelay: "0.3s" }}>
           {resumo.fotosMaquina?.length ? (
-            <div className="relative h-full w-full">
-              <div className="absolute inset-0 overflow-hidden rounded-lg border border-white/20 shadow-2xl">
-                <Image src={resumo.fotosMaquina[0]} alt={resumo.maquina} fill sizes="480px" className="object-cover object-center" priority />
-                <div className="absolute inset-0 bg-gradient-to-t from-brand-950/50 via-transparent to-transparent" />
-              </div>
-              <span className="absolute -bottom-px -left-px h-3 w-3 border-b-2 border-l-2 border-signal-500" />
-              <span className="absolute -right-px -top-px h-3 w-3 border-r-2 border-t-2 border-signal-500" />
-              <div className="absolute bottom-3 left-3 rounded-sm bg-brand-950/70 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-brand-200 backdrop-blur-sm">
-                Registro Fotográfico
-              </div>
-              {resumo.fotosMaquina[1] && (
-                <div className="absolute -bottom-6 -right-6 h-32 w-40 overflow-hidden rounded-md border-4 border-brand-900 shadow-2xl sm:h-36 sm:w-48">
-                  <Image src={resumo.fotosMaquina[1]} alt={resumo.maquina} fill sizes="200px" className="object-cover" />
-                </div>
-              )}
+            <div className="relative h-full w-full overflow-hidden rounded-[18px] bg-brand-900 shadow-2xl">
+              <Image src={resumo.fotosMaquina[0]} alt={resumo.maquina} fill sizes="(min-width: 1024px) 42vw, 94vw" className="object-cover object-center" priority />
+              <div className="absolute inset-0 bg-gradient-to-t from-brand-950/80 via-brand-950/10 to-brand-950/30" />
             </div>
           ) : (
-            <div className="relative flex h-full w-full items-center justify-center rounded-lg border border-white/15 bg-white/5 p-12 backdrop-blur-sm">
-              <MachineIllustration variant={resumo.imagem} className="h-full w-full" />
-            </div>
+            <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-[18px] border border-white/15 bg-brand-900 p-12"><MachineIllustration variant={resumo.imagem} className="h-full w-full" /></div>
           )}
+          <div className="absolute right-9 top-9 rounded-2xl bg-brand-950/95 px-5 py-4 shadow-xl backdrop-blur">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-brand-300">Atividades</p>
+            <p className="mt-1 text-2xl font-bold text-white">{atividades.concluidas} / {atividades.planejadas}</p>
+            <div className="mt-2 h-1.5 w-36 overflow-hidden rounded-full bg-brand-500"><div className="h-full rounded-full bg-signal-500" style={{ width: `${progresso}%` }} /></div>
+            <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.08em] text-brand-100">{progresso}% concluído</p>
+          </div>
+          <div className="absolute bottom-9 left-9 rounded-lg bg-brand-950/85 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.1em] text-brand-100 backdrop-blur">Registro fotográfico · {resumo.maquina}</div>
         </div>
       </div>
     </section>

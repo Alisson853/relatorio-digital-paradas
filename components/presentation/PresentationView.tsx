@@ -128,7 +128,7 @@ export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qr
     const candidatas: Array<{ id: string; node: React.ReactNode; bg: string } | false> = [
       {
         id: "capa",
-        node: <CoverSection key="capa" resumo={data.resumo} />,
+        node: <CoverSection key="capa" resumo={data.resumo} atividades={{ planejadas: data.kpis.osPlanejadas, concluidas: data.kpis.osConcluidas }} />,
         bg: "bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800",
       },
       {
