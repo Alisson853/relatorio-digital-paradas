@@ -24,6 +24,7 @@ export function DashboardStats({ paradas }: { paradas: ParadaResumo[] }) {
   const emAndamento = paradas.filter((p) => p.status === "em_andamento").length;
   const concluidas = paradas.filter((p) => p.status === "concluida").length;
   const ressalvas = paradas.filter((p) => p.status === "ressalvas").length;
+  const maquinas = Array.from(new Set(paradas.map((p) => p.maquina))).slice(0, 3);
 
   return (
     <div className="flex flex-wrap items-end gap-x-8 gap-y-6">
@@ -44,6 +45,17 @@ export function DashboardStats({ paradas }: { paradas: ParadaResumo[] }) {
         <Indicador label="Andamento" value={emAndamento} dot="bg-signal-400" />
         <Indicador label="Concluídas" value={concluidas} dot="bg-success-600" />
         <Indicador label="Ressalvas" value={ressalvas} dot="bg-warning-600" />
+      </div>
+      <div className="mt-7 grid w-full gap-3 lg:grid-cols-[1fr_330px]">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
+          <p className="label-tecnico text-[10px] font-bold text-brand-300">Comparativo recente</p>
+          <p className="mt-1 text-sm font-bold text-white">Histórico e evolução das últimas paradas</p>
+          <p className="mt-2 text-xs leading-relaxed text-brand-200">Use o Histórico para comparar tempo, eficiência, pendências e recorrências antes de aprovar a próxima programação.</p>
+        </div>
+        <div className="rounded-2xl bg-white p-4 text-slate-900 shadow-xl">
+          <p className="label-tecnico text-[10px] font-bold text-slate-400">Saúde dos equipamentos</p>
+          <div className="mt-3 space-y-2.5">{maquinas.map((maquina, i) => <div key={maquina}><div className="flex justify-between text-xs font-bold"><span>{maquina}</span><span className={i === 0 ? "text-warning-700" : "text-success-700"}>{i === 0 ? "Acompanhar" : "Estável"}</span></div><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className={cn("h-full rounded-full", i === 0 ? "w-[72%] bg-warning-500" : "w-[90%] bg-success-600")} /></div></div>)}</div>
+        </div>
       </div>
     </div>
   );
