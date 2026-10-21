@@ -15,6 +15,7 @@ import { ServicesSection, type FiltroServicos } from "./sections/ServicesSection
 import { GallerySection } from "./sections/GallerySection";
 import { ChartsSection } from "./sections/ChartsSection";
 import { CriticalPathSection } from "./sections/CriticalPathSection";
+import { ScheduleSection } from "./sections/ScheduleSection";
 import { ResultSection } from "./sections/ResultSection";
 import { PrintReport } from "./PrintReport";
 
@@ -150,6 +151,11 @@ export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qr
           />
         ),
         bg: "bg-slate-50",
+      },
+      data.servicos.some((servico) => servico.horaInicio && servico.horaFim) && {
+        id: "cronograma",
+        node: <ScheduleSection key="cronograma" servicos={data.servicos} />,
+        bg: "bg-white",
       },
       { id: "fotos", node: <GallerySection key="fotos" fotos={data.fotos} />, bg: "bg-white" },
       { id: "graficos", node: <ChartsSection key="graficos" graficos={data.graficos} />, bg: "bg-slate-50" },

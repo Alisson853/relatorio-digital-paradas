@@ -113,6 +113,7 @@ function ServiceSlide({ servico }: { servico: Servico }) {
               <MetaField label="Início — Término" value={`${servico.horaInicio || "—"} — ${servico.horaFim || "—"}`} />
             </div>
           )}
+          {servico.recursos && <MetaField label="Recursos / materiais" value={servico.recursos} className="col-span-2 sm:col-span-4" />}
         </div>
 
         <div className="mt-6 space-y-4 text-sm">

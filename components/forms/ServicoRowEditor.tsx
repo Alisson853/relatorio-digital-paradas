@@ -18,6 +18,9 @@ export interface ServicoRow {
   motivo: string;
   status: StatusItem;
   tempoGasto: string;
+  horaInicio: string;
+  horaFim: string;
+  recursos: string;
   fotoAntes: string;
   fotoDurante: string;
   fotoDepois: string;
@@ -152,6 +155,9 @@ export function ServicoRowEditor({ item, index, onChange, onRemove, onDuplicate,
         <SelectField label="Categoria" value={item.categoria} onChange={(v) => onChange({ categoria: v })} options={CATEGORIA_OPTIONS} />
         <TextField label="Responsável" value={item.responsavel} onChange={(v) => onChange({ responsavel: v })} suggestions={responsaveisSugeridos} />
         <TextField label="Tempo Gasto" value={item.tempoGasto} onChange={(v) => onChange({ tempoGasto: v })} placeholder="Ex: 2h" />
+        <TextField label="Início" value={item.horaInicio} onChange={(v) => onChange({ horaInicio: v })} placeholder="Ex: 08:00" />
+        <TextField label="Término" value={item.horaFim} onChange={(v) => onChange({ horaFim: v })} placeholder="Ex: 10:00" />
+        <TextField label="Recursos / materiais" value={item.recursos} onChange={(v) => onChange({ recursos: v })} placeholder="Ex: 2 mecânicos, talha, rolamento" className="col-span-2" />
       </div>
     </div>
   );

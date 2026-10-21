@@ -58,6 +58,7 @@ export interface Servico {
   horaInicio: string;
   horaFim: string;
   tempoGasto: string;
+  recursos?: string;
   problemaIdentificado: string;
   servicoExecutado: string;
   resultado: string;

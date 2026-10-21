@@ -10,6 +10,8 @@ export interface ServicoImportado {
   categoria: string;
   responsavel: string;
   tempoGasto: string;
+  horaInicio: string;
+  horaFim: string;
   concluido: boolean;
 }
 
@@ -46,6 +48,7 @@ const CABECALHOS: Record<string, string[]> = {
   hh: ["HH"],
   executante: ["EXECUTANTE"],
   executado: ["EXECUTADO"],
+  horario: ["INICIO - FIM", "INÍCIO - FIM", "INICIO/FIM", "HORARIO"],
 };
 
 // Coluna "Executado" costuma ter um ícone (✓ verde / ✗ vermelho) por cima de
@@ -226,6 +229,19 @@ function minutosParaTempo(totalMinutos: number): string {
   return minutos === 0 ? `${horas}h` : `${horas}h${minutos}min`;
 }
 
+function formatarHorario(valor: unknown): { inicio: string; fim: string } {
+  const texto = String(valor ?? "").trim().replace(/[–—]/g, "-");
+  const partes = texto.split(/\s+-\s+/);
+  if (partes.length !== 2) return { inicio: "", fim: "" };
+  const normalizarHora = (hora: string) => {
+    const match = hora.trim().match(/^(\d{1,2})(?::(\d{2}))?$/);
+    if (!match) return "";
+    const h = Number(match[1]); const m = Number(match[2] ?? 0);
+    return h < 24 && m < 60 ? `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}` : "";
+  };
+  return { inicio: normalizarHora(partes[0]), fim: normalizarHora(partes[1]) };
+}
+
 // O painel no topo da planilha (antes da tabela de OS) traz os totais
 // programados pra semana — bate esses números com o relatório em vez de
 // deixar "OS Planejadas" preso no que foi digitado manualmente uma vez.
@@ -280,6 +296,7 @@ export async function parsePlanilhaServicos(file: File, maquina?: string): Promi
     hh: encontrarColuna(cabecalho, CABECALHOS.hh),
     executante: encontrarColuna(cabecalho, CABECALHOS.executante),
     executado: encontrarColuna(cabecalho, CABECALHOS.executado),
+    horario: encontrarColuna(cabecalho, CABECALHOS.horario),
   };
 
   // Linhas duplicadas com a mesma OS (o mesmo serviço com horas lançadas por
@@ -311,6 +328,7 @@ export async function parsePlanilhaServicos(file: File, maquina?: string): Promi
     const executante = limparNomeExecutante(String(linha[col.executante] ?? ""));
     const tempoGasto = formatarTempo(linha[col.hh]);
     const concluido = col.executado !== -1 && estaExecutado(linha[col.executado]);
+    const horario = col.horario === -1 ? { inicio: "", fim: "" } : formatarHorario(linha[col.horario]);
 
     const existente = porOs.get(numeroOS);
     if (existente && numeroOS !== "Oportunidade") {
@@ -321,6 +339,8 @@ export async function parsePlanilhaServicos(file: File, maquina?: string): Promi
       }
       // Se qualquer lançamento dessa OS foi marcado executado, a OS toda conta como concluída.
       if (concluido) existente.concluido = true;
+      if (horario.inicio && (!existente.horaInicio || horario.inicio < existente.horaInicio)) existente.horaInicio = horario.inicio;
+      if (horario.fim && (!existente.horaFim || horario.fim > existente.horaFim)) existente.horaFim = horario.fim;
       continue;
     }
 
@@ -332,6 +352,8 @@ export async function parsePlanilhaServicos(file: File, maquina?: string): Promi
       categoria: mapearCategoria(tipo),
       responsavel: executante,
       tempoGasto,
+      horaInicio: horario.inicio,
+      horaFim: horario.fim,
       concluido,
     });
   }

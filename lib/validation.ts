@@ -161,6 +161,7 @@ export function sanearServico(bruto: unknown): Servico {
     horaInicio: texto(s.horaInicio, 20),
     horaFim: texto(s.horaFim, 20),
     tempoGasto: texto(s.tempoGasto, 20),
+    recursos: texto(s.recursos, LIMITE_TEXTO_LONGO) || undefined,
     problemaIdentificado: texto(s.problemaIdentificado, LIMITE_TEXTO_LONGO),
     servicoExecutado: texto(s.servicoExecutado, LIMITE_TEXTO_LONGO),
     resultado: texto(s.resultado, LIMITE_TEXTO_LONGO),

@@ -1,5 +1,6 @@
 import {
   Award,
+  CalendarRange,
   GalleryHorizontalEnd,
   Home,
   ListTodo,
@@ -21,6 +22,7 @@ export const SECTIONS: SectionMeta[] = [
   { id: "resumo", label: "Resumo", icon: ListTodo },
   { id: "timeline", label: "Timeline", icon: Milestone },
   { id: "servicos", label: "Serviços", icon: Wrench },
+  { id: "cronograma", label: "Cronograma", icon: CalendarRange },
   { id: "fotos", label: "Fotos", icon: GalleryHorizontalEnd },
   { id: "graficos", label: "Gráficos", icon: PieChart },
   { id: "caminho-critico", label: "Caminho Crítico", icon: Route },
