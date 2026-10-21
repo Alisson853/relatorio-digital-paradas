@@ -1,5 +1,15 @@
 import type { Servico } from "./types";
 
+export type Criticidade = "crítica" | "alta" | "média" | "baixa";
+
+// Prioridade calculada a partir dos sinais que já existem no relatório.
+export function classificarCriticidade(servico: Servico, candidatosCriticos: Servico[] = []): Criticidade {
+  if (servico.categoria === "Etiqueta Vermelha" || servico.status === "atrasado") return "crítica";
+  if (servico.categoria === "Etiqueta Amarela" || candidatosCriticos.some((item) => item.id === servico.id)) return "alta";
+  if (servico.status === "pendente" || servico.categoria === "Corretiva") return "média";
+  return "baixa";
+}
+
 export function horarioParaMinutos(horario: string): number | null {
   const match = horario.trim().match(/^(\d{1,2}):(\d{2})$/);
   if (!match) return null;

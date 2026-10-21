@@ -25,6 +25,9 @@ export function DashboardStats({ paradas }: { paradas: ParadaResumo[] }) {
   const concluidas = paradas.filter((p) => p.status === "concluida").length;
   const ressalvas = paradas.filter((p) => p.status === "ressalvas").length;
   const maquinas = Array.from(new Set(paradas.map((p) => p.maquina))).slice(0, 3);
+  const mesAtual = new Date().toISOString().slice(0, 7);
+  const paradasDoMes = paradas.filter((p) => p.data.startsWith(mesAtual));
+  const taxaConclusaoMes = paradasDoMes.length ? Math.round((paradasDoMes.filter((p) => p.status === "concluida").length / paradasDoMes.length) * 100) : 0;
 
   return (
     <div className="flex flex-wrap items-end gap-x-8 gap-y-6">
@@ -49,7 +52,7 @@ export function DashboardStats({ paradas }: { paradas: ParadaResumo[] }) {
       <div className="mt-7 grid w-full gap-3 lg:grid-cols-[1fr_330px]">
         <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
           <p className="label-tecnico text-[10px] font-bold text-brand-300">Comparativo recente</p>
-          <p className="mt-1 text-sm font-bold text-white">Histórico e evolução das últimas paradas</p>
+          <p className="mt-1 text-sm font-bold text-white">Painel mensal: {paradasDoMes.length} parada(s) · {taxaConclusaoMes}% concluídas</p>
           <p className="mt-2 text-xs leading-relaxed text-brand-200">Use o Histórico para comparar tempo, eficiência, pendências e recorrências antes de aprovar a próxima programação.</p>
         </div>
         <div className="rounded-2xl bg-white p-4 text-slate-900 shadow-xl">

@@ -11,6 +11,7 @@ import { PhotoLightbox } from "@/components/presentation/PhotoLightbox";
 import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { servicosComFoto } from "@/lib/derive";
 import { cn } from "@/lib/utils";
+import { candidatasCriticas, classificarCriticidade } from "@/lib/programacao";
 
 function MetaField({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
@@ -39,7 +40,7 @@ function CategoriaBadge({ categoria }: { categoria?: string }) {
   );
 }
 
-function ServiceSlide({ servico }: { servico: Servico }) {
+function ServiceSlide({ servico, candidatosCriticos }: { servico: Servico; candidatosCriticos: Servico[] }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const fotosDisponiveis = [
@@ -54,6 +55,8 @@ function ServiceSlide({ servico }: { servico: Servico }) {
       : []),
   ];
   const mostrarRotulo = fotosDisponiveis.length > 1;
+  const criticidade = classificarCriticidade(servico, candidatosCriticos);
+  const corCriticidade = criticidade === "crítica" ? "bg-danger-100 text-danger-600" : criticidade === "alta" ? "bg-warning-100 text-warning-600" : criticidade === "média" ? "bg-brand-50 text-brand-600" : "bg-slate-100 text-slate-500";
 
   return (
     <div className="grid grid-rows-[minmax(0,1fr)] flex-1 grid-cols-1 gap-8 overflow-hidden lg:grid-cols-[1fr_1.05fr] lg:gap-10">
@@ -91,6 +94,7 @@ function ServiceSlide({ servico }: { servico: Servico }) {
             </span>
           )}
           <CategoriaBadge categoria={servico.categoria} />
+          <span className={cn("rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide", corCriticidade)}>Prioridade {criticidade}</span>
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-4">
@@ -233,6 +237,7 @@ export function ServicesSection({ servicos: todosServicos, filtro, onLimparFiltr
   const servicos = filtro ? comFoto.filter(filtro.predicate) : comFoto;
   const total = servicos.length;
   const atual = servicos[index];
+  const candidatosCriticos = candidatasCriticas(todosServicos);
 
   // Volta pro início do carrossel sempre que o filtro muda — senão o índice
   // de antes (ex: 5) pode não existir mais na lista filtrada (que tem só 2),
@@ -317,7 +322,7 @@ export function ServicesSection({ servicos: todosServicos, filtro, onLimparFiltr
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
               className="flex min-h-0 flex-1 flex-col"
             >
-              <ServiceSlide servico={atual} />
+              <ServiceSlide servico={atual} candidatosCriticos={candidatosCriticos} />
             </motion.div>
           </AnimatePresence>
 

@@ -23,6 +23,8 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
   const [busca, setBusca] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<"todos" | StatusGeral>("todos");
   const [maquinaFiltro, setMaquinaFiltro] = useState("todas");
+  const [dataDe, setDataDe] = useState("");
+  const [dataAte, setDataAte] = useState("");
 
   // Só vira aba a máquina que já tem relatório — nada de aba vazia. Com só
   // uma máquina no histórico, a aba "Todas" sozinha não ajudaria em nada,
@@ -86,9 +88,9 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
       const bateBusca = !termo || [p.nome, p.maquina, p.area, p.responsavel].some((campo) => campo.toLowerCase().includes(termo));
       const bateStatus = statusFiltro === "todos" || p.status === statusFiltro;
       const bateMaquina = maquinaFiltro === "todas" || codigoMaquina(p.maquina) === maquinaFiltro;
-      return bateBusca && bateStatus && bateMaquina;
+      return bateBusca && bateStatus && bateMaquina && (!dataDe || p.data >= dataDe) && (!dataAte || p.data <= dataAte);
     });
-  }, [busca, statusFiltro, maquinaFiltro, paradas]);
+  }, [busca, statusFiltro, maquinaFiltro, dataDe, dataAte, paradas]);
 
   return (
     <div>
@@ -146,6 +148,10 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
             placeholder="Buscar por nome, máquina ou responsável"
             className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-700 shadow-sm outline-none placeholder:text-slate-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
           />
+        </div>
+        <div className="flex gap-2 rounded-xl border border-slate-200 bg-white p-2 text-xs font-semibold text-slate-600">
+          <label>De <input type="date" value={dataDe} onChange={(e) => setDataDe(e.target.value)} className="ml-1 bg-transparent outline-none" /></label>
+          <label className="border-l border-slate-200 pl-2">Até <input type="date" value={dataAte} onChange={(e) => setDataAte(e.target.value)} className="ml-1 bg-transparent outline-none" /></label>
         </div>
         <div className="flex flex-none gap-1.5 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
           {STATUS_FILTROS.map((f) => (
