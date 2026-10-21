@@ -165,7 +165,11 @@ export async function listParadasHistorico(): Promise<ParadaHistoricoItem[]> {
     .select({ ...COLUNAS_RESUMO, kpis: paradas.kpis })
     .from(paradas)
     .orderBy(asc(paradas.data));
-  return rows.map((row) => ({ resumo: rowParaResumo(row), kpis: row.kpis, porEquipe: calcularPorEquipe(row.servicos) }));
+  return rows.map((row) => ({
+    resumo: rowParaResumo(row),
+    kpis: row.kpis,
+    porEquipe: calcularPorEquipe(row.servicos, parseHoras(row.duracaoRealizada) || parseHoras(row.duracaoPlanejada) || undefined),
+  }));
 }
 
 // Exporta TODOS os relatórios de uma vez (fotos, responsáveis, tudo) — bem
