@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -304,6 +304,13 @@ function NovaParadaForm() {
   const [importResultado, setImportResultado] = useState("");
   const planilhaInputRef = useRef<HTMLInputElement>(null);
 
+  // Alertas de preparação: aparecem antes de salvar, quando ainda é possível
+  // corrigir a programação sem descobrir a falta só na execução em campo.
+  const servicosIncompletos = useMemo(
+    () => servicos.filter((s) => !s.equipamento.trim() || !s.responsavel.trim() || !s.tempoGasto.trim()),
+    [servicos]
+  );
+
   // Histórico de "não será feito" de todos os relatórios — carregado uma vez
   // e cruzado localmente (por número de OS ou equipamento) contra cada linha
   // do formulário, pra avisar antes mesmo da parada começar.
@@ -527,6 +534,7 @@ function NovaParadaForm() {
       const {
         servicos: importados,
         avisos,
+        informativos,
         infoAba,
         totalProgramado,
         etiquetaVermelhaProgramada,
@@ -616,7 +624,7 @@ function NovaParadaForm() {
       if (substituidas > 0) partes.push(`${substituidas} OS antiga${substituidas === 1 ? "" : "s"} que não está${substituidas === 1 ? "" : "ão"} mais na planilha ${substituidas === 1 ? "foi removida" : "foram removidas"}`);
       if (marcadasConcluidas > 0) partes.push(`${marcadasConcluidas} marcadas como concluídas pela coluna Executado`);
       const resultadoBase = `${partes.join(", ")}. Marque como concluído pelo celular (Captura Rápida) conforme forem sendo feitos.`;
-      setImportResultado(infoAba ? `${infoAba} ${resultadoBase}` : resultadoBase);
+      setImportResultado([infoAba, resultadoBase, ...informativos].filter(Boolean).join(" "));
     } catch {
       setImportResultado("Não foi possível ler essa planilha. Confira se é o modelo padrão de programação semanal.");
     } finally {
@@ -904,6 +912,13 @@ function NovaParadaForm() {
             </div>
             {importResultado && <p className="mt-2.5 text-xs font-semibold text-brand-700">{importResultado}</p>}
           </div>
+
+          {servicosIncompletos.length > 0 && (
+            <div className="mb-5 flex items-start gap-2 rounded-xl border border-warning-200 bg-warning-50 px-3 py-2.5 text-xs text-warning-800">
+              <AlertCircle size={16} className="mt-0.5 flex-none" />
+              <p><strong>{servicosIncompletos.length} serviço{servicosIncompletos.length === 1 ? "" : "s"} precisam de revisão:</strong> preencha equipamento, responsável e tempo antes de salvar o relatório.</p>
+            </div>
+          )}
 
           <ServicosChecklist servicos={servicos} onToggle={(id, concluido) => updateRow(setServicos, id, { status: concluido ? "concluido" : "pendente" })} />
 

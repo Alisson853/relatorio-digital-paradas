@@ -16,6 +16,9 @@ export interface ServicoImportado {
 export interface ResultadoImportacao {
   servicos: ServicoImportado[];
   avisos: string[];
+  // Mensagens que não impedem a importação, mas deixam clara uma decisão
+  // tomada pelo importador. Assim uma OS repetida não "some" sem explicação.
+  informativos: string[];
   totalProgramado?: number;
   etiquetaVermelhaProgramada?: number;
   etiquetaAmarelaProgramada?: number;
@@ -256,7 +259,7 @@ export async function parsePlanilhaServicos(file: File, maquina?: string): Promi
   const workbook = XLSX.read(buffer, { type: "array" });
   const avisos: string[] = [];
 
-  if (workbook.SheetNames.length === 0) return { servicos: [], avisos: ["A planilha não tem nenhuma aba."] };
+  if (workbook.SheetNames.length === 0) return { servicos: [], avisos: ["A planilha não tem nenhuma aba."], informativos: [] };
   const { nome: nomeAba, infoAba } = escolherAba(workbook, maquina);
 
   const sheet = workbook.Sheets[nomeAba];
@@ -264,7 +267,7 @@ export async function parsePlanilhaServicos(file: File, maquina?: string): Promi
 
   const idxCabecalho = encontrarLinhaCabecalho(linhas);
   if (idxCabecalho === -1) {
-    return { servicos: [], avisos: ['Não encontrei uma linha com as colunas "EQUIPAMENTO" e "OS/RL" nessa planilha.'] };
+    return { servicos: [], avisos: ['Não encontrei uma linha com as colunas "EQUIPAMENTO" e "OS/RL" nessa planilha.'], informativos: [] };
   }
 
   const cabecalho = linhas[idxCabecalho].map(normalizar);
@@ -282,6 +285,7 @@ export async function parsePlanilhaServicos(file: File, maquina?: string): Promi
   // Linhas duplicadas com a mesma OS (o mesmo serviço com horas lançadas por
   // pessoas/turnos diferentes) viram uma única entrada, somando o tempo.
   const porOs = new Map<string, ServicoImportado>();
+  const repeticoesPorOs = new Map<string, number>();
   let linhasVazias = 0;
 
   for (let i = idxCabecalho + 1; i < linhas.length; i++) {
@@ -310,6 +314,7 @@ export async function parsePlanilhaServicos(file: File, maquina?: string): Promi
 
     const existente = porOs.get(numeroOS);
     if (existente && numeroOS !== "Oportunidade") {
+      repeticoesPorOs.set(numeroOS, (repeticoesPorOs.get(numeroOS) ?? 0) + 1);
       existente.tempoGasto = minutosParaTempo(horasParaMinutos(existente.tempoGasto) + horasParaMinutos(tempoGasto));
       if (executante && !existente.responsavel.includes(executante)) {
         existente.responsavel = existente.responsavel ? `${existente.responsavel} + ${executante}` : executante;
@@ -334,7 +339,12 @@ export async function parsePlanilhaServicos(file: File, maquina?: string): Promi
   const servicos = Array.from(porOs.values());
   if (servicos.length === 0) avisos.push("Nenhuma linha de serviço foi encontrada abaixo do cabeçalho.");
 
+  const repeticoes = Array.from(repeticoesPorOs.values()).reduce((total, quantidade) => total + quantidade, 0);
+  const informativos = repeticoes > 0
+    ? [`${repeticoes} linha${repeticoes === 1 ? "" : "s"} com OS repetida foram consolidadas em ${repeticoesPorOs.size} OS. Revise a planilha se cada linha deveria ser uma atividade independente.`]
+    : [];
+
   const resumoPainel = extrairResumoPainel(linhas, idxCabecalho);
 
-  return { servicos, avisos, infoAba, ...resumoPainel };
+  return { servicos, avisos, informativos, infoAba, ...resumoPainel };
 }
