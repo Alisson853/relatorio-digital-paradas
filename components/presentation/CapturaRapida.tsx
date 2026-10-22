@@ -28,6 +28,7 @@ import {
   X,
   ClipboardList,
   Copy,
+  CalendarRange,
 } from "lucide-react";
 import { MOTIVOS_NAO_FEITO, type Equipe, type MotivoNaoFeitoCategoria, type ParadaCompleta, type Servico, type StatusItem, type TimelineEvento } from "@/lib/types";
 import {
@@ -51,6 +52,8 @@ import { atualizarItemStatus, type StatusPendente, listarStatusPendente, remover
 import { processarFila, type ResultadoTentativa } from "@/lib/offline-sync";
 import { carregarParadaCache, salvarParadaCache } from "@/lib/offline-parada-cache";
 import { encontrarUltimoNaoFeito, type HistoricoNaoFeitoItem } from "@/lib/historico-nao-feito";
+import { parseHoras } from "@/lib/derive";
+import { formatarHorario, servicosProgramados } from "@/lib/programacao";
 
 // As 3 opções que fazem sentido marcar em campo pelo celular — "Atrasado" é
 // mais um estado de relatório do que algo que alguém marca na hora.
@@ -925,6 +928,62 @@ function separarResponsaveis(responsavel: string): string[] {
     .filter((nome) => nome && !/^terceiros?$/i.test(nome) && pareceNomeDePessoa(nome));
 }
 
+// Mapa de campo: fica na mesma tela em que o técnico registra as fotos, para
+// que o prazo não fique escondido apenas na apresentação. Ele usa os horários
+// já programados na OS; não inventa duração real a partir da foto.
+function GanttDeCampo({ data, agora }: { data: ParadaCompleta; agora: Date | null }) {
+  const atividades = servicosProgramados(data.servicos).sort((a, b) => a.inicioMinutos - b.inicioMinutos);
+  if (atividades.length === 0) return null;
+
+  const inicio = Math.min(...atividades.map((item) => item.inicioMinutos));
+  const fimManutencao = Math.max(...atividades.map((item) => item.fimMinutos));
+  const limiteHoras = parseHoras(data.resumo.duracaoPlanejada) || Math.max((fimManutencao - inicio) / 60, 0.5);
+  const fimLimite = inicio + limiteHoras * 60;
+  const fimEscala = Math.max(fimManutencao, fimLimite);
+  const duracaoEscala = Math.max(fimEscala - inicio, 30);
+  const manutencaoHoras = Math.round(((fimManutencao - inicio) / 60) * 10) / 10;
+  const folga = Math.round((limiteHoras - manutencaoHoras) * 10) / 10;
+  const atrasadas = atividades.filter((item) => item.status === "atrasado").length;
+  const emRisco = atrasadas > 0 || folga < 0;
+  const folgaCurta = !emRisco && folga <= 1;
+  const cor = emRisco ? "border-danger-200 bg-danger-50 text-danger-800" : folgaCurta ? "border-warning-200 bg-warning-50 text-warning-800" : "border-success-200 bg-success-50 text-success-800";
+  const agoraMinutos = agora ? agora.getHours() * 60 + agora.getMinutes() : null;
+  const mostrarAgora = agoraMinutos !== null && agoraMinutos >= inicio && agoraMinutos <= fimEscala;
+  const posicaoAgora = mostrarAgora ? ((agoraMinutos - inicio) / duracaoEscala) * 100 : 0;
+
+  return (
+    <section className={`overflow-hidden rounded-2xl border ${cor}`} aria-label="Mapa Gantt e tendência da parada">
+      <div className="flex items-start justify-between gap-3 px-4 py-3">
+        <div>
+          <p className="flex items-center gap-1.5 text-sm font-extrabold"><CalendarRange size={16} /> Mapa da parada</p>
+          <p className="mt-0.5 text-[11px] font-semibold opacity-80">Manutenção {manutencaoHoras}h · limite {limiteHoras}h · {folga >= 0 ? `${folga}h de folga` : `${Math.abs(folga)}h acima do limite`}</p>
+        </div>
+        <span className="flex-none rounded-full bg-white/70 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide">{emRisco ? "Risco" : folgaCurta ? "Folga curta" : "No prazo"}</span>
+      </div>
+      <div className="border-t border-current/15 bg-white p-3">
+        <div className="mb-2 flex justify-between text-[10px] font-bold text-slate-500"><span>{formatarHorario(inicio)}</span><span>Entrega {formatarHorario(fimLimite)}</span></div>
+        <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
+          {atividades.map((atividade) => {
+            const left = ((atividade.inicioMinutos - inicio) / duracaoEscala) * 100;
+            const width = Math.max(((atividade.fimMinutos - atividade.inicioMinutos) / duracaoEscala) * 100, 2.5);
+            const classe = atividade.status === "concluido" ? "bg-success-600" : atividade.status === "atrasado" ? "bg-danger-600" : atividade.status === "em_andamento" ? "bg-brand-600" : "bg-slate-400";
+            return (
+              <div key={atividade.id} className="grid grid-cols-[84px_1fr] items-center gap-2">
+                <p className="truncate text-[10px] font-bold text-slate-600" title={`${atividade.numeroOS} · ${atividade.equipamento}`}>OS {atividade.numeroOS}</p>
+                <div className="relative h-5 overflow-visible rounded bg-slate-100">
+                  <div className={`absolute top-0 h-5 rounded ${classe}`} style={{ left: `${left}%`, width: `${width}%` }} title={`${atividade.horaInicio} — ${atividade.horaFim}`} />
+                  {mostrarAgora && <i className="absolute -top-1 z-[1] h-7 w-0.5 bg-slate-900" style={{ left: `${posicaoAgora}%` }} aria-label="Horário atual" />}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-bold text-slate-500"><span><i className="mr-1 inline-block h-2 w-2 rounded bg-success-600" />Concluída</span><span><i className="mr-1 inline-block h-2 w-2 rounded bg-brand-600" />Em andamento</span><span><i className="mr-1 inline-block h-2 w-2 rounded bg-slate-400" />Pendente</span>{atrasadas > 0 && <span className="text-danger-700"><i className="mr-1 inline-block h-2 w-2 rounded bg-danger-600" />{atrasadas} atrasada{atrasadas > 1 ? "s" : ""}</span>}</div>
+      </div>
+    </section>
+  );
+}
+
 function CapturaRapidaConteudo({ id }: { id: string }) {
   const [data, setData] = useState<ParadaCompleta | null>(null);
   const [status, setStatus] = useState<"loading" | "found" | "not-found">("loading");
@@ -1682,6 +1741,7 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
       )}
 
       <main className="mx-auto max-w-lg space-y-3 px-4 py-5">
+        <GanttDeCampo data={data} agora={horaAgora} />
         <NovaOsForm paradaId={id} onCriada={handleOsCriada} />
         <NovoEventoForm paradaId={id} onCriado={handleEventoCriado} />
 
