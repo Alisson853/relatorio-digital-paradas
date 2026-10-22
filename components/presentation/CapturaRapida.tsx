@@ -948,8 +948,11 @@ function GanttDeCampo({ data, agora }: { data: ParadaCompleta; agora: Date | nul
   const folgaCurta = !emRisco && folga <= 1;
   const cor = emRisco ? "border-danger-200 bg-danger-50 text-danger-800" : folgaCurta ? "border-warning-200 bg-warning-50 text-warning-800" : "border-success-200 bg-success-50 text-success-800";
   const agoraMinutos = agora ? agora.getHours() * 60 + agora.getMinutes() : null;
-  const mostrarAgora = agoraMinutos !== null && agoraMinutos >= inicio && agoraMinutos <= fimEscala;
-  const posicaoAgora = mostrarAgora ? ((agoraMinutos - inicio) / duracaoEscala) * 100 : 0;
+  // Uma parada pode passar da meia-noite. Nesse caso 00:30 é o "dia seguinte"
+  // no mapa, não uma hora antes de 22:00.
+  const agoraNoMapa = agoraMinutos !== null && agoraMinutos < inicio ? agoraMinutos + 1440 : agoraMinutos;
+  const mostrarAgora = agoraNoMapa !== null && agoraNoMapa >= inicio && agoraNoMapa <= fimEscala;
+  const posicaoAgora = mostrarAgora ? ((agoraNoMapa - inicio) / duracaoEscala) * 100 : 0;
 
   return (
     <section className={`overflow-hidden rounded-2xl border ${cor}`} aria-label="Mapa Gantt e tendência da parada">
@@ -961,15 +964,16 @@ function GanttDeCampo({ data, agora }: { data: ParadaCompleta; agora: Date | nul
         <span className="flex-none rounded-full bg-white/70 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide">{emRisco ? "Risco" : folgaCurta ? "Folga curta" : "No prazo"}</span>
       </div>
       <div className="border-t border-current/15 bg-white p-3">
-        <div className="mb-2 flex justify-between text-[10px] font-bold text-slate-500"><span>{formatarHorario(inicio)}</span><span>Entrega {formatarHorario(fimLimite)}</span></div>
+        <div className="mb-2 grid grid-cols-3 text-[10px] font-bold text-slate-500"><span>Início {formatarHorario(inicio)}</span><span className="text-center">Fim manutenção {formatarHorario(fimManutencao)}</span><span className="text-right">Entrega {formatarHorario(fimLimite)}</span></div>
+        {mostrarAgora && <p className="mb-2 flex items-center gap-1 text-[10px] font-extrabold text-slate-700"><i className="h-2 w-0.5 bg-slate-900" /> Agora: {formatarHorario(agoraNoMapa ?? 0)}</p>}
         <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
           {atividades.map((atividade) => {
             const left = ((atividade.inicioMinutos - inicio) / duracaoEscala) * 100;
             const width = Math.max(((atividade.fimMinutos - atividade.inicioMinutos) / duracaoEscala) * 100, 2.5);
             const classe = atividade.status === "concluido" ? "bg-success-600" : atividade.status === "atrasado" ? "bg-danger-600" : atividade.status === "em_andamento" ? "bg-brand-600" : "bg-slate-400";
             return (
-              <div key={atividade.id} className="grid grid-cols-[84px_1fr] items-center gap-2">
-                <p className="truncate text-[10px] font-bold text-slate-600" title={`${atividade.numeroOS} · ${atividade.equipamento}`}>OS {atividade.numeroOS}</p>
+              <div key={atividade.id} className="grid grid-cols-[112px_1fr] items-center gap-2">
+                <div className="min-w-0" title={`${atividade.numeroOS} · ${atividade.equipamento}`}><p className="truncate text-[10px] font-bold text-slate-600">OS {atividade.numeroOS}</p><p className="text-[9px] font-semibold text-slate-400">{atividade.horaInicio} → {atividade.horaFim}</p></div>
                 <div className="relative h-5 overflow-visible rounded bg-slate-100">
                   <div className={`absolute top-0 h-5 rounded ${classe}`} style={{ left: `${left}%`, width: `${width}%` }} title={`${atividade.horaInicio} — ${atividade.horaFim}`} />
                   {mostrarAgora && <i className="absolute -top-1 z-[1] h-7 w-0.5 bg-slate-900" style={{ left: `${posicaoAgora}%` }} aria-label="Horário atual" />}
