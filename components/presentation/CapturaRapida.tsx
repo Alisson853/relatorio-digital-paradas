@@ -928,6 +928,14 @@ function separarResponsaveis(responsavel: string): string[] {
     .filter((nome) => nome && !/^terceiros?$/i.test(nome) && pareceNomeDePessoa(nome));
 }
 
+// Uma disputa de versão acontece quando dois celulares (ou o refresh do
+// relatório) gravam quase juntos. Não é recusa definitiva: a fila deve
+// manter a evidência e tentar outra vez, com a versão nova do relatório.
+function falhaDaFila(erro: string): ResultadoTentativa {
+  if (/muitas alterações simultâneas/i.test(erro)) return { ok: false, tipo: "rede" };
+  return { ok: false, tipo: "negocio", erro };
+}
+
 // Mapa de campo: fica na mesma tela em que o técnico registra as fotos, para
 // que o prazo não fique escondido apenas na apresentação. Ele usa os horários
 // já programados na OS; não inventa duração real a partir da foto.
@@ -1150,9 +1158,9 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
             const formData = new FormData();
             formData.set("file", item.blob, item.nomeArquivo);
             const upload = await uploadFoto(formData);
-            if (!upload.ok || !upload.url) return { ok: false, tipo: "negocio", erro: upload.erro || "Não foi possível enviar a foto." };
+            if (!upload.ok || !upload.url) return falhaDaFila(upload.erro || "Não foi possível enviar a foto.");
             const resultado = await capturarFotoServico(id, item.servicoId, upload.url, item.etapa);
-            if (!resultado.ok) return { ok: false, tipo: "negocio", erro: resultado.erro || "Não foi possível registrar a foto." };
+            if (!resultado.ok) return falhaDaFila(resultado.erro || "Não foi possível registrar a foto.");
             const campo = resultado.label === "Antes" ? "fotoAntes" : resultado.label === "Durante" ? "fotoDurante" : "fotoDepois";
             const horarioCampo = resultado.label === "Antes" ? "fotoAntesHorario" : resultado.label === "Durante" ? "fotoDuranteHorario" : "fotoDepoisHorario";
             handleCaptured(item.servicoId, {
@@ -1220,7 +1228,7 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
         async (item): Promise<ResultadoTentativa> => {
           try {
             const resultado = await definirNaoFeito(id, item.servicoId, item.categoria, item.justificativa);
-            if (!resultado.ok) return { ok: false, tipo: "negocio", erro: resultado.erro || "Não foi possível salvar." };
+            if (!resultado.ok) return falhaDaFila(resultado.erro || "Não foi possível salvar.");
             handleCaptured(item.servicoId, {
               naoFeitoCategoria: (item.categoria || undefined) as MotivoNaoFeitoCategoria | undefined,
               justificativaNaoFeito: item.justificativa || undefined,
@@ -1269,7 +1277,7 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
         async (item): Promise<ResultadoTentativa> => {
           try {
             const resultado = await marcarStatusServico(id, item.servicoId, item.novoStatus);
-            if (!resultado.ok) return { ok: false, tipo: "negocio", erro: resultado.erro || "Não foi possível salvar o status." };
+            if (!resultado.ok) return falhaDaFila(resultado.erro || "Não foi possível salvar o status.");
             return { ok: true };
           } catch {
             return { ok: false, tipo: "rede" };
@@ -1432,6 +1440,13 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
     filaPendente.filter((i) => i.sincronizacao === "erro").length +
     filaNaoFeitoPendente.filter((i) => i.sincronizacao === "erro").length +
     filaStatusPendente.filter((i) => i.sincronizacao === "erro").length;
+  // Não esconder o diagnóstico atrás de "servidor recusou": em reta final,
+  // saber qual OS falhou permite corrigir ou refazer somente aquela captura.
+  const detalhesFilaComErro = [
+    ...filaPendente.filter((i) => i.sincronizacao === "erro").map((i) => ({ servicoId: i.servicoId, tipo: `Foto ${i.etapa}`, erro: i.ultimoErro })),
+    ...filaNaoFeitoPendente.filter((i) => i.sincronizacao === "erro").map((i) => ({ servicoId: i.servicoId, tipo: "Não será feito", erro: i.ultimoErro })),
+    ...filaStatusPendente.filter((i) => i.sincronizacao === "erro").map((i) => ({ servicoId: i.servicoId, tipo: "Status", erro: i.ultimoErro })),
+  ];
   const sincronizandoAlgumaFila = enviandoFila || enviandoNaoFeito || enviandoStatus;
 
   // "Sincronizado com sucesso": aparece só na TRANSIÇÃO de "tinha algo
@@ -1730,7 +1745,7 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
         <div className="px-4 pt-3">
           <div
             className={cn(
-              "flex flex-wrap items-center gap-2.5 rounded-full border px-4 py-2.5 text-xs font-bold shadow-sm",
+              "flex flex-wrap items-center gap-2.5 rounded-2xl border px-4 py-2.5 text-xs font-bold shadow-sm",
               totalComErro > 0 ? "border-danger-200 bg-danger-50 text-danger-700" : "border-warning-200 bg-warning-50 text-warning-700"
             )}
           >
@@ -1764,6 +1779,14 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
               >
                 Tentar novamente
               </button>
+            )}
+            {totalComErro > 0 && (
+              <ul className="w-full space-y-1 border-t border-danger-200 pt-2 text-[11px] font-semibold text-danger-800">
+                {detalhesFilaComErro.slice(0, 5).map((item, index) => {
+                  const os = data?.servicos.find((servico) => servico.id === item.servicoId)?.numeroOS;
+                  return <li key={`${item.servicoId}-${index}`}>{item.tipo} · {os ? `OS ${os}` : "OS não encontrada"}: {item.erro || "Motivo não informado."}</li>;
+                })}
+              </ul>
             )}
           </div>
         </div>
