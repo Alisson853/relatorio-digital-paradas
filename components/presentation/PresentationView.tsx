@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { ParadaCompleta } from "@/lib/types";
 import { SECTIONS, type SectionMeta } from "@/lib/sections";
 import { cn } from "@/lib/utils";
+import { parseHoras } from "@/lib/derive";
 import { Sidebar } from "./Sidebar";
 import { FitToScreen } from "./FitToScreen";
 import { CoverSection } from "./sections/CoverSection";
@@ -155,7 +156,7 @@ export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qr
       },
       data.servicos.some((servico) => servico.horaInicio && servico.horaFim) && {
         id: "cronograma",
-        node: <ScheduleSection key="cronograma" servicos={data.servicos} />,
+        node: <ScheduleSection key="cronograma" servicos={data.servicos} limiteHoras={parseHoras(data.resumo.duracaoPlanejada)} />,
         bg: "bg-white",
       },
       { id: "fotos", node: <GallerySection key="fotos" fotos={data.fotos} />, bg: "bg-white" },

@@ -877,7 +877,7 @@ function NovaParadaForm() {
             <TextField label="Responsável" required value={responsavel} onChange={setResponsavel} placeholder="Nome do responsável" suggestions={responsaveisConhecidos} />
             <TextField label="Data" required type="date" value={data} onChange={setData} />
             <SelectField label="Status Geral" value={status} onChange={(v) => setStatus(v as StatusGeral)} options={STATUS_GERAL_OPTIONS} />
-            <TextField label="Tempo Planejado" value={duracaoPlanejada} onChange={setDuracaoPlanejada} placeholder="Ex: 48h" />
+            <TextField label="Limite total da parada" value={duracaoPlanejada} onChange={setDuracaoPlanejada} placeholder="Ex: 15h" />
             <TextField label="Tempo Realizado" value={duracaoRealizada} onChange={setDuracaoRealizada} placeholder="Ex: 51h 20min" />
           </div>
         </FormSection>
