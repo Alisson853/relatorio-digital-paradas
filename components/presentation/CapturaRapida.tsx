@@ -921,6 +921,9 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<Date | null>(null);
   const [horaAgora, setHoraAgora] = useState<Date | null>(null);
   const [busca, setBusca] = useState("");
+  // Chip de pessoa é filtro exato pelo primeiro nome; não reutiliza a busca
+  // textual, porque "Henrique" também casa dentro de "Carlos Henrique".
+  const [pessoaFiltro, setPessoaFiltro] = useState("");
   // OS concluída fica fora da lista por padrão — com muitas OS na parada,
   // a lista inteira de "já feito" só atrapalha achar o que ainda falta.
   const [mostrarConcluidas, setMostrarConcluidas] = useState(false);
@@ -1371,7 +1374,9 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
 
   const servicosFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();
-    const base = termo
+    const base = pessoaFiltro
+      ? servicosOrdenados.filter((s) => s.responsavel.split(/\s*\+\s*/).some((parte) => parte.trim().split(/\s+/)[0]?.toLowerCase() === pessoaFiltro.toLowerCase()))
+      : termo
       ? servicosOrdenados.filter(
           (s) =>
             s.numeroOS.toLowerCase().includes(termo) ||
@@ -1384,9 +1389,9 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
     // Uma busca digitada vale mais que o filtro de "esconder concluídas" —
     // se a pessoa está procurando uma OS específica, ela aparece mesmo já
     // pronta, senão a busca "falha" sem motivo aparente.
-    if (termo || mostrarConcluidas) return base;
+    if (termo || pessoaFiltro || mostrarConcluidas) return base;
     return base.filter((s) => s.status !== "concluido");
-  }, [servicosOrdenados, busca, mostrarConcluidas]);
+  }, [servicosOrdenados, busca, pessoaFiltro, mostrarConcluidas]);
 
   // As três funções abaixo também gravam a mudança no cache local (não só
   // no state) — sem isso, uma edição feita offline (foto, status, "não será
@@ -1676,14 +1681,14 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
             <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={busca}
-              onChange={(e) => setBusca(e.target.value)}
+              onChange={(e) => { setBusca(e.target.value); setPessoaFiltro(""); }}
               placeholder="Buscar por OS, equipamento ou responsável"
               className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-9 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
             />
             {busca && (
               <button
                 type="button"
-                onClick={() => setBusca("")}
+                onClick={() => { setBusca(""); setPessoaFiltro(""); }}
                 aria-label="Limpar busca"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
@@ -1709,12 +1714,12 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
           // novo no mesmo nome (já selecionado) pra limpar o filtro.
           <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4">
             {pessoas.map((nome) => {
-              const ativo = busca.trim().toLowerCase() === nome.toLowerCase();
+              const ativo = pessoaFiltro.toLowerCase() === nome.toLowerCase();
               return (
                 <button
                   key={nome}
                   type="button"
-                  onClick={() => setBusca(ativo ? "" : nome)}
+                  onClick={() => { setPessoaFiltro(ativo ? "" : nome); setBusca(""); }}
                   className={cn(
                     // A fila rola na horizontal em vez de quebrar linha, entao
                     // subir de 30px pra 44px nao empurra chip nenhum pra fora:
