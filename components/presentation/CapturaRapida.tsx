@@ -914,6 +914,17 @@ function faltaFoto(servico: Servico): boolean {
   return !temDepois;
 }
 
+// A planilha pode trazer equipe externa como "Terceiros - Carlos Henrique /
+// Henrique". "Terceiros" é grupo, não pessoa: os chips e filtros precisam
+// trabalhar com cada nome completo, sem confundir Carlos Henrique com Henrique.
+function separarResponsaveis(responsavel: string): string[] {
+  return responsavel
+    .replace(/^\s*terceiros?\s*[-:–—]?\s*/i, "")
+    .split(/\s*(?:\+|\/|,|;|\be\b)\s*/i)
+    .map((nome) => nome.trim())
+    .filter((nome) => nome && !/^terceiros?$/i.test(nome) && pareceNomeDePessoa(nome));
+}
+
 function CapturaRapidaConteudo({ id }: { id: string }) {
   const [data, setData] = useState<ParadaCompleta | null>(null);
   const [status, setStatus] = useState<"loading" | "found" | "not-found">("loading");
@@ -1353,20 +1364,18 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
     }
   }, [totalPendentesFila]);
 
-  // "responsavel" costuma vir como dupla/trio ("ADELINO + JEBERSON") — quebra
-  // em cada pessoa e pega só o primeiro nome, pra virar um chip curto que dá
-  // pra tocar direto em vez de digitar. Um nome por pessoa (sem repetir).
+  // "responsavel" pode vir como dupla/trio ou como grupo de terceiros. Cada
+  // pessoa vira um chip pelo nome completo; primeiro nome não é identificador
+  // suficiente quando existem Carlos Henrique e Henrique no mesmo relatório.
   // A planilha às vezes traz lixo nessa coluna (número de turno, célula com
   // erro de acentuação virando "?????") — só vira chip o que parece nome de
   // gente de verdade (letras, pelo menos 2 caracteres).
   const pessoas = useMemo(() => {
     const vistos = new Map<string, string>();
     for (const s of servicosOrdenados) {
-      for (const parte of s.responsavel.split(/\s*\+\s*/)) {
-        const primeiroNome = parte.trim().split(/\s+/)[0];
-        if (!primeiroNome || !pareceNomeDePessoa(primeiroNome)) continue;
-        const chave = primeiroNome.toLowerCase();
-        if (!vistos.has(chave)) vistos.set(chave, primeiroNome);
+      for (const nome of separarResponsaveis(s.responsavel)) {
+        const chave = nome.toLocaleLowerCase();
+        if (!vistos.has(chave)) vistos.set(chave, nome);
       }
     }
     return Array.from(vistos.values()).sort((a, b) => a.localeCompare(b, "pt-BR"));
@@ -1375,7 +1384,7 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
   const servicosFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();
     const base = pessoaFiltro
-      ? servicosOrdenados.filter((s) => s.responsavel.split(/\s*\+\s*/).some((parte) => parte.trim().split(/\s+/)[0]?.toLowerCase() === pessoaFiltro.toLowerCase()))
+      ? servicosOrdenados.filter((s) => separarResponsaveis(s.responsavel).some((nome) => nome.toLocaleLowerCase() === pessoaFiltro.toLocaleLowerCase()))
       : termo
       ? servicosOrdenados.filter(
           (s) =>
