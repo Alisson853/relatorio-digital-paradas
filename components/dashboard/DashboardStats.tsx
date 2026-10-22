@@ -1,5 +1,5 @@
 import type { ParadaResumo } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, formatDateCompact, statusLabel } from "@/lib/utils";
 
 // Leitura de instrumento, não cartão. Até o Bloco E2 esses números viviam
 // numa caixa branca com borda e sombra flutuando por cima do hero escuro —
@@ -24,7 +24,7 @@ export function DashboardStats({ paradas }: { paradas: ParadaResumo[] }) {
   const emAndamento = paradas.filter((p) => p.status === "em_andamento").length;
   const concluidas = paradas.filter((p) => p.status === "concluida").length;
   const ressalvas = paradas.filter((p) => p.status === "ressalvas").length;
-  const maquinas = Array.from(new Set(paradas.map((p) => p.maquina))).slice(0, 3);
+  const relatoriosRecentes = [...paradas].sort((a, b) => b.data.localeCompare(a.data)).slice(0, 3);
   const mesAtual = new Date().toISOString().slice(0, 7);
   const paradasDoMes = paradas.filter((p) => p.data.startsWith(mesAtual));
   const taxaConclusaoMes = paradasDoMes.length ? Math.round((paradasDoMes.filter((p) => p.status === "concluida").length / paradasDoMes.length) * 100) : 0;
@@ -56,8 +56,15 @@ export function DashboardStats({ paradas }: { paradas: ParadaResumo[] }) {
           <p className="mt-2 text-xs leading-relaxed text-brand-200">Use o Histórico para comparar tempo, eficiência, pendências e recorrências antes de aprovar a próxima programação.</p>
         </div>
         <div className="rounded-2xl bg-white p-4 text-slate-900 shadow-xl">
-          <p className="label-tecnico text-[10px] font-bold text-slate-400">Saúde dos equipamentos</p>
-          <div className="mt-3 space-y-2.5">{maquinas.map((maquina, i) => <div key={maquina}><div className="flex justify-between text-xs font-bold"><span>{maquina}</span><span className={i === 0 ? "text-warning-700" : "text-success-700"}>{i === 0 ? "Acompanhar" : "Estável"}</span></div><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className={cn("h-full rounded-full", i === 0 ? "w-[72%] bg-warning-500" : "w-[90%] bg-success-600")} /></div></div>)}</div>
+          <p className="label-tecnico text-[10px] font-bold text-slate-400">Últimos relatórios</p>
+          <div className="mt-3 space-y-2.5">
+            {relatoriosRecentes.length ? relatoriosRecentes.map((parada) => (
+              <div key={parada.id} className="border-b border-slate-100 pb-2.5 last:border-0 last:pb-0">
+                <div className="flex items-start justify-between gap-3 text-xs font-bold"><span className="min-w-0 truncate">{parada.maquina}</span><span className={cn("flex-none", parada.status === "concluida" ? "text-success-700" : parada.status === "ressalvas" ? "text-warning-700" : "text-brand-700")}>{statusLabel(parada.status)}</span></div>
+                <p className="mt-1 text-[10px] font-semibold text-slate-400">{formatDateCompact(parada.data)} · {parada.responsavel || "Sem responsável informado"}</p>
+              </div>
+            )) : <p className="text-xs font-semibold text-slate-400">Nenhum relatório registrado.</p>}
+          </div>
         </div>
       </div>
     </div>
