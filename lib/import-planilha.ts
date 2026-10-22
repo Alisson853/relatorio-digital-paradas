@@ -334,7 +334,10 @@ export async function parsePlanilhaServicos(file: File, maquina?: string): Promi
     if (existente && numeroOS !== "Oportunidade") {
       repeticoesPorOs.set(numeroOS, (repeticoesPorOs.get(numeroOS) ?? 0) + 1);
       existente.tempoGasto = minutosParaTempo(horasParaMinutos(existente.tempoGasto) + horasParaMinutos(tempoGasto));
-      if (executante && !existente.responsavel.includes(executante)) {
+      // Comparação por pessoa inteira, não por trecho: "Henrique" não pode
+      // ser considerado já presente só porque existe "Carlos Henrique".
+      const executantesJaRegistrados = existente.responsavel.split(/\s*\+\s*/).map((nome) => nome.trim().toLocaleLowerCase());
+      if (executante && !executantesJaRegistrados.includes(executante.toLocaleLowerCase())) {
         existente.responsavel = existente.responsavel ? `${existente.responsavel} + ${executante}` : executante;
       }
       // Se qualquer lançamento dessa OS foi marcado executado, a OS toda conta como concluída.
