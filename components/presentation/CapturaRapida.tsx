@@ -974,6 +974,14 @@ function GanttDeCampo({ data, agora }: { data: ParadaCompleta; agora: Date | nul
   // a projeção é 8h desde o início. Só aparece depois de haver entrega real.
   const previsaoFim = acompanharAoVivo && percentualExecutado > 0 && minutosTranscorridos > 0 ? Math.round(inicio + minutosTranscorridos / percentualExecutado) : null;
   const previsaoAtrasada = previsaoFim !== null && previsaoFim > fimLimite;
+  const totalAtividades = data.servicos.length;
+  const totalConcluidas = data.servicos.filter((item) => item.status === "concluido").length;
+  const concluidaCompleta = totalAtividades > 0 && totalConcluidas === totalAtividades;
+  // "Encerrada" pode vir da finalização formal do relatório ou do término da
+  // janela de hoje. A marca verde, porém, é reservada exclusivamente para
+  // 100% concluído — encerrada com pendências não pode parecer sucesso total.
+  const janelaTerminou = data.resumo.data < hoje || (data.resumo.data === hoje && agoraNoMapa !== null && agoraNoMapa >= fimLimite);
+  const paradaEncerrada = concluidaCompleta || data.resumo.status !== "em_andamento" || janelaTerminou;
 
   return (
     <section className={`overflow-hidden rounded-2xl border ${cor}`} aria-label="Mapa Gantt e tendência da parada">
@@ -982,22 +990,26 @@ function GanttDeCampo({ data, agora }: { data: ParadaCompleta; agora: Date | nul
           <p className="flex items-center gap-1.5 text-sm font-extrabold"><CalendarRange size={16} /> Mapa da parada</p>
           <p className="mt-0.5 text-[11px] font-semibold opacity-80">Manutenção {manutencaoHoras}h · limite {limiteHoras}h · {folga >= 0 ? `${folga}h de folga` : `${Math.abs(folga)}h acima do limite`}</p>
         </div>
-        <span className="flex-none rounded-full bg-white/70 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide">{emRisco ? "Risco" : folgaCurta ? "Folga curta" : "No prazo"}</span>
+        {concluidaCompleta ? <span className="flex flex-none items-center gap-1 rounded-full bg-success-100 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-success-800"><CheckCircle2 size={13} /> Concluída</span> : paradaEncerrada ? <span className="flex-none rounded-full bg-slate-200 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-700">Encerrada</span> : <span className="flex-none rounded-full bg-white/70 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide">{emRisco ? "Risco" : folgaCurta ? "Folga curta" : "No prazo"}</span>}
       </div>
       <div className="border-t border-current/15 bg-white p-3">
         <div className="mb-2 grid grid-cols-3 text-[10px] font-bold text-slate-500"><span>Início {formatarHorario(inicio)}</span><span className="text-center">Fim manutenção {formatarHorario(fimManutencao)}</span><span className="text-right">Entrega {formatarHorario(fimLimite)}</span></div>
         {mostrarAgora && <p className="mb-2 flex items-center gap-1 text-[10px] font-extrabold text-slate-700"><i className="h-2 w-0.5 bg-slate-900" /> Agora: {formatarHorario(agoraNoMapa ?? 0)}</p>}
         {acompanharAoVivo && (
           <div className="mb-3 space-y-1.5">
-            {previsaoFim !== null ? (
+            {concluidaCompleta ? (
+              <div className="flex items-center gap-2 rounded-lg bg-success-50 px-2.5 py-2 text-[11px] font-extrabold text-success-800"><CheckCircle2 size={16} /> Parada concluída — {totalConcluidas}/{totalAtividades} atividades finalizadas.</div>
+            ) : paradaEncerrada ? (
+              <div className="rounded-lg bg-slate-100 px-2.5 py-2 text-[11px] font-bold text-slate-700">Parada encerrada com pendências — {totalConcluidas}/{totalAtividades} atividades concluídas.</div>
+            ) : previsaoFim !== null ? (
               <div className={`rounded-lg px-2.5 py-2 text-[11px] font-bold ${previsaoAtrasada ? "bg-danger-50 text-danger-800" : "bg-success-50 text-success-800"}`}>
                 Previsão pelo ritmo atual: término às {formatarHorario(previsaoFim)} {previsaoAtrasada ? `· ${Math.round((previsaoFim - fimLimite) / 60 * 10) / 10}h após o limite` : `· ${Math.round((fimLimite - previsaoFim) / 60 * 10) / 10}h de margem`}
               </div>
             ) : (
               <div className="rounded-lg bg-slate-50 px-2.5 py-2 text-[11px] font-bold text-slate-600">Previsão de término será calculada quando a primeira OS for concluída.</div>
             )}
-            {naoIniciadasNoHorario.length > 0 && <div className="rounded-lg bg-warning-50 px-2.5 py-2 text-[11px] font-bold text-warning-800">{naoIniciadasNoHorario.length} atividade{naoIniciadasNoHorario.length > 1 ? "s" : ""} já deveria{naoIniciadasNoHorario.length > 1 ? "m" : ""} ter iniciado: {naoIniciadasNoHorario.slice(0, 3).map((item) => `OS ${item.numeroOS}`).join(", ")}{naoIniciadasNoHorario.length > 3 ? "…" : ""}</div>}
-            {vencidas.length > 0 && <div className="rounded-lg bg-danger-50 px-2.5 py-2 text-[11px] font-bold text-danger-800">{vencidas.length} atividade{vencidas.length > 1 ? "s" : ""} passou{vencidas.length > 1 ? "ram" : ""} do horário final e continua{vencidas.length > 1 ? "m" : ""} aberta{vencidas.length > 1 ? "s" : ""}: {vencidas.slice(0, 3).map((item) => `OS ${item.numeroOS}`).join(", ")}{vencidas.length > 3 ? "…" : ""}</div>}
+            {!paradaEncerrada && naoIniciadasNoHorario.length > 0 && <div className="rounded-lg bg-warning-50 px-2.5 py-2 text-[11px] font-bold text-warning-800">{naoIniciadasNoHorario.length} atividade{naoIniciadasNoHorario.length > 1 ? "s" : ""} já deveria{naoIniciadasNoHorario.length > 1 ? "m" : ""} ter iniciado: {naoIniciadasNoHorario.slice(0, 3).map((item) => `OS ${item.numeroOS}`).join(", ")}{naoIniciadasNoHorario.length > 3 ? "…" : ""}</div>}
+            {!paradaEncerrada && vencidas.length > 0 && <div className="rounded-lg bg-danger-50 px-2.5 py-2 text-[11px] font-bold text-danger-800">{vencidas.length} atividade{vencidas.length > 1 ? "s" : ""} passou{vencidas.length > 1 ? "ram" : ""} do horário final e continua{vencidas.length > 1 ? "m" : ""} aberta{vencidas.length > 1 ? "s" : ""}: {vencidas.slice(0, 3).map((item) => `OS ${item.numeroOS}`).join(", ")}{vencidas.length > 3 ? "…" : ""}</div>}
           </div>
         )}
         <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
