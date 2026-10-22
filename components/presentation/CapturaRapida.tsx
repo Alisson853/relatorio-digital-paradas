@@ -484,10 +484,10 @@ function ServicoCapturaCard({
   const temDurante = !!servico.fotoDurante;
   const temDepois = !!servico.fotoDepois && servico.fotoDepois !== NO_PHOTO_PLACEHOLDER;
 
-  // A foto final é a evidência que fecha a OS. "Antes" é opcional e ainda
-  // pode ser escolhido no marcador, mas não deve fazer o técnico perder a
-  // primeira foto de campo nem impedir a conclusão offline.
-  const etapaSugerida: "Antes" | "Durante" | "Depois" = !temDepois ? "Depois" : !temAntes ? "Antes" : !temDurante ? "Durante" : "Depois";
+  // Caminho padrão da evidência: Antes → Durante → Depois. "Depois" pode
+  // ser escolhido a qualquer momento nos marcadores quando a foto inicial
+  // não for possível; ela ainda conclui a OS mesmo offline.
+  const etapaSugerida: "Antes" | "Durante" | "Depois" = !temAntes ? "Antes" : !temDurante ? "Durante" : "Depois";
   const etapaAtiva = etapaEscolhida ?? etapaSugerida;
   // Se a etapa que esta valendo ja tem foto, a proxima captura sobrescreve.
   // Isso precisa estar dito ANTES do toque, nao descoberto depois.

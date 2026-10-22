@@ -44,13 +44,13 @@ describe("aplicarCapturaFoto", () => {
     expect(resultado.extra?.statusFechado).toBe("concluido");
   });
 
-  it("sugere Depois na primeira foto para fechar a OS em campo", () => {
+  it("mantém Antes como primeira sugestão da sequência de fotos", () => {
     const servico = criarServico({ fotoAntes: NO_PHOTO_PLACEHOLDER, fotoDepois: NO_PHOTO_PLACEHOLDER, status: "pendente" });
     const row = criarParadaRow({ servicos: [servico] });
     const resultado = aplicarCapturaFoto(row, { servicoId: servico.id, url: "https://x.public.blob.vercel-storage.com/depois.jpg" });
     if ("erro" in resultado) throw new Error("não deveria falhar");
-    expect(resultado.extra?.label).toBe("Depois");
-    expect((resultado.valores.servicos as typeof row.servicos)[0].status).toBe("concluido");
+    expect(resultado.extra?.label).toBe("Antes");
+    expect((resultado.valores.servicos as typeof row.servicos)[0].status).toBe("pendente");
   });
 
   it("devolve erro quando o serviço não existe no relatório", () => {

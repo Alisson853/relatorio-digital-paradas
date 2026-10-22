@@ -32,10 +32,10 @@ const ETAPA_ANTES: Etapa = { campo: "fotoAntes", horarioCampo: "fotoAntesHorario
 const ETAPA_DURANTE: Etapa = { campo: "fotoDurante", horarioCampo: "fotoDuranteHorario", label: "Durante" };
 const ETAPA_DEPOIS: Etapa = { campo: "fotoDepois", horarioCampo: "fotoDepoisHorario", label: "Depois" };
 
-// No campo, a primeira evidência disponível costuma ser a de encerramento.
-// "Antes" continua acessível pela seleção manual, mas a sugestão padrão é
-// "Depois" para que uma única foto válida consiga fechar a OS.
-const ORDEM_CAPTURA: Etapa[] = [ETAPA_DEPOIS, ETAPA_ANTES, ETAPA_DURANTE];
+// Sequência de documentação normal: Antes → Durante → Depois. Quem não
+// conseguiu registrar o Antes pode selecionar Depois manualmente; a foto
+// final continua suficiente para encerrar a OS.
+const ORDEM_CAPTURA: Etapa[] = [ETAPA_ANTES, ETAPA_DURANTE, ETAPA_DEPOIS];
 
 const ETAPAS_POR_LABEL: Record<"Antes" | "Durante" | "Depois", Etapa> = {
   Antes: ETAPA_ANTES,
