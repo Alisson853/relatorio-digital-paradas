@@ -439,7 +439,6 @@ export async function listChecklistPendencias(): Promise<PendenciaChecklistItem[
   for (const row of rows) {
     for (const s of row.servicos) {
       const faltando: string[] = [];
-      if (!s.fotoAntes || s.fotoAntes === NO_PHOTO_PLACEHOLDER) faltando.push("Foto Antes");
       if (!s.fotoDepois || s.fotoDepois === NO_PHOTO_PLACEHOLDER) faltando.push("Foto Depois");
       if (s.status !== "concluido") faltando.push("Status pendente");
       if (s.naoFeitoCategoria) faltando.push("Não será feito");

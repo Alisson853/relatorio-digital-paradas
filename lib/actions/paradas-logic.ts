@@ -74,12 +74,12 @@ export function aplicarCapturaFoto(row: ParadaRow, input: CapturaFotoInput): Res
   const horario = horarioAgora();
   let servicoAtualizado: Servico = { ...servico, [etapaVazia.campo]: input.url, [etapaVazia.horarioCampo]: horario };
 
-  // Antes e Depois são as duas fotos que realmente fecham o registro (Durante
-  // é opcional) — assim que as duas existem, a OS conclui sozinha, sem
-  // precisar voltar depois só pra tocar em "Concluído" pelo celular.
-  const temAntes = !!servicoAtualizado.fotoAntes && servicoAtualizado.fotoAntes !== NO_PHOTO_PLACEHOLDER;
+  // A foto "Antes" é evidência recomendada, não bloqueio: em uma intervenção
+  // já iniciada ou numa OS recebida em campo ela pode simplesmente não existir.
+  // A evidência de encerramento é a foto "Depois"; ao registrá-la, a OS deve
+  // concluir mesmo sem foto inicial. "Durante" continua opcional.
   const temDepois = !!servicoAtualizado.fotoDepois && servicoAtualizado.fotoDepois !== NO_PHOTO_PLACEHOLDER;
-  const fechaAutomaticamente = temAntes && temDepois && servicoAtualizado.status !== "concluido";
+  const fechaAutomaticamente = temDepois && servicoAtualizado.status !== "concluido";
   if (fechaAutomaticamente) {
     servicoAtualizado = {
       ...servicoAtualizado,
