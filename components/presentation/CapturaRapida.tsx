@@ -54,6 +54,7 @@ import { carregarParadaCache, salvarParadaCache } from "@/lib/offline-parada-cac
 import { encontrarUltimoNaoFeito, type HistoricoNaoFeitoItem } from "@/lib/historico-nao-feito";
 import { parseHoras } from "@/lib/derive";
 import { formatarHorario, servicosProgramados } from "@/lib/programacao";
+import { sessaoAtiva } from "@/lib/actions/auth";
 
 // As 3 opções que fazem sentido marcar em campo pelo celular — "Atrasado" é
 // mais um estado de relatório do que algo que alguém marca na hora.
@@ -1021,7 +1022,7 @@ function GanttDeCampo({ data, agora }: { data: ParadaCompleta; agora: Date | nul
   );
 }
 
-function CapturaRapidaConteudo({ id }: { id: string }) {
+function CapturaRapidaConteudo({ id, onSessaoExpirada }: { id: string; onSessaoExpirada: () => void }) {
   const [data, setData] = useState<ParadaCompleta | null>(null);
   const [status, setStatus] = useState<"loading" | "found" | "not-found">("loading");
   const [atualizando, setAtualizando] = useState(false);
@@ -1083,6 +1084,14 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
   // uma vez no mount, então uma variável de state lida ali ficaria presa no
   // valor da primeira renderização.
   const temDadosRef = useRef(false);
+
+  function registrarFalhaDaFila(erro: string): ResultadoTentativa {
+    // Não deixa uma fila pendente virar um "erro de servidor" sem saída
+    // quando o único problema é a sessão expirada. Os blobs continuam no
+    // IndexedDB e, após digitar a senha, serão enviados normalmente.
+    if (/^não autorizado\.?$/i.test(erro.trim())) onSessaoExpirada();
+    return falhaDaFila(erro);
+  }
 
   // Sem nenhum setState síncrono no início — assim dá pra chamar direto no
   // corpo de um efeito (carga inicial, atualização em segundo plano) sem
@@ -1158,9 +1167,9 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
             const formData = new FormData();
             formData.set("file", item.blob, item.nomeArquivo);
             const upload = await uploadFoto(formData);
-            if (!upload.ok || !upload.url) return falhaDaFila(upload.erro || "Não foi possível enviar a foto.");
+            if (!upload.ok || !upload.url) return registrarFalhaDaFila(upload.erro || "Não foi possível enviar a foto.");
             const resultado = await capturarFotoServico(id, item.servicoId, upload.url, item.etapa);
-            if (!resultado.ok) return falhaDaFila(resultado.erro || "Não foi possível registrar a foto.");
+            if (!resultado.ok) return registrarFalhaDaFila(resultado.erro || "Não foi possível registrar a foto.");
             const campo = resultado.label === "Antes" ? "fotoAntes" : resultado.label === "Durante" ? "fotoDurante" : "fotoDepois";
             const horarioCampo = resultado.label === "Antes" ? "fotoAntesHorario" : resultado.label === "Durante" ? "fotoDuranteHorario" : "fotoDepoisHorario";
             handleCaptured(item.servicoId, {
@@ -1228,7 +1237,7 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
         async (item): Promise<ResultadoTentativa> => {
           try {
             const resultado = await definirNaoFeito(id, item.servicoId, item.categoria, item.justificativa);
-            if (!resultado.ok) return falhaDaFila(resultado.erro || "Não foi possível salvar.");
+            if (!resultado.ok) return registrarFalhaDaFila(resultado.erro || "Não foi possível salvar.");
             handleCaptured(item.servicoId, {
               naoFeitoCategoria: (item.categoria || undefined) as MotivoNaoFeitoCategoria | undefined,
               justificativaNaoFeito: item.justificativa || undefined,
@@ -1277,7 +1286,7 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
         async (item): Promise<ResultadoTentativa> => {
           try {
             const resultado = await marcarStatusServico(id, item.servicoId, item.novoStatus);
-            if (!resultado.ok) return falhaDaFila(resultado.erro || "Não foi possível salvar o status.");
+            if (!resultado.ok) return registrarFalhaDaFila(resultado.erro || "Não foi possível salvar o status.");
             return { ok: true };
           } catch {
             return { ok: false, tipo: "rede" };
@@ -1893,14 +1902,38 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
 
 export function CapturaRapida({ id }: { id: string }) {
   const { ready, isEditor, unlock } = useEditorMode();
+  // A dica visual de editor vive em um cookie legível pelo navegador; a
+  // autorização real é httpOnly e pode ter vencido. Só monta a Captura (e as
+  // rotinas automáticas de sincronização) depois de confirmar a sessão real.
+  const [sessaoConfirmada, setSessaoConfirmada] = useState<boolean | null>(null);
+
+  function confirmarSessao() {
+    setSessaoConfirmada(null);
+    sessaoAtiva().then(setSessaoConfirmada).catch(() => setSessaoConfirmada(false));
+  }
+
+  useEffect(() => {
+    let ativa = true;
+    if (!isEditor) {
+      setSessaoConfirmada(false);
+      return () => { ativa = false; };
+    }
+    setSessaoConfirmada(null);
+    sessaoAtiva().then((valida) => { if (ativa) setSessaoConfirmada(valida); }).catch(() => { if (ativa) setSessaoConfirmada(false); });
+    return () => { ativa = false; };
+  }, [isEditor]);
 
   if (!ready) return <div className="min-h-screen bg-slate-50" />;
 
-  if (!isEditor) {
+  if (isEditor && sessaoConfirmada === null) {
+    return <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6 text-center text-sm font-semibold text-slate-500">Confirmando acesso seguro…</div>;
+  }
+
+  if (!isEditor || !sessaoConfirmada) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-slate-50 px-6">
         <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <EditorPasswordForm onUnlock={unlock} onSuccess={() => {}} titulo="Acesso Restrito" descricao="Digite a senha para registrar fotos em campo." />
+          <EditorPasswordForm onUnlock={unlock} onSuccess={confirmarSessao} titulo="Acesso Restrito" descricao="Digite a senha para registrar fotos em campo." />
         </div>
         <Link href={`/parada/${id}`} className="text-sm font-semibold text-slate-400 hover:text-slate-700">
           Voltar ao Relatório
@@ -1909,5 +1942,5 @@ export function CapturaRapida({ id }: { id: string }) {
     );
   }
 
-  return <CapturaRapidaConteudo id={id} />;
+  return <CapturaRapidaConteudo id={id} onSessaoExpirada={() => setSessaoConfirmada(false)} />;
 }
