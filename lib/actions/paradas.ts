@@ -92,9 +92,17 @@ function rowParaResumo(row: LinhaResumo): ParadaResumo {
 }
 
 function rowParaCompleta(row: typeof paradas.$inferSelect): ParadaCompleta {
+  // A lista de serviços é a fonte de verdade. Um KPI importado pode carregar
+  // a contagem original da planilha mesmo após uma OS ser removida/corrigida;
+  // usar esse número em exportações criava relatórios 32/33 (97%) quando a
+  // Captura Rápida já mostrava corretamente 32/32. Recalcular na leitura faz
+  // RTF, DOCX, PPTX, impressão e apresentação concordarem sem alterar dados.
+  const limiteHoras = parseHoras(row.duracaoRealizada) || parseHoras(row.duracaoPlanejada) || undefined;
+  const kpisAtuais = deriveKpis(row.servicos, row.kpis.seguranca, { duracaoMaximaHoras: limiteHoras });
+  const resultadoFinalAtual = { ...row.resultadoFinal, eficiencia: kpisAtuais.eficiencia, pendenciasAbertas: kpisAtuais.pendencias };
   return {
     resumo: rowParaResumo(row),
-    kpis: row.kpis,
+    kpis: kpisAtuais,
     timeline: row.timeline,
     servicos: row.servicos,
     fotos: deriveFotos(row.servicos),
@@ -107,10 +115,11 @@ function rowParaCompleta(row: typeof paradas.$inferSelect): ParadaCompleta {
     // relatórios já salvos, cujo gráfico foi gravado agrupando por "area".
     graficos: {
       ...row.graficos,
+      percentualConcluido: kpisAtuais.eficiencia,
       horasPorServico: row.graficos.horasPorServico ?? [],
-      horasPorSetor: calcularHorasPorSetor(row.servicos, parseHoras(row.duracaoRealizada) || parseHoras(row.duracaoPlanejada) || undefined),
+      horasPorSetor: calcularHorasPorSetor(row.servicos, limiteHoras),
     },
-    resultadoFinal: row.resultadoFinal,
+    resultadoFinal: resultadoFinalAtual,
   };
 }
 
