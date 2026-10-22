@@ -176,7 +176,11 @@ export async function listParadasHistorico(): Promise<ParadaHistoricoItem[]> {
     .orderBy(asc(paradas.data));
   return rows.map((row) => ({
     resumo: rowParaResumo(row),
-    kpis: row.kpis,
+    // Histórico e comparativos seguem a mesma fonte da apresentação e das
+    // exportações: serviços atuais, não o contador congelado da planilha.
+    kpis: deriveKpis(row.servicos, row.kpis.seguranca, {
+      duracaoMaximaHoras: parseHoras(row.duracaoRealizada) || parseHoras(row.duracaoPlanejada) || undefined,
+    }),
     porEquipe: calcularPorEquipe(row.servicos, parseHoras(row.duracaoRealizada) || parseHoras(row.duracaoPlanejada) || undefined),
   }));
 }
