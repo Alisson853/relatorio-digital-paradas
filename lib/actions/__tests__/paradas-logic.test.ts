@@ -23,7 +23,7 @@ describe("aplicarCapturaFoto", () => {
     const servico = criarServico({ fotoAntes: "https://x.public.blob.vercel-storage.com/antes.jpg", fotoDepois: NO_PHOTO_PLACEHOLDER, status: "pendente" });
     const row = criarParadaRow({ servicos: [servico] });
 
-    const resultado = aplicarCapturaFoto(row, { servicoId: servico.id, url: "https://x.public.blob.vercel-storage.com/depois.jpg" });
+    const resultado = aplicarCapturaFoto(row, { servicoId: servico.id, url: "https://x.public.blob.vercel-storage.com/depois.jpg", etapaEscolhida: "Depois" });
 
     if ("erro" in resultado) throw new Error("não deveria falhar");
     const servicosAtualizados = resultado.valores.servicos as typeof row.servicos;
