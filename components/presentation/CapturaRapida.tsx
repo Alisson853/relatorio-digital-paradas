@@ -484,7 +484,10 @@ function ServicoCapturaCard({
   const temDurante = !!servico.fotoDurante;
   const temDepois = !!servico.fotoDepois && servico.fotoDepois !== NO_PHOTO_PLACEHOLDER;
 
-  const etapaSugerida: "Antes" | "Durante" | "Depois" = !temAntes ? "Antes" : !temDepois ? "Depois" : !temDurante ? "Durante" : "Depois";
+  // A foto final é a evidência que fecha a OS. "Antes" é opcional e ainda
+  // pode ser escolhido no marcador, mas não deve fazer o técnico perder a
+  // primeira foto de campo nem impedir a conclusão offline.
+  const etapaSugerida: "Antes" | "Durante" | "Depois" = !temDepois ? "Depois" : !temAntes ? "Antes" : !temDurante ? "Durante" : "Depois";
   const etapaAtiva = etapaEscolhida ?? etapaSugerida;
   // Se a etapa que esta valendo ja tem foto, a proxima captura sobrescreve.
   // Isso precisa estar dito ANTES do toque, nao descoberto depois.
@@ -904,13 +907,11 @@ function ServicoCapturaCard({
   );
 }
 
-// Falta pelo menos a foto de Antes ou Depois — as duas que realmente contam
-// pra fechar o registro (Durante é opcional). Usado tanto pra ordenar a lista
-// quanto pro contador do topo.
+// A foto Depois é a evidência obrigatória de encerramento. Foto Antes e
+// Durante enriquecem o registro, mas não podem manter uma OS aberta.
 function faltaFoto(servico: Servico): boolean {
-  const temAntes = !!servico.fotoAntes && servico.fotoAntes !== NO_PHOTO_PLACEHOLDER;
   const temDepois = !!servico.fotoDepois && servico.fotoDepois !== NO_PHOTO_PLACEHOLDER;
-  return !temAntes || !temDepois;
+  return !temDepois;
 }
 
 function CapturaRapidaConteudo({ id }: { id: string }) {
@@ -1093,6 +1094,10 @@ function CapturaRapidaConteudo({ id }: { id: string }) {
     };
     await salvarFotoPendente(item);
     setFilaPendente((prev) => [...prev.filter((p) => p.id !== item.id), item]);
+    // Offline é uma confirmação local: a foto está guardada de forma
+    // persistente no IndexedDB. Ao fotografar o Depois, já fecha a OS na tela
+    // e no cache; quando houver rede a fila substitui pelo URL definitivo.
+    if (etapa === "Depois") handleCaptured(servicoId, { status: "concluido" });
     if (navigator.onLine) tentarEnviarFila();
   }
 

@@ -32,11 +32,10 @@ const ETAPA_ANTES: Etapa = { campo: "fotoAntes", horarioCampo: "fotoAntesHorario
 const ETAPA_DURANTE: Etapa = { campo: "fotoDurante", horarioCampo: "fotoDuranteHorario", label: "Durante" };
 const ETAPA_DEPOIS: Etapa = { campo: "fotoDepois", horarioCampo: "fotoDepoisHorario", label: "Depois" };
 
-// A maioria das OS só usa duas fotos (antes no computador, depois em campo
-// pelo celular) — "Durante" é opcional. Por isso a busca pela próxima etapa
-// vazia prioriza Depois antes de Durante: senão a foto tirada em campo cai em
-// "Durante" mesmo quando a intenção era fechar o registro com "Depois".
-const ORDEM_CAPTURA: Etapa[] = [ETAPA_ANTES, ETAPA_DEPOIS, ETAPA_DURANTE];
+// No campo, a primeira evidência disponível costuma ser a de encerramento.
+// "Antes" continua acessível pela seleção manual, mas a sugestão padrão é
+// "Depois" para que uma única foto válida consiga fechar a OS.
+const ORDEM_CAPTURA: Etapa[] = [ETAPA_DEPOIS, ETAPA_ANTES, ETAPA_DURANTE];
 
 const ETAPAS_POR_LABEL: Record<"Antes" | "Durante" | "Depois", Etapa> = {
   Antes: ETAPA_ANTES,

@@ -8,7 +8,7 @@ describe("aplicarCapturaFoto", () => {
     const servico = criarServico({ fotoAntes: NO_PHOTO_PLACEHOLDER, fotoDepois: NO_PHOTO_PLACEHOLDER, status: "pendente" });
     const row = criarParadaRow({ servicos: [servico] });
 
-    const resultado = aplicarCapturaFoto(row, { servicoId: servico.id, url: "https://x.public.blob.vercel-storage.com/a.jpg" });
+    const resultado = aplicarCapturaFoto(row, { servicoId: servico.id, url: "https://x.public.blob.vercel-storage.com/a.jpg", etapaEscolhida: "Antes" });
 
     if ("erro" in resultado) throw new Error("não deveria falhar");
     const servicosAtualizados = resultado.valores.servicos as typeof row.servicos;
@@ -42,6 +42,15 @@ describe("aplicarCapturaFoto", () => {
     if ("erro" in resultado) throw new Error("não deveria falhar");
     expect((resultado.valores.servicos as typeof row.servicos)[0].status).toBe("concluido");
     expect(resultado.extra?.statusFechado).toBe("concluido");
+  });
+
+  it("sugere Depois na primeira foto para fechar a OS em campo", () => {
+    const servico = criarServico({ fotoAntes: NO_PHOTO_PLACEHOLDER, fotoDepois: NO_PHOTO_PLACEHOLDER, status: "pendente" });
+    const row = criarParadaRow({ servicos: [servico] });
+    const resultado = aplicarCapturaFoto(row, { servicoId: servico.id, url: "https://x.public.blob.vercel-storage.com/depois.jpg" });
+    if ("erro" in resultado) throw new Error("não deveria falhar");
+    expect(resultado.extra?.label).toBe("Depois");
+    expect((resultado.valores.servicos as typeof row.servicos)[0].status).toBe("concluido");
   });
 
   it("devolve erro quando o serviço não existe no relatório", () => {
