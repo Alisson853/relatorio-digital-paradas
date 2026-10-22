@@ -950,9 +950,21 @@ function GanttDeCampo({ data, agora }: { data: ParadaCompleta; agora: Date | nul
   const agoraMinutos = agora ? agora.getHours() * 60 + agora.getMinutes() : null;
   // Uma parada pode passar da meia-noite. Nesse caso 00:30 é o "dia seguinte"
   // no mapa, não uma hora antes de 22:00.
-  const agoraNoMapa = agoraMinutos !== null && agoraMinutos < inicio ? agoraMinutos + 1440 : agoraMinutos;
+  const agoraNoMapa = agoraMinutos !== null && fimEscala > 1440 && agoraMinutos < inicio ? agoraMinutos + 1440 : agoraMinutos;
   const mostrarAgora = agoraNoMapa !== null && agoraNoMapa >= inicio && agoraNoMapa <= fimEscala;
   const posicaoAgora = mostrarAgora ? ((agoraNoMapa - inicio) / duracaoEscala) * 100 : 0;
+  const hoje = agora ? `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}-${String(agora.getDate()).padStart(2, "0")}` : "";
+  const acompanharAoVivo = data.resumo.data === hoje && agoraNoMapa !== null && agoraNoMapa >= inicio;
+  const naoIniciadasNoHorario = acompanharAoVivo ? atividades.filter((item) => item.status === "pendente" && item.inicioMinutos <= (agoraNoMapa ?? 0)) : [];
+  const vencidas = acompanharAoVivo ? atividades.filter((item) => item.status !== "concluido" && !item.naoFeitoCategoria && item.fimMinutos < (agoraNoMapa ?? 0)) : [];
+  const pesoTotal = atividades.reduce((soma, item) => soma + (item.fimMinutos - item.inicioMinutos), 0);
+  const pesoConcluido = atividades.filter((item) => item.status === "concluido").reduce((soma, item) => soma + (item.fimMinutos - item.inicioMinutos), 0);
+  const percentualExecutado = pesoTotal > 0 ? pesoConcluido / pesoTotal : 0;
+  const minutosTranscorridos = acompanharAoVivo ? Math.max(0, (agoraNoMapa ?? inicio) - inicio) : 0;
+  // Projeção por ritmo: se em 2h foram concluídos 25% das horas programadas,
+  // a projeção é 8h desde o início. Só aparece depois de haver entrega real.
+  const previsaoFim = acompanharAoVivo && percentualExecutado > 0 && minutosTranscorridos > 0 ? Math.round(inicio + minutosTranscorridos / percentualExecutado) : null;
+  const previsaoAtrasada = previsaoFim !== null && previsaoFim > fimLimite;
 
   return (
     <section className={`overflow-hidden rounded-2xl border ${cor}`} aria-label="Mapa Gantt e tendência da parada">
@@ -966,6 +978,19 @@ function GanttDeCampo({ data, agora }: { data: ParadaCompleta; agora: Date | nul
       <div className="border-t border-current/15 bg-white p-3">
         <div className="mb-2 grid grid-cols-3 text-[10px] font-bold text-slate-500"><span>Início {formatarHorario(inicio)}</span><span className="text-center">Fim manutenção {formatarHorario(fimManutencao)}</span><span className="text-right">Entrega {formatarHorario(fimLimite)}</span></div>
         {mostrarAgora && <p className="mb-2 flex items-center gap-1 text-[10px] font-extrabold text-slate-700"><i className="h-2 w-0.5 bg-slate-900" /> Agora: {formatarHorario(agoraNoMapa ?? 0)}</p>}
+        {acompanharAoVivo && (
+          <div className="mb-3 space-y-1.5">
+            {previsaoFim !== null ? (
+              <div className={`rounded-lg px-2.5 py-2 text-[11px] font-bold ${previsaoAtrasada ? "bg-danger-50 text-danger-800" : "bg-success-50 text-success-800"}`}>
+                Previsão pelo ritmo atual: término às {formatarHorario(previsaoFim)} {previsaoAtrasada ? `· ${Math.round((previsaoFim - fimLimite) / 60 * 10) / 10}h após o limite` : `· ${Math.round((fimLimite - previsaoFim) / 60 * 10) / 10}h de margem`}
+              </div>
+            ) : (
+              <div className="rounded-lg bg-slate-50 px-2.5 py-2 text-[11px] font-bold text-slate-600">Previsão de término será calculada quando a primeira OS for concluída.</div>
+            )}
+            {naoIniciadasNoHorario.length > 0 && <div className="rounded-lg bg-warning-50 px-2.5 py-2 text-[11px] font-bold text-warning-800">{naoIniciadasNoHorario.length} atividade{naoIniciadasNoHorario.length > 1 ? "s" : ""} já deveria{naoIniciadasNoHorario.length > 1 ? "m" : ""} ter iniciado: {naoIniciadasNoHorario.slice(0, 3).map((item) => `OS ${item.numeroOS}`).join(", ")}{naoIniciadasNoHorario.length > 3 ? "…" : ""}</div>}
+            {vencidas.length > 0 && <div className="rounded-lg bg-danger-50 px-2.5 py-2 text-[11px] font-bold text-danger-800">{vencidas.length} atividade{vencidas.length > 1 ? "s" : ""} passou{vencidas.length > 1 ? "ram" : ""} do horário final e continua{vencidas.length > 1 ? "m" : ""} aberta{vencidas.length > 1 ? "s" : ""}: {vencidas.slice(0, 3).map((item) => `OS ${item.numeroOS}`).join(", ")}{vencidas.length > 3 ? "…" : ""}</div>}
+          </div>
+        )}
         <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
           {atividades.map((atividade) => {
             const left = ((atividade.inicioMinutos - inicio) / duracaoEscala) * 100;
