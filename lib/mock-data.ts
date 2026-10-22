@@ -354,13 +354,13 @@ function fotosMp09(servicos: Servico[]): FotoGaleria[] {
   const fotos: FotoGaleria[] = [];
   servicos.forEach((s) => {
     if (s.fotoAntes && s.fotoAntes !== NO_PHOTO_PLACEHOLDER) {
-      fotos.push({ id: `${s.id}-antes`, categoria: "antes", servico: s.titulo, area: s.area, url: s.fotoAntes });
+      fotos.push({ id: `${s.id}-antes`, servicoId: s.id, categoria: "antes", servico: s.titulo, area: s.area, url: s.fotoAntes });
     }
     if (s.fotoDurante) {
-      fotos.push({ id: `${s.id}-durante`, categoria: "durante", servico: s.titulo, area: s.area, url: s.fotoDurante });
+      fotos.push({ id: `${s.id}-durante`, servicoId: s.id, categoria: "durante", servico: s.titulo, area: s.area, url: s.fotoDurante });
     }
     if (s.fotoDepois && s.fotoDepois !== NO_PHOTO_PLACEHOLDER) {
-      fotos.push({ id: `${s.id}-depois`, categoria: "depois", servico: s.titulo, area: s.area, url: s.fotoDepois });
+      fotos.push({ id: `${s.id}-depois`, servicoId: s.id, categoria: "depois", servico: s.titulo, area: s.area, url: s.fotoDepois });
     }
   });
   return fotos;

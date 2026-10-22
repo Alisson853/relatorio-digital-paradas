@@ -17,16 +17,19 @@ export function GallerySection({ fotos }: { fotos: FotoGaleria[] }) {
 
   const filtradas = fotos.filter((f) => filtro === "todas" || f.categoria === filtro);
 
+  const chaveServico = (foto: FotoGaleria) => foto.servicoId ?? foto.id.replace(/-(antes|durante|depois)$/, "");
   const contagemPorServico = fotos.reduce<Record<string, number>>((acc, f) => {
-    acc[f.servico] = (acc[f.servico] ?? 0) + 1;
+    const chave = chaveServico(f);
+    acc[chave] = (acc[chave] ?? 0) + 1;
     return acc;
   }, {});
   const comparacoes = Object.values(
     fotos.reduce<Record<string, { antes?: FotoGaleria; depois?: FotoGaleria }>>((acc, foto) => {
-      const atual = acc[foto.servico] ?? {};
+      const chave = chaveServico(foto);
+      const atual = acc[chave] ?? {};
       if (foto.categoria === "antes") atual.antes = foto;
       if (foto.categoria === "depois") atual.depois = foto;
-      acc[foto.servico] = atual;
+      acc[chave] = atual;
       return acc;
     }, {})
   ).filter((par) => par.antes && par.depois);
@@ -61,7 +64,7 @@ export function GallerySection({ fotos }: { fotos: FotoGaleria[] }) {
             <div className="mb-4 flex items-center justify-between"><p className="text-sm font-extrabold text-slate-900">Comparativo Antes ↔ Depois</p><span className="text-xs font-bold text-slate-400">{comparacoes.length} serviço(s) com evidência completa</span></div>
             <div className="grid gap-4 md:grid-cols-2">
               {comparacoes.slice(0, 4).map((par) => (
-                <div key={par.antes!.servico} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <div key={chaveServico(par.antes!)} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                   <p className="truncate px-3 py-2 text-xs font-bold text-slate-700">{par.antes!.servico}</p>
                   <div className="grid grid-cols-2 gap-px bg-slate-200">
                     {[par.antes!, par.depois!].map((foto) => <button key={foto.id} onClick={() => setActiveIndex(filtradas.findIndex((f) => f.id === foto.id))} className="relative aspect-[4/3] bg-slate-100 text-left"><Image src={foto.url} alt={`${foto.categoria}: ${foto.servico}`} fill sizes="360px" className="object-cover" unoptimized={foto.url.startsWith("data:")} /><span className={`absolute left-2 top-2 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase text-white ${foto.categoria === "antes" ? "bg-slate-800/85" : "bg-brand-600/90"}`}>{foto.categoria}</span></button>)}
@@ -106,7 +109,7 @@ export function GallerySection({ fotos }: { fotos: FotoGaleria[] }) {
               <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/70 via-black/10 to-black/0 p-2.5 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
                 <p className="line-clamp-2 text-[11px] font-semibold leading-snug text-white">{foto.servico}</p>
               </div>
-              {contagemPorServico[foto.servico] > 1 && (
+              {contagemPorServico[chaveServico(foto)] > 1 && (
                 <span
                   className={cn(
                     "absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase text-white shadow",

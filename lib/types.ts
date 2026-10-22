@@ -81,6 +81,9 @@ export interface Servico {
 
 export interface FotoGaleria {
   id: string;
+  // Identidade do serviço, separada do texto exibido. Títulos podem se
+  // repetir; agrupar fotos pelo nome mistura evidências de OS diferentes.
+  servicoId?: string;
   categoria: "antes" | "durante" | "depois";
   servico: string;
   area: string;
