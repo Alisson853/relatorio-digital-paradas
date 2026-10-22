@@ -129,7 +129,10 @@ export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qr
     const candidatas: Array<{ id: string; node: React.ReactNode; bg: string } | false> = [
       {
         id: "capa",
-        node: <CoverSection key="capa" resumo={data.resumo} atividades={{ planejadas: data.kpis.osPlanejadas, concluidas: data.kpis.osConcluidas }} />,
+        // A capa precisa usar a mesma lista viva da Captura Rápida. Os KPIs
+        // podem guardar um total importado antigo (ex.: 33), enquanto uma OS
+        // removida/corrigida deixa 32 serviços reais no relatório.
+        node: <CoverSection key="capa" resumo={data.resumo} atividades={{ planejadas: data.servicos.length, concluidas: data.servicos.filter((servico) => servico.status === "concluido").length }} />,
         bg: "bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800",
       },
       {
