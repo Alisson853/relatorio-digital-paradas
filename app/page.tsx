@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Activity, ClipboardList, LineChart, Plus } from "lucide-react";
+import { Activity, ClipboardList, LineChart, Plus, Route } from "lucide-react";
 import { listEventosOperacionais, listParadasResumo } from "@/lib/actions/paradas";
 import { ParadaGrid } from "@/components/dashboard/ParadaGrid";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
@@ -53,6 +53,7 @@ export default async function DashboardPage() {
                 <ClipboardList size={15} />
                 Pendências
               </Link>
+              <Link href="/gestao" className="flex items-center gap-1.5 rounded-full border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"><Route size={15} /> Gestão</Link>
               <BackupControls />
               <Link
                 href="/novo"
