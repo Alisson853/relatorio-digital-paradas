@@ -1702,9 +1702,6 @@ function CapturaRapidaConteudo({ id, onSessaoExpirada }: { id: string; onSessaoE
             </span>
           )}
         </div>
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><div><p className="text-sm font-extrabold text-slate-900">Atividades em campo</p><p className="text-[11px] font-semibold text-slate-400">Localize, filtre e cobre a OS certa</p></div><span className="rounded-full bg-brand-50 px-2.5 py-1 text-[10px] font-extrabold text-brand-700">{servicosFiltrados.length} visíveis</span></div>
-          <div className="space-y-3 p-3">
         {totalServicos > 0 && (
           <div className="px-4 pb-3 pt-4">
             <div className="flex items-end justify-between gap-3">
@@ -1956,9 +1953,6 @@ function CapturaRapidaConteudo({ id, onSessaoExpirada }: { id: string; onSessaoE
             })}
           </div>
         )}
-          </div>
-        </section>
-
         {data.servicos.length === 0 ? (
           <p className="py-16 text-center text-sm text-slate-400">Nenhuma OS cadastrada ainda neste relatório.</p>
         ) : servicosFiltrados.length === 0 ? (
