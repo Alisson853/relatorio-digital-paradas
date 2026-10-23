@@ -1526,6 +1526,17 @@ function CapturaRapidaConteudo({ id, onSessaoExpirada }: { id: string; onSessaoE
   const barraConcluidas = baseBarra.filter((s) => s.status === "concluido").length;
   const barraEmAndamento = baseBarra.filter((s) => s.status === "em_andamento").length;
   const percConcluido = barraTotal > 0 ? Math.round((barraConcluidas / barraTotal) * 100) : 0;
+  // Duas leituras complementares: quantidade de OS e peso de tempo das OS
+  // concluídas. Uma OS de 4h não pode valer igual a uma inspeção de 15min.
+  const agendaDaBarra = servicosProgramados(baseBarra);
+  const minutosProgramados = agendaDaBarra.reduce((soma, item) => soma + item.fimMinutos - item.inicioMinutos, 0);
+  const minutosEntregues = agendaDaBarra.filter((item) => item.status === "concluido").reduce((soma, item) => soma + item.fimMinutos - item.inicioMinutos, 0);
+  const percPorTempo = minutosProgramados > 0 ? Math.round((minutosEntregues / minutosProgramados) * 100) : null;
+  const inicioAgenda = agendaDaBarra.length ? Math.min(...agendaDaBarra.map((item) => item.inicioMinutos)) : null;
+  const fimAgenda = agendaDaBarra.length ? Math.max(...agendaDaBarra.map((item) => item.fimMinutos)) : null;
+  const agoraMinutosTopo = horaAgora ? horaAgora.getHours() * 60 + horaAgora.getMinutes() : null;
+  const percTempoDecorrido = inicioAgenda !== null && fimAgenda !== null && agoraMinutosTopo !== null ? Math.max(0, Math.min(100, Math.round(((agoraMinutosTopo - inicioAgenda) / (fimAgenda - inicioAgenda)) * 100))) : null;
+  const ritmoTempo = percPorTempo !== null && percTempoDecorrido !== null ? percPorTempo - percTempoDecorrido : null;
 
   // Consolidado das três filas offline (fotos, "não será feito", status) pro
   // banner único do topo — ver JSX mais abaixo. Um item com sincronizacao
@@ -1727,6 +1738,12 @@ function CapturaRapidaConteudo({ id, onSessaoExpirada }: { id: string; onSessaoE
             <div className="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
               <div className="h-full rounded-full bg-success-600 transition-all" style={{ width: `${percConcluido}%` }} />
             </div>
+            {percPorTempo !== null && (
+              <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] font-bold">
+                <div className="rounded-lg bg-brand-50 px-2.5 py-2 text-brand-800"><span className="block uppercase tracking-wide text-brand-500">Avanço por tempo</span><b className="text-base">{percPorTempo}%</b><span className="ml-1 text-brand-600">das horas entregues</span></div>
+                <div className={cn("rounded-lg px-2.5 py-2", ritmoTempo !== null && ritmoTempo < 0 ? "bg-warning-50 text-warning-800" : "bg-success-50 text-success-800")}><span className="block uppercase tracking-wide opacity-70">Ritmo x relógio</span><b className="text-base">{percTempoDecorrido ?? 0}%</b><span className="ml-1">decorrido · {ritmoTempo === null ? "—" : ritmoTempo >= 0 ? `${ritmoTempo}% adiantado` : `${Math.abs(ritmoTempo)}% atrás`}</span></div>
+              </div>
+            )}
             {oportunidadesCount > 0 && (
               <label className="mt-2.5 flex items-center gap-2 text-[11px] font-bold text-slate-500">
                 <input
