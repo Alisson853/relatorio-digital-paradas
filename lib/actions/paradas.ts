@@ -233,14 +233,6 @@ export async function gerarBackupSistema(): Promise<ParadaCompleta[]> {
   return rows.map((row) => aplicarOperacoesNaParada(rowParaCompleta(row), porParada.get(row.id) ?? [])).reverse();
 }
 
-// Painel gerencial: dados consolidados de todas as paradas. Não é público —
-// caminho crítico, desvios por equipe e reunião pós-parada são informação de
-// gestão, não material da apresentação aberta pelo QR Code.
-export async function listParadasGestao(): Promise<ParadaCompleta[]> {
-  if (!(await ehEditor())) return [];
-  return gerarBackupSistema();
-}
-
 export async function listEventosOperacionais(): Promise<Awaited<ReturnType<typeof listarEventosOperacionaisAbertos>>> {
   if (!(await ehEditor())) return [];
   return listarEventosOperacionaisAbertos();
