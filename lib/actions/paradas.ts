@@ -15,6 +15,7 @@ import { ehEditor } from "@/lib/auth/session";
 import { consumirLimite, identificarRequisitante, limiteExcedidoMsg } from "@/lib/rate-limit";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { escreverComVersao, upsertComVersao } from "@/lib/db/paradas-repo";
+import { aplicarOperacoesNosServicos, listarOperacoesServico, salvarOperacaoServico } from "@/lib/db/servico-operacoes";
 import {
   aplicarCapturaFoto,
   aplicarMarcarStatus,
@@ -149,7 +150,21 @@ export async function getParadaCompleta(idBruto: string): Promise<ParadaCompleta
   if (!id) return null;
 
   const [row] = await getDb().select().from(paradas).where(eq(paradas.id, id)).limit(1);
-  return row ? rowParaCompleta(row) : null;
+  if (!row) return null;
+  const base = rowParaCompleta(row);
+  const operacoes = await listarOperacoesServico(id);
+  if (operacoes.length === 0) return base;
+  const servicos = aplicarOperacoesNosServicos(base.servicos, operacoes);
+  const limiteHoras = parseHoras(base.resumo.duracaoRealizada) || parseHoras(base.resumo.duracaoPlanejada) || undefined;
+  const kpis = deriveKpis(servicos, base.kpis.seguranca, { duracaoMaximaHoras: limiteHoras });
+  return {
+    ...base,
+    servicos,
+    fotos: deriveFotos(servicos),
+    kpis,
+    graficos: { ...base.graficos, percentualConcluido: kpis.eficiencia, horasPorSetor: calcularHorasPorSetor(servicos, limiteHoras) },
+    resultadoFinal: { ...base.resultadoFinal, eficiencia: kpis.eficiencia, pendenciasAbertas: kpis.pendencias },
+  };
 }
 
 export interface ParadaHistoricoItem {
@@ -580,10 +595,21 @@ export async function capturarFotoServico(
   const etapaEscolhida =
     etapaEscolhidaBruta === "Antes" || etapaEscolhidaBruta === "Durante" || etapaEscolhidaBruta === "Depois" ? etapaEscolhidaBruta : undefined;
 
-  const resultado = await escreverComVersao(paradaId, (row) => aplicarCapturaFoto(row, { servicoId, url, etapaEscolhida }));
-  if (!resultado.ok) return { ok: false, erro: resultado.erro };
-  await registrarAuditoria({ acao: "captura_foto", paradaId, servicoId, origem: await identificarRequisitante(), detalhe: { etapa: resultado.extra.label } });
-  return { ok: true, ...resultado.extra };
+  const parada = await getParadaCompleta(paradaId);
+  const servico = parada?.servicos.find((item) => item.id === servicoId);
+  if (!servico) return { ok: false, erro: "Serviço não encontrado." };
+  const label = etapaEscolhida ?? (!servico.fotoAntes || servico.fotoAntes === NO_PHOTO_PLACEHOLDER ? "Antes" : !servico.fotoDurante ? "Durante" : "Depois");
+  const campo = label === "Antes" ? "fotoAntes" : label === "Durante" ? "fotoDurante" : "fotoDepois";
+  const campoHorario = label === "Antes" ? "fotoAntesHorario" : label === "Durante" ? "fotoDuranteHorario" : "fotoDepoisHorario";
+  const horario = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Sao_Paulo" }).format(new Date());
+  const fecha = label === "Depois" && servico.status !== "concluido";
+  await salvarOperacaoServico(paradaId, servicoId, {
+    [campo]: url,
+    [campoHorario]: horario,
+    ...(fecha ? { status: "concluido", servicoExecutado: gerarDescricaoExecucao(servico.problemaIdentificado, "concluido"), resultado: textoResultadoPadrao("concluido", servico.problemaIdentificado) } : {}),
+  });
+  await registrarAuditoria({ acao: "captura_foto", paradaId, servicoId, origem: await identificarRequisitante(), detalhe: { etapa: label } });
+  return { ok: true, label, horario, ...(fecha ? { statusFechado: "concluido" as StatusItem } : {}) };
 }
 
 // Serviços importados de planilha entram como "pendente" e podem ser marcados
@@ -611,8 +637,14 @@ export async function marcarStatusServico(
     return { ok: false, erro: "Status inválido." };
   }
 
-  const resultado = await escreverComVersao(paradaId, (row) => aplicarMarcarStatus(row, { servicoId, status }));
-  if (!resultado.ok) return { ok: false, erro: resultado.erro };
+  const parada = await getParadaCompleta(paradaId);
+  const servico = parada?.servicos.find((item) => item.id === servicoId);
+  if (!servico) return { ok: false, erro: "Serviço não encontrado." };
+  await salvarOperacaoServico(paradaId, servicoId, {
+    status,
+    servicoExecutado: gerarDescricaoExecucao(servico.problemaIdentificado, status),
+    resultado: textoResultadoPadrao(status, servico.problemaIdentificado),
+  });
   await registrarAuditoria({ acao: "mudanca_status", paradaId, servicoId, origem: await identificarRequisitante(), detalhe: { status } });
   return { ok: true };
 }
