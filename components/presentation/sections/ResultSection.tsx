@@ -2,12 +2,12 @@
 
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { AlertTriangle, CheckCircle2, Gauge, ShieldCheck, Timer, TrendingUp } from "lucide-react";
-import type { Pendencia, ResultadoFinal } from "@/lib/types";
+import { AlertTriangle, CheckCircle2, Gauge, Mail, ShieldCheck, Timer, TrendingUp } from "lucide-react";
+import type { ParadaResumo, Pendencia, ResultadoFinal } from "@/lib/types";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 import { cn } from "@/lib/utils";
 
-export function ResultSection({ resultado, pendencias }: { resultado: ResultadoFinal; pendencias: Pendencia[] }) {
+export function ResultSection({ resultado, pendencias, resumo }: { resultado: ResultadoFinal; pendencias: Pendencia[]; resumo: ParadaResumo }) {
   const sucesso = resultado.selo === "concluida";
   const ressalvas = resultado.selo === "ressalvas";
 
@@ -18,6 +18,24 @@ export function ResultSection({ resultado, pendencias }: { resultado: ResultadoF
     { label: "Disponibilidade", value: resultado.disponibilidade, suffix: "%", decimals: 1, icon: TrendingUp },
     { label: "Pendências", value: resultado.pendenciasAbertas, suffix: "", icon: AlertTriangle },
   ];
+
+  function prepararEmail() {
+    const assunto = `Parada concluída — ${resumo.maquina} — ${resumo.data}`;
+    const linkRelatorio = window.location.href;
+    const texto = [
+      "Prezados,",
+      "",
+      `A parada ${resumo.nome} da ${resumo.maquina} foi concluída.${ressalvas ? " Há ressalvas registradas no relatório." : ""}`,
+      `Resultado: ${resultado.eficiencia}% das atividades concluídas.`,
+      `Tempo planejado: ${resultado.tempoPlanejadoHoras}h · Tempo realizado: ${resultado.tempoRealizadoHoras}h.`,
+      "",
+      `Relatório digital: ${linkRelatorio}`,
+      "",
+      "Atenciosamente,",
+      resumo.responsavel || "Equipe de Manutenção",
+    ].join("\r\n");
+    window.location.href = `mailto:?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(texto)}`;
+  }
 
   return (
     <section
@@ -101,6 +119,12 @@ export function ResultSection({ resultado, pendencias }: { resultado: ResultadoF
               ))}
             </ul>
           </motion.div>
+        )}
+
+        {resultado.selo !== "em_andamento" && (
+          <button type="button" onClick={prepararEmail} className="mt-8 inline-flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-white/20">
+            <Mail size={17} /> Preparar e-mail de conclusão
+          </button>
         )}
 
         <motion.div

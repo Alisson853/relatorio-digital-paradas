@@ -171,7 +171,7 @@ export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qr
       },
       {
         id: "resultado",
-        node: <ResultSection key="resultado" resultado={data.resultadoFinal} pendencias={[...data.pendencias, ...pendenciasDeServicosNaoFeitos]} />,
+        node: <ResultSection key="resultado" resumo={data.resumo} resultado={data.resultadoFinal} pendencias={[...data.pendencias, ...pendenciasDeServicosNaoFeitos]} />,
         bg: "bg-gradient-to-br from-brand-950 via-brand-900 to-slate-950",
       },
     ];
