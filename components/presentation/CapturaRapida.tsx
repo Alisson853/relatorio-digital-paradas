@@ -1679,7 +1679,7 @@ function CapturaRapidaConteudo({ id, onSessaoExpirada }: { id: string; onSessaoE
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-16">
+    <div className="captura-rapida min-h-screen bg-slate-50 pb-20">
       {/* Cabeçalho de ferramenta de campo: o número de conclusão é a leitura
           dominante (tipografia grande, sozinha), não mais duas barras finas
           de peso igual dividindo a atenção — em campo, sob sol, o que
@@ -1702,6 +1702,9 @@ function CapturaRapidaConteudo({ id, onSessaoExpirada }: { id: string; onSessaoE
             </span>
           )}
         </div>
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><div><p className="text-sm font-extrabold text-slate-900">Atividades em campo</p><p className="text-[11px] font-semibold text-slate-400">Localize, filtre e cobre a OS certa</p></div><span className="rounded-full bg-brand-50 px-2.5 py-1 text-[10px] font-extrabold text-brand-700">{servicosFiltrados.length} visíveis</span></div>
+          <div className="space-y-3 p-3">
         {totalServicos > 0 && (
           <div className="px-4 pb-3 pt-4">
             <div className="flex items-end justify-between gap-3">
@@ -1889,7 +1892,7 @@ function CapturaRapidaConteudo({ id, onSessaoExpirada }: { id: string; onSessaoE
         </div>
       )}
 
-      <main className="mx-auto max-w-xl space-y-4 px-4 py-5">
+      <main className="mx-auto max-w-2xl space-y-5 px-4 py-5 sm:px-6">
         <PainelControle data={data} />
         <GanttDeCampo data={data} agora={horaAgora} />
         <div className="grid gap-3 sm:grid-cols-2"><NovaOsForm paradaId={id} onCriada={handleOsCriada} /><div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"><p className="mb-2 px-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Diário do planejador</p><NovoEventoForm paradaId={id} onCriado={handleEventoCriado} /></div></div>
@@ -1930,7 +1933,7 @@ function CapturaRapidaConteudo({ id, onSessaoExpirada }: { id: string; onSessaoE
         {pessoas.length > 0 && (
           // Um toque no nome já filtra — evita digitar no celular. Toca de
           // novo no mesmo nome (já selecionado) pra limpar o filtro.
-          <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4">
+          <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
             {pessoas.map((nome) => {
               const ativo = pessoaFiltro.toLowerCase() === nome.toLowerCase();
               return (
@@ -1953,6 +1956,8 @@ function CapturaRapidaConteudo({ id, onSessaoExpirada }: { id: string; onSessaoE
             })}
           </div>
         )}
+          </div>
+        </section>
 
         {data.servicos.length === 0 ? (
           <p className="py-16 text-center text-sm text-slate-400">Nenhuma OS cadastrada ainda neste relatório.</p>
