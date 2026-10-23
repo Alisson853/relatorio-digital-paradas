@@ -29,7 +29,7 @@ export function ParadaCard({ parada, index, onDelete, onExport, onClone }: Parad
       viewport={{ once: true, margin: "-8% 0px" }}
       transition={{ duration: 0.5, delay: index * 0.05, ease: [0.16, 1, 0.3, 1] }}
       whileHover={{ y: -6 }}
-      className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] transition-shadow duration-300 hover:shadow-[0_12px_28px_rgba(16,24,40,0.12)]"
+      className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] transition-shadow duration-300 hover:shadow-[0_12px_28px_rgba(16,24,40,0.12)]"
     >
       <div className="relative h-40 overflow-hidden bg-gradient-to-br from-brand-900 via-brand-800 to-brand-700">
         {parada.fotosMaquina?.[0] ? (
@@ -101,7 +101,7 @@ export function ParadaCard({ parada, index, onDelete, onExport, onClone }: Parad
         <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-brand-950/60 to-transparent" />
       </div>
 
-      <div className="p-6">
+      <div className="flex flex-1 flex-col p-6">
         <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-brand-600">
           <Factory size={13} />
           {parada.area}
@@ -125,23 +125,18 @@ export function ParadaCard({ parada, index, onDelete, onExport, onClone }: Parad
           </div>
         </div>
 
-        <Link
-          href={`/parada/${parada.id}`}
-          className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
-        >
-          Visualizar Relatório
-          <ArrowUpRight size={16} className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-        </Link>
-
-        {showEditorControls && (
-          <Link
-            href={`/parada/${parada.id}/fotos`}
-            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-100"
-          >
-            <Camera size={16} />
-            Captura Rápida (Celular)
+        <div className="mt-auto pt-6">
+          <Link href={`/parada/${parada.id}`} className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-700">
+            Visualizar Relatório
+            <ArrowUpRight size={16} className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
           </Link>
-        )}
+          {showEditorControls && (
+            <Link href={`/parada/${parada.id}/fotos`} className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-100">
+              <Camera size={16} />
+              Captura Rápida (Celular)
+            </Link>
+          )}
+        </div>
       </div>
     </motion.div>
   );
