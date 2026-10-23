@@ -38,7 +38,9 @@ export type NovaParadaRow = typeof paradas.$inferInsert;
 export const servicoOperacoes = pgTable(
   "servico_operacoes",
   {
-    paradaId: text("parada_id").notNull(),
+    // A operação não pode existir sem o relatório pai. Além de proteger dados
+    // inválidos, o cascade evita sobras quando um relatório é removido.
+    paradaId: text("parada_id").notNull().references(() => paradas.id, { onDelete: "cascade" }),
     servicoId: text("servico_id").notNull(),
     dados: jsonb("dados").$type<Partial<Servico>>().notNull().default({}),
     atualizadoEm: timestamp("atualizado_em").notNull().defaultNow(),
@@ -50,6 +52,30 @@ export const servicoOperacoes = pgTable(
 );
 
 export type ServicoOperacaoRow = typeof servicoOperacoes.$inferSelect;
+
+// Eventos que merecem atenção da operação: falhas de gravação, backups e
+// recuperações. Diferente do log efêmero da plataforma, ficam consultáveis no
+// próprio sistema para que a equipe consiga agir antes de perder informação.
+export const eventosOperacionais = pgTable(
+  "eventos_operacionais",
+  {
+    id: text("id").primaryKey(),
+    tipo: text("tipo").notNull(),
+    severidade: text("severidade").notNull(),
+    mensagem: text("mensagem").notNull(),
+    paradaId: text("parada_id").references(() => paradas.id, { onDelete: "set null" }),
+    servicoId: text("servico_id"),
+    detalhe: jsonb("detalhe").$type<Record<string, unknown>>().notNull().default({}),
+    resolvidoEm: timestamp("resolvido_em"),
+    criadoEm: timestamp("criado_em").notNull().defaultNow(),
+  },
+  (table) => [
+    index("eventos_operacionais_criado_idx").on(table.criadoEm),
+    index("eventos_operacionais_abertos_idx").on(table.resolvidoEm),
+  ]
+);
+
+export type EventoOperacionalRow = typeof eventosOperacionais.$inferSelect;
 
 // Contador de rate limit compartilhado. Estava em memória do processo antes —
 // o que em serverless não segura nada: cada instância tinha o próprio contador

@@ -4,7 +4,7 @@ import { del, put } from "@vercel/blob";
 import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { sufixoAleatorio } from "@/lib/utils";
-import { paradas } from "@/lib/db/schema";
+import { paradas, servicoOperacoes } from "@/lib/db/schema";
 import type { CaminhoCriticoItem, Equipe, Kpis, MotivoNaoFeitoCategoria, ParadaCompleta, ParadaResumo, Servico, StatusItem, TimelineEvento } from "@/lib/types";
 import type { HistoricoNaoFeitoItem } from "@/lib/historico-nao-feito";
 import { calcularHorasPorSetor, calcularPorEquipe, deriveFotoCapa, deriveFotos, deriveGraficos, deriveKpis, gerarDescricaoExecucao, parseHoras, textoResultadoPadrao } from "@/lib/derive";
@@ -14,6 +14,7 @@ import { NO_PHOTO_PLACEHOLDER } from "@/lib/image-utils";
 import { ehEditor } from "@/lib/auth/session";
 import { consumirLimite, identificarRequisitante, limiteExcedidoMsg } from "@/lib/rate-limit";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { listarEventosOperacionaisAbertos, registrarEventoOperacional, resolverEventoOperacional } from "@/lib/operacao-monitoramento";
 import { escreverComVersao, upsertComVersao } from "@/lib/db/paradas-repo";
 import { aplicarOperacoesNosServicos, listarOperacoesServico, salvarOperacaoServico } from "@/lib/db/servico-operacoes";
 import {
@@ -154,6 +155,10 @@ export async function getParadaCompleta(idBruto: string): Promise<ParadaCompleta
   const base = rowParaCompleta(row);
   const operacoes = await listarOperacoesServico(id);
   if (operacoes.length === 0) return base;
+  return aplicarOperacoesNaParada(base, operacoes);
+}
+
+function aplicarOperacoesNaParada(base: ParadaCompleta, operacoes: Awaited<ReturnType<typeof listarOperacoesServico>>): ParadaCompleta {
   const servicos = aplicarOperacoesNosServicos(base.servicos, operacoes);
   const limiteHoras = parseHoras(base.resumo.duracaoRealizada) || parseHoras(base.resumo.duracaoPlanejada) || undefined;
   const kpis = deriveKpis(servicos, base.kpis.seguranca, { duracaoMaximaHoras: limiteHoras });
@@ -208,8 +213,36 @@ export async function exportarBackupCompleto(): Promise<{ ok: boolean; erro?: st
   const autorizado = await ehEditor();
   if (!autorizado) return { ok: false, erro: "Não autorizado." };
 
-  const rows = await getDb().select().from(paradas).orderBy(asc(paradas.data));
-  return { ok: true, dados: rows.map(rowParaCompleta).reverse() };
+  return { ok: true, dados: await gerarBackupSistema() };
+}
+
+// Usado exclusivamente pela rota interna do cron. Inclui a camada operacional
+// das OS, não só o JSON-base do relatório, para que um backup restaurado seja
+// exatamente igual ao que estava sendo acompanhado no campo.
+export async function gerarBackupSistema(): Promise<ParadaCompleta[]> {
+  const [rows, operacoes] = await Promise.all([
+    getDb().select().from(paradas).orderBy(asc(paradas.data)),
+    getDb().select().from(servicoOperacoes),
+  ]);
+  const porParada = new Map<string, typeof operacoes>();
+  for (const operacao of operacoes) {
+    const atuais = porParada.get(operacao.paradaId) ?? [];
+    atuais.push(operacao);
+    porParada.set(operacao.paradaId, atuais);
+  }
+  return rows.map((row) => aplicarOperacoesNaParada(rowParaCompleta(row), porParada.get(row.id) ?? [])).reverse();
+}
+
+export async function listEventosOperacionais(): Promise<Awaited<ReturnType<typeof listarEventosOperacionaisAbertos>>> {
+  if (!(await ehEditor())) return [];
+  return listarEventosOperacionaisAbertos();
+}
+
+export async function resolverEventoOperacionalAction(id: string): Promise<{ ok: boolean; erro?: string }> {
+  if (!(await ehEditor())) return { ok: false, erro: "Não autorizado." };
+  if (!/^evt-[a-z0-9-]+$/i.test(id)) return { ok: false, erro: "Evento inválido." };
+  await resolverEventoOperacional(id);
+  return { ok: true };
 }
 
 // Igual a getParadaCompleta, mas devolve também a versão (atualizadoEm) da
@@ -603,11 +636,16 @@ export async function capturarFotoServico(
   const campoHorario = label === "Antes" ? "fotoAntesHorario" : label === "Durante" ? "fotoDuranteHorario" : "fotoDepoisHorario";
   const horario = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Sao_Paulo" }).format(new Date());
   const fecha = label === "Depois" && servico.status !== "concluido";
-  await salvarOperacaoServico(paradaId, servicoId, {
-    [campo]: url,
-    [campoHorario]: horario,
-    ...(fecha ? { status: "concluido", servicoExecutado: gerarDescricaoExecucao(servico.problemaIdentificado, "concluido"), resultado: textoResultadoPadrao("concluido", servico.problemaIdentificado) } : {}),
-  });
+  try {
+    await salvarOperacaoServico(paradaId, servicoId, {
+      [campo]: url,
+      [campoHorario]: horario,
+      ...(fecha ? { status: "concluido", servicoExecutado: gerarDescricaoExecucao(servico.problemaIdentificado, "concluido"), resultado: textoResultadoPadrao("concluido", servico.problemaIdentificado) } : {}),
+    });
+  } catch (erro) {
+    await registrarEventoOperacional({ tipo: "falha_foto", severidade: "erro", mensagem: "Não foi possível gravar uma foto capturada.", paradaId, servicoId, detalhe: { etapa: label, erro: erro instanceof Error ? erro.message : "erro desconhecido" } });
+    return { ok: false, erro: "Não foi possível salvar a foto. Ela permanece na fila deste aparelho para nova tentativa." };
+  }
   await registrarAuditoria({ acao: "captura_foto", paradaId, servicoId, origem: await identificarRequisitante(), detalhe: { etapa: label } });
   return { ok: true, label, horario, ...(fecha ? { statusFechado: "concluido" as StatusItem } : {}) };
 }
@@ -640,11 +678,16 @@ export async function marcarStatusServico(
   const parada = await getParadaCompleta(paradaId);
   const servico = parada?.servicos.find((item) => item.id === servicoId);
   if (!servico) return { ok: false, erro: "Serviço não encontrado." };
-  await salvarOperacaoServico(paradaId, servicoId, {
-    status,
-    servicoExecutado: gerarDescricaoExecucao(servico.problemaIdentificado, status),
-    resultado: textoResultadoPadrao(status, servico.problemaIdentificado),
-  });
+  try {
+    await salvarOperacaoServico(paradaId, servicoId, {
+      status,
+      servicoExecutado: gerarDescricaoExecucao(servico.problemaIdentificado, status),
+      resultado: textoResultadoPadrao(status, servico.problemaIdentificado),
+    });
+  } catch (erro) {
+    await registrarEventoOperacional({ tipo: "falha_status", severidade: "erro", mensagem: "Não foi possível atualizar o status de uma OS.", paradaId, servicoId, detalhe: { status, erro: erro instanceof Error ? erro.message : "erro desconhecido" } });
+    return { ok: false, erro: "Não foi possível atualizar a OS. A alteração permanece na fila deste aparelho." };
+  }
   await registrarAuditoria({ acao: "mudanca_status", paradaId, servicoId, origem: await identificarRequisitante(), detalhe: { status } });
   return { ok: true };
 }

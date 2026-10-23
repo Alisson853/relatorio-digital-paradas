@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Activity, ClipboardList, LineChart, Plus } from "lucide-react";
-import { listParadasResumo } from "@/lib/actions/paradas";
+import { listEventosOperacionais, listParadasResumo } from "@/lib/actions/paradas";
 import { ParadaGrid } from "@/components/dashboard/ParadaGrid";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { BackupControls } from "@/components/dashboard/BackupControls";
@@ -9,11 +9,12 @@ import { RecorrenciasNaoFeito } from "@/components/dashboard/RecorrenciasNaoFeit
 import { EditorOnly } from "@/components/shared/EditorOnly";
 import { EditorToggle } from "@/components/shared/EditorToggle";
 import { StatusConexao } from "@/components/shared/StatusConexao";
+import { AlertasOperacionais } from "@/components/dashboard/AlertasOperacionais";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const paradas = await listParadasResumo();
+  const [paradas, eventosOperacionais] = await Promise.all([listParadasResumo(), listEventosOperacionais()]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -101,6 +102,9 @@ export default async function DashboardPage() {
       </div>
 
       <main className="mx-auto max-w-7xl px-6 py-12 sm:px-10">
+        <EditorOnly>
+          <AlertasOperacionais eventos={eventosOperacionais} />
+        </EditorOnly>
         <RecorrenciasNaoFeito />
 
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-4">
