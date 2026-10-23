@@ -30,6 +30,10 @@ import {
   Copy,
   CalendarRange,
   Mic,
+  Users,
+  Timer,
+  ListTodo,
+  MessageSquareText,
 } from "lucide-react";
 import { MOTIVOS_NAO_FEITO, type Equipe, type MotivoNaoFeitoCategoria, type ParadaCompleta, type Servico, type StatusItem, type TimelineEvento } from "@/lib/types";
 import {
@@ -973,6 +977,32 @@ function falhaDaFila(erro: string): ResultadoTentativa {
   return { ok: false, tipo: "negocio", erro };
 }
 
+// Painel-resumo do planejador. A Captura Rápida não é só uma lista de fotos:
+// em campo ela precisa responder, em segundos, "onde está o risco?", "quem
+// está trabalhando?" e "o que eu preciso cobrar agora?".
+function PainelControle({ data }: { data: ParadaCompleta }) {
+  const pendentes = data.servicos.filter((s) => s.status === "pendente" && !s.naoFeitoCategoria).length;
+  const emAndamento = data.servicos.filter((s) => s.status === "em_andamento").length;
+  const concluidas = data.servicos.filter((s) => s.status === "concluido").length;
+  const equipes = new Set(data.servicos.map((s) => s.equipe)).size;
+  const ultimaAtualizacao = [...data.timeline].sort((a, b) => b.horario.localeCompare(a.horario))[0];
+  return (
+    <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-brand-950 to-brand-800 p-4 text-white shadow-[0_14px_34px_rgba(10,36,76,0.22)]">
+      <div className="flex items-start justify-between gap-3"><div><p className="label-tecnico text-[10px] font-bold text-brand-200">Painel do planejador</p><h2 className="mt-1 text-lg font-extrabold tracking-tight">Controle da parada</h2></div><span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-brand-100">Ao vivo</span></div>
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        <MiniPainel icon={CheckCircle2} valor={concluidas} rotulo="feitas" cor="text-emerald-300" />
+        <MiniPainel icon={Timer} valor={emAndamento} rotulo="em execução" cor="text-brand-200" />
+        <MiniPainel icon={ListTodo} valor={pendentes} rotulo="a cobrar" cor="text-amber-200" />
+      </div>
+      <div className="mt-3 flex items-center gap-2 border-t border-white/10 pt-3 text-[11px] text-brand-100"><Users size={14} className="text-brand-300" /><b className="text-white">{equipes} equipes</b> mobilizadas <span className="mx-1 text-white/30">·</span><MessageSquareText size={14} className="text-brand-300" />{ultimaAtualizacao ? `último marco: ${ultimaAtualizacao.titulo} às ${ultimaAtualizacao.horario}` : "registre os marcos no diário"}</div>
+    </section>
+  );
+}
+
+function MiniPainel({ icon: Icon, valor, rotulo, cor }: { icon: typeof Timer; valor: number; rotulo: string; cor: string }) {
+  return <div className="rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-3"><Icon size={14} className={cor} /><p className="mt-2 text-2xl font-extrabold leading-none">{valor}</p><p className="mt-1 text-[9px] font-bold uppercase tracking-wide text-brand-200">{rotulo}</p></div>;
+}
+
 // Mapa de campo: fica na mesma tela em que o técnico registra as fotos, para
 // que o prazo não fique escondido apenas na apresentação. Ele usa os horários
 // já programados na OS; não inventa duração real a partir da foto.
@@ -1657,7 +1687,7 @@ function CapturaRapidaConteudo({ id, onSessaoExpirada }: { id: string; onSessaoE
           tempo. Continua em fundo claro (não escuro) de propósito: contraste
           alto é o que se lê melhor ao ar livre, um hero escuro aqui
           trabalharia contra a própria leitura em campo. */}
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top)] shadow-sm backdrop-blur">
         <div className="flex items-center gap-3 px-4 pt-4">
           <Link href={`/parada/${id}`} className="flex h-9 w-9 flex-none items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700">
             <ArrowLeft size={18} />
@@ -1859,10 +1889,10 @@ function CapturaRapidaConteudo({ id, onSessaoExpirada }: { id: string; onSessaoE
         </div>
       )}
 
-      <main className="mx-auto max-w-lg space-y-3 px-4 py-5">
+      <main className="mx-auto max-w-xl space-y-4 px-4 py-5">
+        <PainelControle data={data} />
         <GanttDeCampo data={data} agora={horaAgora} />
-        <NovaOsForm paradaId={id} onCriada={handleOsCriada} />
-        <div className="rounded-2xl border border-slate-200 bg-white p-3"><p className="mb-2 px-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Diário do planejador</p><NovoEventoForm paradaId={id} onCriado={handleEventoCriado} /></div>
+        <div className="grid gap-3 sm:grid-cols-2"><NovaOsForm paradaId={id} onCriada={handleOsCriada} /><div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"><p className="mb-2 px-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Diário do planejador</p><NovoEventoForm paradaId={id} onCriado={handleEventoCriado} /></div></div>
 
         {totalServicos > 0 && (
           <div className="relative">
