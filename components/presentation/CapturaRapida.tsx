@@ -1018,6 +1018,10 @@ function GanttDeCampo({ data, agora }: { data: ParadaCompleta; agora: Date | nul
   // 100% concluído — encerrada com pendências não pode parecer sucesso total.
   const janelaTerminou = data.resumo.data < hoje || (data.resumo.data === hoje && agoraNoMapa !== null && agoraNoMapa >= fimLimite);
   const paradaEncerrada = concluidaCompleta || data.resumo.status !== "em_andamento" || janelaTerminou;
+  const equipes = Array.from(new Set(data.servicos.map((servico) => servico.equipe))).map((equipe) => {
+    const itens = data.servicos.filter((servico) => servico.equipe === equipe);
+    return { equipe, pendentes: itens.filter((s) => s.status === "pendente").length, andamento: itens.filter((s) => s.status === "em_andamento").length, concluidas: itens.filter((s) => s.status === "concluido").length };
+  });
 
   return (
     <section className={`overflow-hidden rounded-2xl border ${cor}`} aria-label="Mapa Gantt e tendência da parada">
@@ -1048,6 +1052,12 @@ function GanttDeCampo({ data, agora }: { data: ParadaCompleta; agora: Date | nul
             {!paradaEncerrada && vencidas.length > 0 && <div className="rounded-lg bg-danger-50 px-2.5 py-2 text-[11px] font-bold text-danger-800">{vencidas.length} atividade{vencidas.length > 1 ? "s" : ""} passou{vencidas.length > 1 ? "ram" : ""} do horário final e continua{vencidas.length > 1 ? "m" : ""} aberta{vencidas.length > 1 ? "s" : ""}: {vencidas.slice(0, 3).map((item) => `OS ${item.numeroOS}`).join(", ")}{vencidas.length > 3 ? "…" : ""}</div>}
           </div>
         )}
+        <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+          <p className="mb-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Mapa de equipes</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {equipes.map((item) => <div key={item.equipe} className="rounded-lg bg-white px-2.5 py-2 text-[10px] shadow-sm"><p className="truncate font-extrabold text-slate-700">{item.equipe}</p><p className="mt-0.5 font-bold text-slate-500"><span className="text-emerald-700">{item.concluidas} concluída{item.concluidas !== 1 ? "s" : ""}</span> · <span className="text-brand-700">{item.andamento} em andamento</span> · {item.pendentes} pendente{item.pendentes !== 1 ? "s" : ""}</p></div>)}
+          </div>
+        </div>
         <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
           {atividades.map((atividade) => {
             const left = ((atividade.inicioMinutos - inicio) / duracaoEscala) * 100;
@@ -1852,7 +1862,7 @@ function CapturaRapidaConteudo({ id, onSessaoExpirada }: { id: string; onSessaoE
       <main className="mx-auto max-w-lg space-y-3 px-4 py-5">
         <GanttDeCampo data={data} agora={horaAgora} />
         <NovaOsForm paradaId={id} onCriada={handleOsCriada} />
-        <NovoEventoForm paradaId={id} onCriado={handleEventoCriado} />
+        <div className="rounded-2xl border border-slate-200 bg-white p-3"><p className="mb-2 px-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Diário do planejador</p><NovoEventoForm paradaId={id} onCriado={handleEventoCriado} /></div>
 
         {totalServicos > 0 && (
           <div className="relative">
