@@ -172,6 +172,8 @@ export function sanearServico(bruto: unknown): Servico {
     fotoDuranteHorario: texto(s.fotoDuranteHorario, 20) || undefined,
     fotoDepois: urlDeImagem(s.fotoDepois),
     fotoDepoisHorario: texto(s.fotoDepoisHorario, 20) || undefined,
+    observacaoAudio: urlDeImagem(s.observacaoAudio) || undefined,
+    observacaoAudioHorario: texto(s.observacaoAudioHorario, 20) || undefined,
     categoria: texto(s.categoria) || undefined,
     naoFeitoCategoria: umDeOpcional<MotivoNaoFeitoCategoria>(s.naoFeitoCategoria, MOTIVOS_NAO_FEITO),
     justificativaNaoFeito: texto(s.justificativaNaoFeito, LIMITE_TEXTO_LONGO) || undefined,

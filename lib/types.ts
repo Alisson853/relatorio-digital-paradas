@@ -69,6 +69,10 @@ export interface Servico {
   fotoDuranteHorario?: string;
   fotoDepois: string;
   fotoDepoisHorario?: string;
+  // Áudio curto registrado em campo, vinculado à OS (não fica solto no
+  // relatório nem mistura observações de serviços com nome parecido).
+  observacaoAudio?: string;
+  observacaoAudioHorario?: string;
   categoria?: string;
   // Marcado pelo técnico em campo quando o serviço não vai ser feito. A
   // categoria É o sinal de "está marcado" (undefined = não marcado) — o

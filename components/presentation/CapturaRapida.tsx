@@ -29,12 +29,15 @@ import {
   ClipboardList,
   Copy,
   CalendarRange,
+  Mic,
 } from "lucide-react";
 import { MOTIVOS_NAO_FEITO, type Equipe, type MotivoNaoFeitoCategoria, type ParadaCompleta, type Servico, type StatusItem, type TimelineEvento } from "@/lib/types";
 import {
   getParadaCompleta,
   capturarFotoServico,
   uploadFoto,
+  uploadAudio,
+  salvarAudioServico,
   adicionarServicoRapido,
   adicionarEventoRapido,
   marcarStatusServico,
@@ -473,6 +476,10 @@ function ServicoCapturaCard({
   const [categoria, setCategoria] = useState<MotivoNaoFeitoCategoria | "">(servico.naoFeitoCategoria ?? "");
   const [justificativa, setJustificativa] = useState(servico.justificativaNaoFeito ?? "");
   const [salvandoNaoFeito, setSalvandoNaoFeito] = useState(false);
+  const [gravando, setGravando] = useState(false);
+  const [audioErro, setAudioErro] = useState("");
+  const gravadorRef = useRef<MediaRecorder | null>(null);
+  const partesAudioRef = useRef<Blob[]>([]);
   // O que já foi confirmado salvo (no servidor OU na fila offline) — não usa
   // os props do servico direto porque eles só refletem a gravação depois que
   // o round-trip do servidor volta e o pai atualiza o estado; entre um
@@ -497,6 +504,28 @@ function ServicoCapturaCard({
   // Isso precisa estar dito ANTES do toque, nao descoberto depois.
   const jaTemFotoNaEtapaAtiva =
     etapaAtiva === "Antes" ? temAntes : etapaAtiva === "Durante" ? temDurante : temDepois;
+
+  async function alternarAudio() {
+    setAudioErro("");
+    if (gravadorRef.current?.state === "recording") { gravadorRef.current.stop(); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const gravador = new MediaRecorder(stream);
+      partesAudioRef.current = [];
+      gravador.ondataavailable = (evento) => { if (evento.data.size) partesAudioRef.current.push(evento.data); };
+      gravador.onstop = async () => {
+        setGravando(false); stream.getTracks().forEach((track) => track.stop());
+        const audio = new Blob(partesAudioRef.current, { type: gravador.mimeType || "audio/webm" });
+        const form = new FormData(); form.set("file", audio, "observacao.webm");
+        const upload = await uploadAudio(form);
+        if (!upload.ok || !upload.url) { setAudioErro(upload.erro || "Não foi possível enviar o áudio."); return; }
+        const salvo = await salvarAudioServico(paradaId, servico.id, upload.url);
+        if (!salvo.ok) { setAudioErro(salvo.erro || "Não foi possível vincular o áudio à OS."); return; }
+        onCaptured(servico.id, { observacaoAudio: upload.url, observacaoAudioHorario: salvo.horario });
+      };
+      gravador.start(); gravadorRef.current = gravador; setGravando(true);
+    } catch { setAudioErro("Não foi possível acessar o microfone. Verifique a permissão do navegador."); }
+  }
 
   // Sem internet, nem tenta — vai direto pra fila (evita 3 tentativas de
   // rede fadadas ao erro, que só atrasam e gastam bateria à toa em campo).
@@ -889,6 +918,13 @@ function ServicoCapturaCard({
               {loading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
               {loading ? "Enviando..." : jaTemFotoNaEtapaAtiva ? `Substituir foto de ${etapaAtiva}` : `Tirar foto de ${etapaAtiva}`}
             </button>
+            <button type="button" onClick={alternarAudio} disabled={loading} className={cn("mt-2 flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold transition-colors disabled:opacity-60", gravando ? "border-red-300 bg-red-50 text-red-700" : "border-brand-200 bg-white text-brand-700 hover:bg-brand-50")}>
+              {gravando ? <Square size={15} fill="currentColor" /> : <Mic size={17} />}
+              {gravando ? "Parar e salvar observação" : servico.observacaoAudio ? "Gravar nova observação de áudio" : "Gravar observação de áudio"}
+            </button>
+            {gravando && <p className="mt-1.5 text-center text-[11px] font-bold text-red-600">Gravando — fale o defeito, material ou bloqueio encontrado.</p>}
+            {servico.observacaoAudio && !gravando && <audio controls src={servico.observacaoAudio} className="mt-2 h-8 w-full" />}
+            {audioErro && <p className="mt-2 text-center text-xs font-semibold text-danger-600">{audioErro}</p>}
 
             {pendentesDoServico.length > 0 && (
               <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-warning-700">

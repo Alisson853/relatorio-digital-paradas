@@ -597,6 +597,33 @@ export async function uploadFoto(formData: FormData): Promise<{ ok: boolean; url
   return { ok: true, url: blob.url };
 }
 
+export async function uploadAudio(formData: FormData): Promise<{ ok: boolean; url?: string; erro?: string }> {
+  if (!(await ehEditor())) return { ok: false, erro: "Não autorizado." };
+  const file = formData.get("file");
+  if (!(file instanceof File) || !file.size) return { ok: false, erro: "Áudio inválido." };
+  if (file.size > 8 * 1024 * 1024) return { ok: false, erro: "Áudio muito grande (máximo 8 MB)." };
+  const tipos = ["audio/webm", "audio/mp4", "audio/mpeg", "audio/ogg"];
+  if (!tipos.includes(file.type)) return { ok: false, erro: "Use uma gravação de áudio válida." };
+  const extensao = file.type === "audio/mp4" ? ".m4a" : file.type === "audio/mpeg" ? ".mp3" : file.type === "audio/ogg" ? ".ogg" : ".webm";
+  const blob = await put(`audios/${Date.now()}-${Math.random().toString(36).slice(2, 10)}${extensao}`, file, { access: "public", contentType: file.type });
+  return { ok: true, url: blob.url };
+}
+
+export async function salvarAudioServico(paradaIdBruto: string, servicoIdBruto: string, urlBruta: string): Promise<{ ok: boolean; erro?: string; horario?: string }> {
+  if (!(await ehEditor())) return { ok: false, erro: "Não autorizado." };
+  const paradaId = idSeguro(paradaIdBruto);
+  if (!paradaId) return { ok: false, erro: "Identificador inválido." };
+  const servicoId = sanearTexto(servicoIdBruto, 80);
+  const url = urlDeFotoValida(urlBruta);
+  if (!url) return { ok: false, erro: "URL de áudio inválida." };
+  const parada = await getParadaCompleta(paradaId);
+  if (!parada?.servicos.some((s) => s.id === servicoId)) return { ok: false, erro: "Serviço não encontrado." };
+  const horario = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Sao_Paulo" }).format(new Date());
+  await salvarOperacaoServico(paradaId, servicoId, { observacaoAudio: url, observacaoAudioHorario: horario });
+  await registrarAuditoria({ acao: "observacao_audio", paradaId, servicoId, origem: await identificarRequisitante() });
+  return { ok: true, horario };
+}
+
 // Grava a foto direto na OS certa, mexendo só no array de serviços — assim uma
 // captura em campo não corre o risco de sobrescrever outras edições feitas ao
 // mesmo tempo em outras partes do relatório (diferente do formulário completo,
