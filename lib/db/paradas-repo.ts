@@ -60,7 +60,20 @@ export const paradaStorePostgres: ParadaStore = {
   },
 };
 
-const MAX_TENTATIVAS = 5;
+// Em campo, vários celulares podem fechar OS no mesmo minuto. Cinco novas
+// tentativas imediatas só faziam todos baterem no banco de novo juntos. Doze
+// tentativas com espera progressiva espalham as gravações sem segurar lock ou
+// conexão persistente (o Neon usa HTTP) e absorvem picos reais de equipe.
+const MAX_TENTATIVAS = 10;
+
+function esperarAntesDeTentarDeNovo(tentativa: number): Promise<void> {
+  // Exponencial moderado (50ms, 100ms, ... até 500ms) + jitter. O teto mantém a
+  // interação de campo responsiva; o jitter impede que dois aparelhos que
+  // conflitaram continuem sincronizados para sempre.
+  const base = Math.min(50 * 2 ** tentativa, 500);
+  const jitter = Math.floor(Math.random() * 50);
+  return new Promise((resolve) => setTimeout(resolve, base + jitter));
+}
 
 // Usado por toda mutação pontual (foto, status, "não será feito", nova OS
 // rápida, novo evento) que hoje lê o relatório inteiro, muda um item do
@@ -92,7 +105,9 @@ export async function escreverComVersao<Extra = undefined>(
     // Conflito: outra escrita aconteceu entre a leitura e a gravação. Tenta
     // de novo com dado fresco em vez de devolver erro na primeira tentativa —
     // isso é o esperado sempre que duas pessoas mexem na mesma parada quase
-    // ao mesmo tempo, não uma falha de verdade.
+    // ao mesmo tempo, não uma falha de verdade. Espera antes de reler: sem
+    // isso todos os celulares repetem a mesma corrida no mesmo instante.
+    if (tentativa < MAX_TENTATIVAS - 1) await esperarAntesDeTentarDeNovo(tentativa);
   }
   return { ok: false, erro: "Muitas alterações simultâneas neste relatório. Tente novamente em instantes." };
 }
