@@ -93,7 +93,7 @@ Variáveis de ambiente necessárias (veja `.env.local` — nunca committado):
 | `EDITOR_PASSWORD` | Senha em texto puro do modo editor — fallback de `EDITOR_PASSWORD_HASH` para deploys ainda não migrados; evite em produção |
 | `SESSION_SECRET` | Segredo usado para assinar (HMAC) o token de sessão do editor — se ausente, cai para `EDITOR_PASSWORD_HASH`/`EDITOR_PASSWORD` |
 
-Migrações de schema: `npx dotenv -e .env.local -- npx drizzle-kit push` (usa `DATABASE_URL`, a credencial de dono — nunca `APP_DATABASE_URL`).
+Migrações de schema: `npx dotenv -e .env.local -- npx drizzle-kit push` (usa `DATABASE_URL`, a credencial de dono — nunca `APP_DATABASE_URL`). Após criar uma tabela usada pelo app, conceda também `SELECT, INSERT, UPDATE, DELETE` ao role `app_paradas`; sem isso o deploy pode subir, mas a tela falhará em produção por falta de permissão.
 
 ## Escrita e concorrência
 
