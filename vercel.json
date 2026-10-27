@@ -1,8 +1,10 @@
 {
   "crons": [
-    {
-      "path": "/api/cron/backup",
-      "schedule": "10 3 * * *"
-    }
-  ]
+    { "path": "/api/cron/backup", "schedule": "10 3 * * *" }
+  ],
+  "functions": {
+    "app/api/cron/backup/route.ts": { "maxDuration": 60 },
+    "app/api/export/docx/[id]/route.ts": { "maxDuration": 60 },
+    "app/api/export/pptx/[id]/route.ts": { "maxDuration": 60 }
+  }
 }

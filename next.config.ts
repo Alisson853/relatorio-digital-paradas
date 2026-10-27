@@ -62,6 +62,7 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           // A Captura Rápida grava observações curtas por OS. `self` permite o
           // microfone somente neste próprio site (nunca em iframe/terceiros).
+                    { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=()" },
           // Isola esta aba de qualquer janela que a tenha aberto (e vice-versa):
           // uma pagina que abrisse um relatorio com window.open perde a
@@ -91,7 +92,7 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "script-src 'self' 'unsafe-inline'" + (producao ? "" : " 'unsafe-eval'"),
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com https://picsum.photos",
               "font-src 'self' data:",

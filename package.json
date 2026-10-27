@@ -8,7 +8,13 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+        "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "db:push": "dotenv -e .env.local -- drizzle-kit push",
+        "audit:prod": "npm audit --omit=dev --audit-level=high"
+  },
+  "engines": {
+    "node": ">=20.9"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
