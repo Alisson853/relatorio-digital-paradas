@@ -18,5 +18,8 @@ function semanaAtual() {
 export default async function AdminAtividadesPage() {
   if (!await ehEditor()) redirect("/");
   const { inicio, fim } = semanaAtual(); const [dados, usuarios] = await Promise.all([resumoSupervisor(inicio, fim), getDb().select().from(atividadeUsuarios).orderBy(asc(atividadeUsuarios.nome))]);
-  return <PainelAtividadesAdmin {...dados} usuarios={usuarios} inicio={inicio} fim={fim} />;
+  const token = process.env.ATIVIDADES_STATUS_TOKEN;
+  const site = process.env.NEXT_PUBLIC_SITE_URL ?? "https://relatorio-digital-paradas.vercel.app";
+  const statusUrl = token ? `${site}/api/atividades/status?formato=csv&token=${encodeURIComponent(token)}` : null;
+  return <PainelAtividadesAdmin {...dados} usuarios={usuarios} inicio={inicio} fim={fim} statusUrl={statusUrl} />;
 }
