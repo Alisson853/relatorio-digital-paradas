@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { PainelAtividadesAdmin } from "@/components/atividades/PainelAtividadesAdmin";
+import { ControleSemanalPlanejador } from "@/components/atividades/ControleSemanalPlanejador";
 import { ehEditor } from "@/lib/auth/session";
 import { resumoSupervisor } from "@/lib/atividades";
 import { getDb } from "@/lib/db";
@@ -21,5 +22,5 @@ export default async function AdminAtividadesPage() {
   const token = process.env.ATIVIDADES_STATUS_TOKEN;
   const site = process.env.NEXT_PUBLIC_SITE_URL ?? "https://relatorio-digital-paradas.vercel.app";
   const statusUrl = token ? `${site}/api/atividades/status?formato=csv&token=${encodeURIComponent(token)}` : null;
-  return <PainelAtividadesAdmin {...dados} usuarios={usuarios} inicio={inicio} fim={fim} statusUrl={statusUrl} />;
+  return <><ControleSemanalPlanejador programadas={dados.programadas} lancamentos={dados.lancamentos} inicio={inicio} fim={fim} /><PainelAtividadesAdmin {...dados} usuarios={usuarios} inicio={inicio} fim={fim} statusUrl={statusUrl} /></>;
 }

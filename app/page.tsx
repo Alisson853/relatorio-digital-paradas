@@ -39,7 +39,7 @@ export default async function DashboardPage() {
               segunda linha. Do sm pra cima voltam a se agrupar a direita, ao
               lado da marca, como sempre foram. */}
           <nav aria-label="Ações principais" className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end sm:gap-3">
-            <HeaderAction href="/atividades" icon={ClipboardClock} className="flex-1 sm:flex-none">Atividades Semanais</HeaderAction>
+            <HeaderAction href="/lancamento" icon={ClipboardClock} className="flex-1 sm:flex-none">Lançamento de Horas</HeaderAction>
             <HeaderAction href="/historico" icon={LineChart} className="flex-1 sm:flex-none">Histórico</HeaderAction>
             <EditorOnly>
               <HeaderAction href="/pendencias" icon={ClipboardList} className="flex-1 sm:flex-none">Pendências</HeaderAction>
