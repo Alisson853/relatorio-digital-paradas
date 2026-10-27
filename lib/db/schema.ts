@@ -1,4 +1,4 @@
-import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import type { CaminhoCriticoItem, GraficosData, Kpis, Pendencia, ResultadoFinal, Servico, TimelineEvento } from "@/lib/types";
 
 export const paradas = pgTable("paradas", {
@@ -86,3 +86,103 @@ export const rateLimits = pgTable("rate_limits", {
   contagem: integer("contagem").notNull().default(0),
   janelaInicio: timestamp("janela_inicio", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Módulo Atividades Semanais -------------------------------------------------
+// Estas tabelas não compartilham dados com o relatório de Paradas. Assim uma
+// importação de programação ou lançamento de horas jamais altera o relatório
+// digital já em operação.
+export const atividadeUsuarios = pgTable(
+  "atividade_usuarios",
+  {
+    id: text("id").primaryKey(),
+    identificador: text("identificador").notNull(), // RE ou usuário do terceiro
+    nome: text("nome").notNull(),
+    oficina: text("oficina").notNull().default(""),
+    funcao: text("funcao").notNull().default(""),
+    perfil: text("perfil").notNull().default("funcionario"),
+    ativo: boolean("ativo").notNull().default(true),
+    criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+    atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("atividade_usuarios_identificador_idx").on(table.identificador)]
+);
+
+export const atividadeImportacoes = pgTable("atividade_importacoes", {
+  id: text("id").primaryKey(),
+  mes: integer("mes").notNull(),
+  ano: integer("ano").notNull(),
+  arquivo: text("arquivo").notNull(),
+  linhasLidas: integer("linhas_lidas").notNull().default(0),
+  linhasImportadas: integer("linhas_importadas").notNull().default(0),
+  importadoPor: text("importado_por").notNull(),
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const atividadeProgramacoes = pgTable(
+  "atividade_programacoes",
+  {
+    id: text("id").primaryKey(),
+    chave: text("chave").notNull(), // OS + executante normalizado + data
+    importacaoId: text("importacao_id").references(() => atividadeImportacoes.id, { onDelete: "set null" }),
+    statusPlanilha: text("status_planilha").notNull().default("Pendente"),
+    data: text("data").notNull(), // yyyy-mm-dd, sempre America/Sao_Paulo
+    dia: integer("dia").notNull(),
+    equipamento: text("equipamento").notNull().default(""),
+    descricao: text("descricao").notNull().default(""),
+    os: text("os").notNull(),
+    tipoServico: text("tipo_servico").notNull().default(""),
+    tempoPrevistoMinutos: integer("tempo_previsto_minutos").notNull().default(0),
+    oficina: text("oficina").notNull().default(""),
+    executante: text("executante").notNull(),
+    executanteNormalizado: text("executante_normalizado").notNull(),
+    prioridade: text("prioridade").notNull().default(""),
+    justificativaPlanilha: text("justificativa_planilha").notNull().default(""),
+    cancelado: boolean("cancelado").notNull().default(false),
+    atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("atividade_programacoes_chave_idx").on(table.chave),
+    index("atividade_programacoes_data_executante_idx").on(table.data, table.executanteNormalizado),
+    index("atividade_programacoes_status_idx").on(table.statusPlanilha),
+  ]
+);
+
+export const atividadeLancamentos = pgTable(
+  "atividade_lancamentos",
+  {
+    id: text("id").primaryKey(),
+    programacaoId: text("programacao_id").notNull().references(() => atividadeProgramacoes.id, { onDelete: "cascade" }),
+    usuarioId: text("usuario_id").notNull().references(() => atividadeUsuarios.id, { onDelete: "restrict" }),
+    data: text("data").notNull(),
+    inicioMinutos: integer("inicio_minutos").notNull(),
+    fimMinutos: integer("fim_minutos").notNull(),
+    minutos: integer("minutos").notNull(),
+    observacao: text("observacao").notNull().default(""),
+    status: text("status").notNull().default("Andamento"),
+    justificativa: text("justificativa").notNull().default(""),
+    aprovadoPor: text("aprovado_por"),
+    aprovadoEm: timestamp("aprovado_em", { withTimezone: true }),
+    exportadoEm: timestamp("exportado_em", { withTimezone: true }),
+    criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+    atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("atividade_lancamentos_usuario_data_idx").on(table.usuarioId, table.data),
+    index("atividade_lancamentos_programacao_idx").on(table.programacaoId),
+    index("atividade_lancamentos_aprovacao_idx").on(table.aprovadoEm, table.exportadoEm),
+  ]
+);
+
+export const atividadeAuditoria = pgTable(
+  "atividade_auditoria",
+  {
+    id: text("id").primaryKey(),
+    ator: text("ator").notNull(),
+    acao: text("acao").notNull(),
+    entidade: text("entidade").notNull(),
+    entidadeId: text("entidade_id").notNull(),
+    detalhe: jsonb("detalhe").$type<Record<string, unknown>>().notNull().default({}),
+    criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("atividade_auditoria_entidade_idx").on(table.entidade, table.entidadeId)]
+);
