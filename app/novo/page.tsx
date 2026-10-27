@@ -213,14 +213,16 @@ function FormSection({
   lead?: boolean;
   children: React.ReactNode;
 }) {
+  const titleId = `secao-${numero}`;
   // Cabeçalho vira uma faixa própria (levemente tingida, separada por
   // borda) em vez de dividir o mesmo bloco de padding do conteúdo — cada
   // seção lê como um módulo com título fixo no topo, não um texto solto
   // acima de um monte de campos.
   return (
-    <section className={cn("overflow-hidden rounded-3xl border bg-white shadow-sm", lead ? "border-brand-200" : "border-slate-200")}>
-      <div className={cn("flex items-start gap-3 border-b px-6 py-5 sm:px-8", lead ? "border-brand-100 bg-brand-50/60" : "border-slate-100 bg-slate-50/70")}>
+    <section aria-labelledby={titleId} className={cn("overflow-hidden rounded-3xl border bg-white shadow-sm", lead ? "border-brand-200" : "border-slate-200")}>
+      <div className={cn("flex items-start gap-3 border-b px-4 py-4 sm:px-8 sm:py-5", lead ? "border-brand-100 bg-brand-50/60" : "border-slate-100 bg-slate-50/70")}>
         <span
+          aria-hidden="true"
           className={cn(
             "label-tecnico flex flex-none items-center justify-center rounded-lg font-bold text-white",
             lead ? "h-10 w-10 bg-brand-700 text-base" : "h-9 w-9 bg-brand-600 text-sm"
@@ -228,12 +230,12 @@ function FormSection({
         >
           {String(numero).padStart(2, "0")}
         </span>
-        <div>
-          <h2 className={cn("font-bold text-slate-900", lead ? "text-xl" : "text-lg")}>{titulo}</h2>
-          <p className="text-sm text-slate-500">{descricao}</p>
+        <div className="min-w-0">
+          <h2 id={titleId} className={cn("font-bold text-slate-900", lead ? "text-xl" : "text-lg")}>{titulo}</h2>
+          <p className="text-sm text-slate-600">{descricao}</p>
         </div>
       </div>
-      <div className="p-6 sm:p-8">{children}</div>
+      <div className="p-4 sm:p-8">{children}</div>
     </section>
   );
 }
@@ -246,7 +248,7 @@ function FormSection({
 function DivisorGrupo({ rotulo }: { rotulo: string }) {
   return (
     <div className="flex items-center gap-3 pt-4">
-      <span className="label-tecnico flex-none text-[10px] font-bold text-slate-400">{rotulo}</span>
+      <span className="label-tecnico flex-none text-[10px] font-bold text-slate-500">{rotulo}</span>
       <div className="h-px flex-1 bg-slate-200" />
     </div>
   );
@@ -257,9 +259,9 @@ function AddButton({ onClick, label }: { onClick: () => void; label: string }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-1.5 rounded-xl border-2 border-dashed border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-500 transition-colors hover:border-brand-400 hover:text-brand-600"
+      className="flex min-h-11 items-center gap-1.5 rounded-xl border-2 border-dashed border-slate-300 px-4 text-sm font-bold text-slate-600 transition-colors hover:border-brand-400 hover:text-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
     >
-      <Plus size={15} />
+      <Plus size={15} aria-hidden="true" />
       {label}
     </button>
   );
@@ -294,6 +296,9 @@ function NovaParadaForm() {
   const [planejadoRealizado, setPlanejadoRealizado] = useState(PLANEJADO_REALIZADO_PADRAO);
   const [resumoFinalCustom, setResumoFinalCustom] = useState("");
   const [erro, setErro] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const salvandoRef = useRef(false);
+  const erroRef = useRef<HTMLDivElement>(null);
   // Versão do relatório (atualizadoEm, epoch ms) no momento em que este
   // formulário carregou os dados pra edição — mandada de volta em saveParada
   // pra recusar a gravação se alguém mais (ex: a Captura Rápida) mudou o
@@ -324,6 +329,10 @@ function NovaParadaForm() {
   // Nomes já usados como responsável em outros relatórios — só para sugerir
   // no autocomplete (ver TextField.suggestions); nunca restringe o campo.
   const [responsaveisConhecidos, setResponsaveisConhecidos] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (erro) erroRef.current?.focus({ preventScroll: true });
+  }, [erro]);
 
   useEffect(() => {
     listHistoricoNaoFeito().then(setHistoricoNaoFeito);
@@ -644,6 +653,7 @@ function NovaParadaForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (salvandoRef.current) return;
     setConflitoAoSalvar(false);
 
     if (!nome.trim() || !maquina.trim() || !data || !responsavel.trim()) {
@@ -665,6 +675,8 @@ function NovaParadaForm() {
       }
     }
     setErro("");
+    salvandoRef.current = true;
+    setSalvando(true);
 
     // Id novo leva sufixo aleatorio (ver sufixoAleatorio). editId preserva o id
     // de quem ja existe: mudar o id de um relatorio publicado invalidaria os QR
@@ -750,10 +762,20 @@ function NovaParadaForm() {
       resultadoFinal,
     };
 
-    const resultado = await saveParada(parada, editId ? (atualizadoEmCarregadoRef.current ?? undefined) : undefined);
+    let resultado;
+    try {
+      resultado = await saveParada(parada, editId ? (atualizadoEmCarregadoRef.current ?? undefined) : undefined);
+    } catch {
+      setErro("Não foi possível salvar o relatório. Verifique a conexão e tente novamente.");
+      salvandoRef.current = false;
+      setSalvando(false);
+      return;
+    }
     if (!resultado.ok) {
       setErro(resultado.erro || "Não foi possível salvar o relatório.");
       setConflitoAoSalvar(!!resultado.conflito);
+      salvandoRef.current = false;
+      setSalvando(false);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -795,10 +817,10 @@ function NovaParadaForm() {
   if (notFound) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50 px-6 text-center">
-        <AlertCircle size={28} className="text-warning-600" />
+        <AlertCircle size={28} className="text-warning-600" aria-hidden="true" />
         <h1 className="text-lg font-bold text-slate-900">Relatório não encontrado</h1>
         <p className="max-w-sm text-sm text-slate-500">Este relatório não existe neste navegador ou já foi excluído.</p>
-        <Link href="/" className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
+        <Link href="/" className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-bold text-white hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
           Voltar ao Dashboard
         </Link>
       </div>
@@ -807,16 +829,16 @@ function NovaParadaForm() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-5xl items-center gap-3 px-6 py-5 sm:px-10">
-          <Link href="/" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700">
-            <ArrowLeft size={17} />
+      <header className="border-b border-slate-200 bg-white sm:sticky sm:top-0 sm:z-30 sm:bg-white/90 sm:backdrop-blur">
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-4 sm:px-10 sm:py-5">
+          <Link href="/" aria-label="Voltar ao painel" className="flex h-10 w-10 flex-none items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
+            <ArrowLeft size={18} aria-hidden="true" />
           </Link>
-          <Image src="/santher-logo-azul.png" alt="Santher" width={110} height={29} className="h-7 w-auto" />
+          <Image src="/santher-logo-azul.png" alt="Santher" width={110} height={29} className="hidden h-7 w-auto sm:block" />
           <div className="hidden h-8 w-px bg-slate-200 sm:block" />
-          <div className="hidden sm:block">
-            <p className="text-sm font-bold leading-none text-slate-900">{editId ? "Editar Relatório" : "Alimentar Novo Relatório"}</p>
-            <p className="mt-1 text-xs font-medium text-slate-400">
+          <div className="min-w-0">
+            <h1 className="truncate text-sm font-bold leading-none text-slate-900">{editId ? "Editar Relatório" : "Alimentar Novo Relatório"}</h1>
+            <p className="mt-1 line-clamp-2 text-xs font-medium text-slate-500 sm:line-clamp-1">
               {editId ? "Alterações são salvas neste navegador." : "Rápido: fotos, OS, motivos e pendências. O resto é opcional."}
             </p>
           </div>
@@ -825,27 +847,27 @@ function NovaParadaForm() {
 
       <StatusConexao />
 
-      <form onSubmit={handleSubmit} className="mx-auto max-w-5xl space-y-6 px-6 py-10 sm:px-10">
+      <form onSubmit={handleSubmit} className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-10 sm:py-10">
         {draftDisponivel && (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm">
+          <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm">
             <div className="flex items-center gap-2 font-semibold text-brand-700">
-              <History size={16} />
+              <History size={16} aria-hidden="true" />
               Encontramos um rascunho não salvo deste formulário. Deseja restaurar?
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={restaurarRascunho}
-                className="rounded-lg bg-brand-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-brand-700"
+                className="min-h-10 rounded-lg bg-brand-600 px-4 text-xs font-bold text-white hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
               >
                 Restaurar
               </button>
               <button
                 type="button"
                 onClick={descartarRascunho}
-                className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-800"
+                className="flex min-h-10 items-center gap-1 rounded-lg px-3 text-xs font-bold text-slate-600 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
               >
-                <X size={13} />
+                <X size={13} aria-hidden="true" />
                 Descartar
               </button>
             </div>
@@ -853,16 +875,16 @@ function NovaParadaForm() {
         )}
 
         {erro && (
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-danger-100 bg-danger-100/60 px-4 py-3 text-sm font-semibold text-danger-600">
+          <div ref={erroRef} tabIndex={-1} role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-danger-100 bg-danger-100/60 px-4 py-3 text-sm font-semibold text-danger-600 outline-none">
             <div className="flex flex-1 items-center gap-2">
-              <AlertCircle size={16} />
+              <AlertCircle size={16} aria-hidden="true" />
               {erro}
             </div>
             {conflitoAoSalvar && (
               <button
                 type="button"
                 onClick={() => window.location.reload()}
-                className="flex-none rounded-lg bg-danger-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-danger-600/90"
+                className="min-h-10 flex-none rounded-lg bg-danger-600 px-4 text-xs font-bold text-white hover:bg-danger-600/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-600"
               >
                 Recarregar página
               </button>
@@ -920,7 +942,7 @@ function NovaParadaForm() {
                 {importando ? "Importando..." : "Importar .xlsx"}
               </button>
             </div>
-            {importResultado && <p className="mt-2.5 text-xs font-semibold text-brand-700">{importResultado}</p>}
+            {importResultado && <p role="status" className="mt-2.5 text-xs font-semibold text-brand-700">{importResultado}</p>}
           </div>
 
           {servicosIncompletos.length > 0 && (
@@ -1024,26 +1046,10 @@ function NovaParadaForm() {
         >
           <div className="space-y-3">
             {planejadoRealizado.map((etapa, i) => (
-              <div key={etapa.etapa} className="grid grid-cols-3 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-sm font-bold text-slate-700">{etapa.etapa}</p>
-                <input
-                  type="number"
-                  min={0}
-                  step={0.1}
-                  value={etapa.planejado}
-                  onChange={(e) => setPlanejadoRealizado((prev) => prev.map((p, idx) => (idx === i ? { ...p, planejado: Number(e.target.value) || 0 } : p)))}
-                  placeholder="Planejado (h)"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
-                />
-                <input
-                  type="number"
-                  min={0}
-                  step={0.1}
-                  value={etapa.realizado}
-                  onChange={(e) => setPlanejadoRealizado((prev) => prev.map((p, idx) => (idx === i ? { ...p, realizado: Number(e.target.value) || 0 } : p)))}
-                  placeholder="Realizado (h)"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
-                />
+              <div key={etapa.etapa} className="grid grid-cols-2 items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-3">
+                <p className="col-span-2 text-sm font-bold text-slate-700 sm:col-span-1 sm:pb-2.5">{etapa.etapa}</p>
+                <label className="block"><span className="mb-1 block text-xs font-semibold text-slate-600">Planejado (h)</span><input type="number" inputMode="decimal" min={0} step={0.1} value={etapa.planejado} onChange={(e) => setPlanejadoRealizado((prev) => prev.map((p, idx) => (idx === i ? { ...p, planejado: Number(e.target.value) || 0 } : p)))} className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100" /></label>
+                <label className="block"><span className="mb-1 block text-xs font-semibold text-slate-600">Realizado (h)</span><input type="number" inputMode="decimal" min={0} step={0.1} value={etapa.realizado} onChange={(e) => setPlanejadoRealizado((prev) => prev.map((p, idx) => (idx === i ? { ...p, realizado: Number(e.target.value) || 0 } : p)))} className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100" /></label>
               </div>
             ))}
           </div>
@@ -1078,8 +1084,8 @@ function NovaParadaForm() {
           <LinkButton href="/" variant="ghost">
             Cancelar
           </LinkButton>
-          <Button type="submit" variant="primary">
-            {editId ? "Salvar Alterações" : "Salvar e Visualizar Relatório"}
+          <Button type="submit" variant="primary" disabled={salvando}>
+            {salvando ? "Salvando..." : editId ? "Salvar Alterações" : "Salvar e Visualizar Relatório"}
           </Button>
         </div>
 
@@ -1088,8 +1094,8 @@ function NovaParadaForm() {
             <LinkButton href="/" variant="ghost" className="flex-none">
               Cancelar
             </LinkButton>
-            <Button type="submit" variant="primary" className="flex-1 shadow-[0_4px_12px_rgba(27,77,153,0.25)]">
-              {editId ? "Salvar Alterações" : "Salvar Relatório"}
+            <Button type="submit" variant="primary" disabled={salvando} className="flex-1 shadow-[0_4px_12px_rgba(27,77,153,0.25)]">
+              {salvando ? "Salvando..." : editId ? "Salvar Alterações" : "Salvar Relatório"}
             </Button>
           </div>
         </div>
@@ -1116,7 +1122,7 @@ export default function NovaParadaPage() {
             descricao="Esta área é só para quem alimenta os relatórios. Digite a senha para continuar."
           />
         </div>
-        <Link href="/" className="text-sm font-semibold text-slate-400 hover:text-slate-700">
+        <Link href="/" className="text-sm font-semibold text-slate-600 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
           Voltar ao Dashboard
         </Link>
       </div>
