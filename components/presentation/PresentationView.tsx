@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { ParadaCompleta } from "@/lib/types";
 import { SECTIONS, type SectionMeta } from "@/lib/sections";
 import { cn } from "@/lib/utils";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { parseHoras } from "@/lib/derive";
 import { Sidebar } from "./Sidebar";
 import { FitToScreen } from "./FitToScreen";
@@ -21,6 +22,7 @@ import { ResultSection } from "./sections/ResultSection";
 import { PrintReport } from "./PrintReport";
 
 export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qrDataUrl?: string }) {
+  const reduzirMovimento = useReducedMotion();
   const [presentationMode, setPresentationMode] = useState(false);
   const [sidebarCompacta, setSidebarCompacta] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -269,10 +271,10 @@ export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qr
         <AnimatePresence mode="wait">
           <motion.div
             key={sections[activeIndex].id}
-            initial={{ opacity: 0, scale: 1.015 }}
+            initial={reduzirMovimento ? { opacity: 0 } : { opacity: 0, scale: 1.015 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.985 }}
-            transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+            exit={reduzirMovimento ? { opacity: 0 } : { opacity: 0, scale: 0.985 }}
+            transition={{ duration: reduzirMovimento ? 0.01 : 0.55, ease: [0.16, 1, 0.3, 1] }}
             className="h-full w-full overflow-hidden"
           >
             <FitToScreen>{sectionNodes[activeIndex]}</FitToScreen>
@@ -280,39 +282,45 @@ export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qr
         </AnimatePresence>
 
         <div className="pointer-events-none fixed inset-x-0 bottom-6 flex items-center justify-center gap-3 px-4">
-          <div className="pointer-events-auto flex items-center gap-3 rounded-full bg-black/50 px-4 py-2.5 backdrop-blur-md">
+          <nav aria-label="Navegação da apresentação" className="pointer-events-auto flex items-center gap-2 rounded-full bg-black/60 px-2 py-1.5 backdrop-blur-md">
             <button
+              type="button"
               onClick={() => goTo(activeIndex - 1)}
               disabled={activeIndex === 0}
-              className="text-white transition-opacity disabled:opacity-25"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-white transition-colors hover:bg-white/10 disabled:opacity-25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               aria-label="Seção anterior"
             >
-              <ChevronLeft size={18} />
+              <ChevronLeft size={20} aria-hidden="true" />
             </button>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center">
               {sections.map((s, i) => (
                 <button
+                  type="button"
                   key={s.id}
                   onClick={() => goTo(i)}
                   aria-label={s.label}
-                  className={cn("h-1.5 rounded-full transition-all duration-300", i === activeIndex ? "w-6 bg-white" : "w-1.5 bg-white/30")}
-                />
+                  aria-current={i === activeIndex ? "step" : undefined}
+                  title={s.label}
+                  className="group flex h-6 items-center justify-center px-1 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white"
+                ><span className={cn("block h-1.5 rounded-full transition-all duration-300", i === activeIndex ? "w-6 bg-white" : "w-1.5 bg-white/40 group-hover:bg-white/70")} /></button>
               ))}
             </div>
             <button
+              type="button"
               onClick={() => goTo(activeIndex + 1)}
               disabled={activeIndex === sections.length - 1}
-              className="text-white transition-opacity disabled:opacity-25"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-white transition-colors hover:bg-white/10 disabled:opacity-25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               aria-label="Próxima seção"
             >
-              <ChevronRight size={18} />
+              <ChevronRight size={20} aria-hidden="true" />
             </button>
-          </div>
+          </nav>
           <button
+            type="button"
             onClick={exitPresentation}
-            className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-black/50 px-4 py-2.5 text-xs font-bold text-white backdrop-blur-md transition-colors hover:bg-black/70"
+            className="pointer-events-auto flex min-h-10 items-center gap-1.5 rounded-full bg-black/60 px-4 text-xs font-bold text-white backdrop-blur-md transition-colors hover:bg-black/75 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
-            <X size={14} />
+            <X size={14} aria-hidden="true" />
             Sair (Esc)
           </button>
         </div>
@@ -335,8 +343,8 @@ export function PresentationView({ data, qrDataUrl }: { data: ParadaCompleta; qr
         />
         <main className={cn("presentation-scroll pb-20 transition-[padding] duration-300 lg:pb-0", sidebarCompacta ? "lg:pl-20" : "lg:pl-72")}>
           <div className="sticky top-0 z-20 hidden items-center justify-between border-b border-slate-200 bg-white/90 px-8 py-2.5 text-xs backdrop-blur lg:flex">
-            <div className="flex items-center gap-3 text-slate-500"><b className="text-slate-800">{data.resumo.maquina}</b><span>{new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium" }).format(new Date(`${data.resumo.data}T12:00:00`))}</span></div>
-            <span className={cn("rounded-full px-3 py-1 font-bold", data.resumo.status === "concluida" ? "bg-success-50 text-success-700" : data.resumo.status === "ressalvas" ? "bg-warning-50 text-warning-800" : "bg-brand-50 text-brand-700")}>{data.resumo.status === "concluida" ? "Concluída" : data.resumo.status === "ressalvas" ? "Com ressalvas" : "Em andamento"}</span>
+            <div className="flex items-center gap-3 text-slate-600"><b className="text-slate-800">{data.resumo.maquina}</b><span>{new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium" }).format(new Date(`${data.resumo.data}T12:00:00`))}</span></div>
+            <StatusBadge status={data.resumo.status} className="font-bold" />
           </div>
           {sectionNodes}
         </main>
