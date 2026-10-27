@@ -18,8 +18,6 @@ import { listarEventosOperacionaisAbertos, registrarEventoOperacional, resolverE
 import { escreverComVersao, upsertComVersao } from "@/lib/db/paradas-repo";
 import { aplicarOperacoesNosServicos, listarOperacoesServico, salvarOperacaoServico } from "@/lib/db/servico-operacoes";
 import {
-  aplicarCapturaFoto,
-  aplicarMarcarStatus,
   aplicarNaoFeito,
   aplicarNovoEventoRapido,
   aplicarNovoServicoRapido,

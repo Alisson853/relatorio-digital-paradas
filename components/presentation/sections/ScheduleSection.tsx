@@ -1,7 +1,6 @@
 "use client";
 
 import { AlertTriangle, Clock3, Route, Timer } from "lucide-react";
-import { parseHoras } from "@/lib/derive";
 import { candidatasCriticas, detectarConflitosProgramacao, formatarHorario, servicosProgramados } from "@/lib/programacao";
 import type { Servico } from "@/lib/types";
 

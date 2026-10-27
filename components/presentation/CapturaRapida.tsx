@@ -1295,6 +1295,9 @@ function CapturaRapidaConteudo({ id, onSessaoExpirada }: { id: string; onSessaoE
       etapa,
       nomeArquivo,
       blob,
+      // Esta função só é chamada por uma ação explícita de captura do usuário;
+      // o timestamp não faz parte da renderização do componente.
+      // eslint-disable-next-line react-hooks/purity
       criadoEm: Date.now(),
       sincronizacao: "pendente",
       tentativas: 0,
@@ -2018,12 +2021,19 @@ export function CapturaRapida({ id }: { id: string }) {
 
   useEffect(() => {
     let ativa = true;
-    if (!isEditor) {
-      setSessaoConfirmada(false);
-      return () => { ativa = false; };
-    }
-    setSessaoConfirmada(null);
-    sessaoAtiva().then((valida) => { if (ativa) setSessaoConfirmada(valida); }).catch(() => { if (ativa) setSessaoConfirmada(false); });
+    void Promise.resolve().then(async () => {
+      if (!isEditor) {
+        if (ativa) setSessaoConfirmada(false);
+        return;
+      }
+      if (ativa) setSessaoConfirmada(null);
+      try {
+        const valida = await sessaoAtiva();
+        if (ativa) setSessaoConfirmada(valida);
+      } catch {
+        if (ativa) setSessaoConfirmada(false);
+      }
+    });
     return () => { ativa = false; };
   }, [isEditor]);
 

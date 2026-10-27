@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ScrollText, Search, SearchX } from "lucide-react";
 import type { ParadaResumo, StatusGeral } from "@/lib/types";
@@ -24,7 +24,10 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
   const { isEditor } = useEditorMode();
   const [busca, setBusca] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<"todos" | StatusGeral>("todos");
-  const [maquinaFiltro, setMaquinaFiltro] = useState("todas");
+  const [maquinaFiltro, setMaquinaFiltro] = useState(() => {
+    if (typeof window === "undefined") return "todas";
+    return new URLSearchParams(window.location.search).get("maquina")?.toUpperCase() || "todas";
+  });
   const [dataDe, setDataDe] = useState("");
   const [dataAte, setDataAte] = useState("");
 
@@ -44,17 +47,6 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
     });
     return contagem;
   }, [paradas]);
-
-  // Abre já filtrado quando o link vem com ?maquina=MP09 — é o que deixa um
-  // QR code colado na própria máquina levar direto pras paradas dela, sem
-  // precisar tocar na aba depois de abrir. Lido do window.location (não
-  // useSearchParams) pelo mesmo motivo do "edit" em /novo: evita o Suspense
-  // boundary que esse hook exige, mantendo o padrão já usado no resto do app.
-  useEffect(() => {
-    const daUrl = new URLSearchParams(window.location.search).get("maquina");
-    if (daUrl) setMaquinaFiltro(daUrl.toUpperCase());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Escolher uma aba também atualiza a URL — assim o link da tela (pra
   // favoritar, mandar por WhatsApp, ou virar QR code) sempre reflete o que
