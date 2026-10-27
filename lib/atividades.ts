@@ -79,7 +79,8 @@ export const sessaoAtividade = cache(async (): Promise<SessaoAtividade | null> =
   if (!bruto) return null;
   try {
     const payload = JSON.parse(bruto) as { id?: string; expiraEm?: number };
-    if (!payload.id || !Number.isFinite(payload.expiraEm) || Date.now() > payload.expiraEm) return null;
+    const expiraEm = payload.expiraEm;
+    if (!payload.id || !Number.isFinite(expiraEm) || expiraEm === undefined || Date.now() > expiraEm) return null;
     const usuario = await getDb().select().from(atividadeUsuarios).where(and(eq(atividadeUsuarios.id, payload.id), eq(atividadeUsuarios.ativo, true))).limit(1);
     const u = usuario[0];
     if (!u) return null;

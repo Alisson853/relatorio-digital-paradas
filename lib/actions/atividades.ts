@@ -5,7 +5,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { atividadeImportacoes, atividadeLancamentos, atividadeProgramacoes, atividadeUsuarios } from "@/lib/db/schema";
 import { getDb } from "@/lib/db";
-import { abrirSessaoAtividade, chaveProgramacao, existeSobreposicao, fecharSessaoAtividade, horaParaMinutos, identificadorTerceiro, listarProgramacaoDoUsuario, minutosParaHora, normalizarPessoa, osNumerica, registrarAuditoria, sessaoAtividade, textoLimpo, atualizarStatusProgramacao } from "@/lib/atividades";
+import { abrirSessaoAtividade, chaveProgramacao, existeSobreposicao, fecharSessaoAtividade, horaParaMinutos, identificadorTerceiro, minutosParaHora, normalizarPessoa, osNumerica, registrarAuditoria, sessaoAtividade, textoLimpo, atualizarStatusProgramacao } from "@/lib/atividades";
 import { ehEditor } from "@/lib/auth/session";
 import { consumirLimite, identificarRequisitante, limiteExcedidoMsg } from "@/lib/rate-limit";
 

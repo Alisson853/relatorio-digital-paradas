@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ClipboardClock, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import { AtividadesArea } from "@/components/atividades/AtividadesArea";
 import { listarProgramacaoDoUsuario, sessaoAtividade } from "@/lib/atividades";
 import { ehEditor } from "@/lib/auth/session";

@@ -6,7 +6,7 @@ import * as XLSX from "xlsx";
 import { aprovarLancamentos, exportarMantec, importarProgramacao, salvarUsuarioAtividade } from "@/lib/actions/atividades";
 import { Button } from "@/components/ui/Button";
 
-type Lancamento = { id: string; data: string; inicioMinutos: number; fimMinutos: number; minutos: number; status: string; justificativa: string; aprovadoEm: string | null; exportadoEm: string | null; programacaoId: string };
+type Lancamento = { id: string; data: string; inicioMinutos: number; fimMinutos: number; minutos: number; status: string; justificativa: string; aprovadoEm: Date | null; exportadoEm: Date | null; programacaoId: string };
 type Programacao = { id: string; os: string; executante: string; descricao: string; data: string; statusPlanilha: string; cancelado: boolean };
 const hora = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 
