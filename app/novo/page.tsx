@@ -1084,7 +1084,7 @@ function NovaParadaForm() {
           <LinkButton href="/" variant="ghost">
             Cancelar
           </LinkButton>
-          <Button type="submit" variant="primary" disabled={salvando}>
+          <Button type="submit" variant="primary" loading={salvando}>
             {salvando ? "Salvando..." : editId ? "Salvar Alterações" : "Salvar e Visualizar Relatório"}
           </Button>
         </div>
@@ -1094,7 +1094,7 @@ function NovaParadaForm() {
             <LinkButton href="/" variant="ghost" className="flex-none">
               Cancelar
             </LinkButton>
-            <Button type="submit" variant="primary" disabled={salvando} className="flex-1 shadow-[0_4px_12px_rgba(27,77,153,0.25)]">
+            <Button type="submit" variant="primary" loading={salvando} className="flex-1 shadow-[0_4px_12px_rgba(27,77,153,0.25)]">
               {salvando ? "Salvando..." : editId ? "Salvar Alterações" : "Salvar Relatório"}
             </Button>
           </div>

@@ -19,10 +19,10 @@ export function statusLabel(status: string): string {
 
 export function statusColorClasses(status: string): string {
   const map: Record<string, string> = {
-    concluida: "bg-success-100 text-success-600",
-    concluido: "bg-success-100 text-success-600",
-    ressalvas: "bg-warning-100 text-warning-600",
-    atrasado: "bg-danger-100 text-danger-600",
+    concluida: "bg-success-100 text-success-700",
+    concluido: "bg-success-100 text-success-700",
+    ressalvas: "bg-warning-100 text-warning-700",
+    atrasado: "bg-danger-100 text-danger-700",
     em_andamento: "bg-brand-100 text-brand-700",
     pendente: "bg-slate-200 text-slate-600",
   };
@@ -36,9 +36,9 @@ export function statusDotClasses(status: string): string {
     ressalvas: "bg-warning-600",
     atrasado: "bg-danger-600",
     em_andamento: "bg-brand-500",
-    pendente: "bg-slate-400",
+    pendente: "bg-slate-500",
   };
-  return map[status] ?? "bg-slate-400";
+  return map[status] ?? "bg-slate-500";
 }
 
 export function formatDate(iso: string): string {
