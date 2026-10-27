@@ -60,34 +60,38 @@ interface Props {
 }
 
 export function ServicoRowEditor({ item, index, onChange, onRemove, onDuplicate, historicoNaoFeito, responsaveisSugeridos }: Props) {
+  const numero = index + 1;
+  const botaoAcao = "flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600";
   return (
-    <div className="relative rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
-      <div className="absolute right-3 top-3 flex items-center gap-1">
+    <div role="group" aria-label={`Serviço OS ${numero}`} className="relative rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+      <div className="absolute right-2 top-2 flex items-center gap-0.5">
         <button
           type="button"
           onClick={onDuplicate}
-          aria-label="Duplicar serviço"
-          className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-brand-100 hover:text-brand-600"
+          aria-label={`Duplicar serviço OS ${numero}`}
+          title="Duplicar serviço"
+          className={`${botaoAcao} hover:bg-brand-100 hover:text-brand-600`}
         >
-          <Copy size={14} />
+          <Copy size={16} aria-hidden="true" />
         </button>
         <button
           type="button"
           onClick={onRemove}
-          aria-label="Remover serviço"
-          className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-danger-100 hover:text-danger-600"
+          aria-label={`Remover serviço OS ${numero}`}
+          title="Remover serviço"
+          className={`${botaoAcao} hover:bg-danger-100 hover:text-danger-600`}
         >
-          <Trash2 size={14} />
+          <Trash2 size={16} aria-hidden="true" />
         </button>
       </div>
-      <p className="mb-3 text-xs font-bold text-brand-600">OS {index + 1}</p>
+      <p className="mb-3 text-xs font-bold text-brand-600">OS {numero}</p>
 
       {/* Estado atual DESTE serviço (marcado pelo celular) — diferente do
           alerta de histórico abaixo, que é sobre OUTRA parada. Só leitura:
           esse formulário não marca/desmarca, é a Captura Rápida que faz
           isso; aqui é só pra o coordenador ver sem precisar abrir o celular. */}
       {item.naoFeitoCategoria && (
-        <div className="mb-4 rounded-xl border border-danger-200 bg-danger-50 px-3 py-2.5">
+        <div role="note" className="mb-4 rounded-xl border border-danger-200 bg-danger-50 px-3 py-2.5">
           <p className="text-xs font-bold text-danger-800">Marcado em campo como não será feito — {item.naoFeitoCategoria}</p>
           {item.justificativaNaoFeito && <p className="mt-0.5 text-xs text-danger-700">{item.justificativaNaoFeito}</p>}
         </div>
@@ -98,8 +102,8 @@ export function ServicoRowEditor({ item, index, onChange, onRemove, onDuplicate,
           remanejar equipe) antes da parada começar, não só constatar em
           campo que de novo não foi feito. */}
       {historicoNaoFeito && (
-        <div className="mb-4 flex items-start gap-2 rounded-xl border border-warning-200 bg-warning-50 px-3 py-2.5">
-          <AlertTriangle size={15} className="mt-0.5 flex-none text-warning-600" />
+        <div role="note" className="mb-4 flex items-start gap-2 rounded-xl border border-warning-200 bg-warning-50 px-3 py-2.5">
+          <AlertTriangle size={15} className="mt-0.5 flex-none text-warning-700" aria-hidden="true" />
           <div className="min-w-0">
             <p className="text-xs font-bold text-warning-800">
               Não foi feito na parada &quot;{historicoNaoFeito.paradaNome}&quot; ({formatDateCompact(historicoNaoFeito.paradaData)}) — {historicoNaoFeito.categoria}
@@ -121,12 +125,12 @@ export function ServicoRowEditor({ item, index, onChange, onRemove, onDuplicate,
             onChange={(v) => onChange({ numeroOS: v })}
             placeholder={item.numeroOS === "Oportunidade" ? "Oportunidade" : "Ex: 53.298"}
           />
-          <label className="mt-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
+          <label className="mt-1 flex min-h-10 items-center gap-2 text-xs font-semibold text-slate-600">
             <input
               type="checkbox"
               checked={item.numeroOS === "Oportunidade"}
               onChange={(e) => onChange({ numeroOS: e.target.checked ? "Oportunidade" : "" })}
-              className="h-3.5 w-3.5 rounded border-slate-300 text-brand-600 focus:ring-brand-400"
+              className="h-5 w-5 flex-none rounded border-slate-300 text-brand-600 focus:ring-brand-400"
             />
             Oportunidade (sem nº de OS)
           </label>

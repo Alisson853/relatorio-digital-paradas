@@ -4,7 +4,7 @@ import { useId, type ChangeEvent, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 const baseInput =
-  "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100";
+  "min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base text-slate-800 outline-none transition-colors placeholder:text-slate-500 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 sm:text-sm";
 
 interface FieldWrapperProps {
   label: string;
@@ -16,9 +16,9 @@ interface FieldWrapperProps {
 function FieldWrapper({ label, required, className, children }: FieldWrapperProps) {
   return (
     <label className={cn("block", className)}>
-      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">
+      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">
         {label}
-        {required && <span className="ml-0.5 text-danger-600">*</span>}
+        {required && <><span aria-hidden="true" className="ml-0.5 text-danger-600">*</span><span className="sr-only"> (obrigatório)</span></>}
       </span>
       {children}
     </label>
@@ -47,6 +47,7 @@ export function TextField({ label, value, onChange, placeholder, required, class
         type={type}
         value={value}
         placeholder={placeholder}
+        aria-required={required || undefined}
         onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
         list={suggestions?.length ? datalistId : undefined}
         className={baseInput}
@@ -75,6 +76,7 @@ export function NumberField({ label, value, onChange, className, min = 0 }: Numb
     <FieldWrapper label={label} className={className}>
       <input
         type="number"
+        inputMode="decimal"
         min={min}
         value={Number.isNaN(value) ? "" : value}
         onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value === "" ? 0 : Number(e.target.value))}
