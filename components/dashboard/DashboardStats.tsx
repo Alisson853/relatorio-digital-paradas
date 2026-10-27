@@ -1,6 +1,12 @@
 import type { ParadaResumo } from "@/lib/types";
 import { cn, formatDateCompact, statusLabel } from "@/lib/utils";
 
+const STATUS_TEXT: Record<string, string> = {
+  concluida: "text-success-700",
+  ressalvas: "text-warning-700",
+  em_andamento: "text-brand-700",
+};
+
 // Leitura de instrumento, não cartão. Até o Bloco E2 esses números viviam
 // numa caixa branca com borda e sombra flutuando por cima do hero escuro —
 // exatamente a colisão que "pare de usar card pra tudo" pede pra eliminar:
@@ -11,10 +17,10 @@ function Indicador({ label, value, dot }: { label: string; value: number; dot: s
   return (
     <div className="flex-1">
       <div className="flex items-center gap-1.5">
-        <span className={cn("h-1.5 w-1.5 flex-none rounded-full", dot)} />
+        <span className={cn("h-1.5 w-1.5 flex-none rounded-full", dot)} aria-hidden="true" />
         <p className="label-tecnico text-[10px] font-bold text-brand-300">{label}</p>
       </div>
-      <p className="mt-1.5 text-2xl font-bold leading-none tracking-tight text-white sm:text-3xl">{value}</p>
+      <p className="mt-1.5 text-2xl font-bold leading-none tracking-tight text-white tabular-nums sm:text-3xl">{value}</p>
     </div>
   );
 }
@@ -36,7 +42,7 @@ export function DashboardStats({ paradas }: { paradas: ParadaResumo[] }) {
           não mais um número de card genérico. */}
       <div className="flex-none">
         <p className="label-tecnico text-[10px] font-bold text-brand-300">Paradas Registradas</p>
-        <p className="font-display mt-1.5 text-5xl font-semibold leading-none tracking-tight text-white sm:text-6xl">{total}</p>
+        <p className="font-display mt-1.5 text-5xl font-semibold leading-none tracking-tight text-white tabular-nums sm:text-6xl">{total}</p>
       </div>
 
       {/* Regra divisória em vez de borda de card — separa "o total" dos
@@ -53,19 +59,24 @@ export function DashboardStats({ paradas }: { paradas: ParadaResumo[] }) {
         <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
           <p className="label-tecnico text-[10px] font-bold text-brand-300">Comparativo recente</p>
           <p className="mt-1 text-sm font-bold text-white">Painel mensal: {paradasDoMes.length} parada(s) · {taxaConclusaoMes}% concluídas</p>
-          <p className="mt-2 text-xs leading-relaxed text-brand-200">Use o Histórico para comparar tempo, eficiência, pendências e recorrências antes de aprovar a próxima programação.</p>
-        </div>
-        <div className="rounded-2xl bg-white p-4 text-slate-900 shadow-xl">
-          <p className="label-tecnico text-[10px] font-bold text-slate-400">Últimos relatórios</p>
-          <div className="mt-3 space-y-2.5">
-            {relatoriosRecentes.length ? relatoriosRecentes.map((parada) => (
-              <div key={parada.id} className="border-b border-slate-100 pb-2.5 last:border-0 last:pb-0">
-                <div className="flex items-start justify-between gap-3 text-xs font-bold"><span className="min-w-0 truncate">{parada.maquina}</span><span className={cn("flex-none", parada.status === "concluida" ? "text-success-700" : parada.status === "ressalvas" ? "text-warning-700" : "text-brand-700")}>{statusLabel(parada.status)}</span></div>
-                <p className="mt-1 text-[10px] font-semibold text-slate-400">{formatDateCompact(parada.data)} · {parada.responsavel || "Sem responsável informado"}</p>
-              </div>
-            )) : <p className="text-xs font-semibold text-slate-400">Nenhum relatório registrado.</p>}
+          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label="Taxa de conclusão do mês" aria-valuemin={0} aria-valuemax={100} aria-valuenow={taxaConclusaoMes}>
+            <div className="h-full rounded-full bg-success-600 transition-[width] duration-500" style={{ width: `${taxaConclusaoMes}%` }} />
           </div>
+          <p className="mt-3 text-xs leading-relaxed text-brand-200">Use o Histórico para comparar tempo, eficiência, pendências e recorrências antes de aprovar a próxima programação.</p>
         </div>
+        <section aria-label="Últimos relatórios" className="rounded-2xl bg-white p-4 text-slate-900 shadow-xl">
+          <p className="label-tecnico text-[10px] font-bold text-slate-500">Últimos relatórios</p>
+          {relatoriosRecentes.length ? (
+            <ul className="mt-3 space-y-2.5">
+            {relatoriosRecentes.map((parada) => (
+              <li key={parada.id} className="border-b border-slate-100 pb-2.5 last:border-0 last:pb-0">
+                <div className="flex items-start justify-between gap-3 text-xs font-bold"><span className="min-w-0 truncate">{parada.maquina}</span><span className={cn("flex-none", STATUS_TEXT[parada.status] ?? "text-slate-600")}>{statusLabel(parada.status)}</span></div>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">{formatDateCompact(parada.data)} · {parada.responsavel || "Sem responsável informado"}</p>
+              </li>
+            ))}
+            </ul>
+          ) : <p className="mt-3 text-xs font-semibold text-slate-500">Nenhum relatório registrado.</p>}
+        </section>
       </div>
     </div>
   );

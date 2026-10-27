@@ -17,6 +17,8 @@ const STATUS_FILTROS: Array<{ value: "todos" | StatusGeral; label: string }> = [
   { value: "ressalvas", label: "Ressalvas" },
 ];
 
+const FOCO = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600";
+
 export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
   const router = useRouter();
   const { isEditor } = useEditorMode();
@@ -33,6 +35,14 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
     const vistos = new Set<string>();
     paradas.forEach((p) => vistos.add(codigoMaquina(p.maquina)));
     return Array.from(vistos).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [paradas]);
+
+  const contagemPorStatus = useMemo(() => {
+    const contagem: Record<string, number> = { todos: paradas.length };
+    paradas.forEach((parada) => {
+      contagem[parada.status] = (contagem[parada.status] ?? 0) + 1;
+    });
+    return contagem;
   }, [paradas]);
 
   // Abre já filtrado quando o link vem com ?maquina=MP09 — é o que deixa um
@@ -92,17 +102,30 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
     });
   }, [busca, statusFiltro, maquinaFiltro, dataDe, dataAte, paradas]);
 
+  const temFiltroAtivo = busca !== "" || statusFiltro !== "todos" || maquinaFiltro !== "todas" || dataDe !== "" || dataAte !== "";
+
+  function limparFiltros() {
+    setBusca("");
+    setStatusFiltro("todos");
+    setDataDe("");
+    setDataAte("");
+    selecionarMaquina("todas");
+  }
+
   return (
     <div>
       {maquinas.length > 1 && (
         // Aba de máquina separada da fileira de busca/status, mais acima —
         // é o agrupamento principal (qual máquina), os outros dois filtram
         // dentro do que a aba já escolheu.
-        <div className="no-scrollbar mb-4 flex gap-1.5 overflow-x-auto">
+        <div role="group" aria-label="Filtrar por máquina" className="no-scrollbar -mx-4 mb-4 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <button
+            type="button"
+            aria-pressed={maquinaFiltro === "todas"}
             onClick={() => selecionarMaquina("todas")}
             className={cn(
-              "flex-none rounded-full border px-4 py-2 text-xs font-bold transition-colors",
+              "min-h-11 flex-none rounded-full border px-4 text-xs font-bold transition-colors",
+              FOCO,
               maquinaFiltro === "todas" ? "border-brand-600 bg-brand-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
             )}
           >
@@ -117,8 +140,10 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
               )}
             >
               <button
+                type="button"
+                aria-pressed={maquinaFiltro === cod}
                 onClick={() => selecionarMaquina(cod)}
-                className={cn("px-4 py-2 text-xs font-bold", maquinaFiltro === cod ? "text-white" : "text-slate-600 hover:bg-slate-50")}
+                className={cn("min-h-11 px-4 text-xs font-bold", FOCO, maquinaFiltro === cod ? "text-white" : "text-slate-600 hover:bg-slate-50")}
               >
                 {cod}
               </button>
@@ -126,12 +151,14 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
                 <a
                   href={`/api/export/rtf/maquina/${cod}`}
                   title={`Baixar RTF com o QR code de ${cod} (colar no Mantec)`}
+                  aria-label={`Baixar RTF com o QR code de ${cod}`}
                   className={cn(
-                    "flex items-center border-l px-2.5 transition-colors",
-                    maquinaFiltro === cod ? "border-white/25 text-white/80 hover:bg-brand-700" : "border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+                    "flex min-w-11 items-center justify-center border-l transition-colors",
+                    FOCO,
+                    maquinaFiltro === cod ? "border-white/25 text-white/80 hover:bg-brand-700" : "border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
                   )}
                 >
-                  <ScrollText size={13} />
+                  <ScrollText size={14} aria-hidden="true" />
                 </a>
               )}
             </div>
@@ -139,50 +166,60 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
         </div>
       )}
 
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">
         <div className="relative flex-1">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={16} aria-hidden="true" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
           <input
+            type="search"
+            aria-label="Buscar paradas"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar por nome, máquina ou responsável"
-            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-700 shadow-sm outline-none placeholder:text-slate-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+            className="min-h-11 w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-700 shadow-sm outline-none placeholder:text-slate-500 focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
           />
         </div>
-        <div className="flex gap-2 rounded-xl border border-slate-200 bg-white p-2 text-xs font-semibold text-slate-600">
-          <label>De <input type="date" value={dataDe} onChange={(e) => setDataDe(e.target.value)} className="ml-1 bg-transparent outline-none" /></label>
-          <label className="border-l border-slate-200 pl-2">Até <input type="date" value={dataAte} onChange={(e) => setDataAte(e.target.value)} className="ml-1 bg-transparent outline-none" /></label>
+        <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-2 text-xs font-semibold text-slate-600 sm:flex">
+          <label className="flex items-center gap-1">De <input type="date" value={dataDe} onChange={(e) => setDataDe(e.target.value)} className={cn("min-h-9 min-w-0 flex-1 rounded bg-transparent", FOCO)} /></label>
+          <label className="flex items-center gap-1 border-l border-slate-200 pl-2">Até <input type="date" value={dataAte} onChange={(e) => setDataAte(e.target.value)} className={cn("min-h-9 min-w-0 flex-1 rounded bg-transparent", FOCO)} /></label>
         </div>
-        <div className="flex flex-none gap-1.5 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-          {STATUS_FILTROS.map((f) => (
+        <div role="group" aria-label="Filtrar por status" className="no-scrollbar flex flex-none gap-1.5 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+          {STATUS_FILTROS.map((f) => {
+            const ativo = statusFiltro === f.value;
+            return (
             <button
+              type="button"
               key={f.value}
+              aria-pressed={ativo}
               onClick={() => setStatusFiltro(f.value)}
               className={cn(
-                // Leva o chip de 28px para 36px de altura. A diretriz de toque
-                // pede 44px, mas o chip vive numa fila horizontal de quatro:
-                // 44 empurraria os ultimos para fora da tela do celular. 36 e
-                // o maior que cabe sem quebrar a fila, e ja tira o alvo da
-                // faixa em que o dedo erra.
-                "flex-none rounded-lg px-3.5 py-2.5 text-xs font-bold transition-colors",
-                statusFiltro === f.value ? "bg-brand-600 text-white" : "text-slate-500 hover:bg-slate-100"
+                "inline-flex min-h-10 flex-none items-center gap-1.5 rounded-lg px-3.5 text-xs font-bold transition-colors",
+                FOCO,
+                ativo ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-100"
               )}
             >
               {f.label}
+              <span className={cn("rounded-full px-1.5 py-px text-[10px] tabular-nums", ativo ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600")}>{contagemPorStatus[f.value] ?? 0}</span>
             </button>
-          ))}
+            );
+          })}
         </div>
       </div>
 
+      <div className="mb-5 flex min-h-6 items-center justify-between gap-3">
+        <p role="status" aria-live="polite" className="text-xs font-semibold text-slate-600">{filtradas.length} de {paradas.length} parada(s)</p>
+        {temFiltroAtivo && <button type="button" onClick={limparFiltros} className={cn("min-h-8 rounded px-2 text-xs font-bold text-brand-600 hover:text-brand-700", FOCO)}>Limpar filtros</button>}
+      </div>
+
       {filtradas.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-white py-20 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-            <SearchX size={22} />
+        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-white px-4 py-16 text-center sm:py-20">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+            <SearchX size={22} aria-hidden="true" />
           </div>
-          <p className="text-sm font-medium text-slate-400">Nenhuma parada encontrada com esses filtros.</p>
+          <p className="text-sm font-medium text-slate-600">Nenhuma parada encontrada com esses filtros.</p>
+          {temFiltroAtivo && <button type="button" onClick={limparFiltros} className={cn("min-h-10 rounded-lg px-3 text-sm font-bold text-brand-600 hover:text-brand-700", FOCO)}>Limpar filtros</button>}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
           {filtradas.map((parada, index) => (
             <ParadaCard
               key={parada.id}
