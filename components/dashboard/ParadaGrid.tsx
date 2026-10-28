@@ -198,7 +198,7 @@ export function ParadaGrid({ paradas }: { paradas: ParadaResumo[] }) {
       </div>
 
       <div className="mb-5 flex min-h-6 items-center justify-between gap-3">
-        <p role="status" aria-live="polite" className="text-xs font-semibold text-slate-600">{filtradas.length} de {paradas.length} parada(s)</p>
+        <p role="status" aria-live="polite" className="text-xs font-semibold text-slate-600">{filtradas.length} de {paradas.length} {paradas.length === 1 ? "parada" : "paradas"}</p>
         {temFiltroAtivo && <button type="button" onClick={limparFiltros} className={cn("min-h-8 rounded px-2 text-xs font-bold text-brand-600 hover:text-brand-700", FOCO)}>Limpar filtros</button>}
       </div>
 

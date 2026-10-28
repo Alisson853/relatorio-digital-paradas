@@ -34,6 +34,7 @@ export function DashboardStats({ paradas }: { paradas: ParadaResumo[] }) {
   const mesAtual = new Date().toISOString().slice(0, 7);
   const paradasDoMes = paradas.filter((p) => p.data.startsWith(mesAtual));
   const taxaConclusaoMes = paradasDoMes.length ? Math.round((paradasDoMes.filter((p) => p.status === "concluida").length / paradasDoMes.length) * 100) : 0;
+  const textoParadasDoMes = `${paradasDoMes.length} ${paradasDoMes.length === 1 ? "parada" : "paradas"}`;
 
   return (
     <div className="flex flex-wrap items-end gap-x-8 gap-y-6">
@@ -55,16 +56,16 @@ export function DashboardStats({ paradas }: { paradas: ParadaResumo[] }) {
         <Indicador label="Concluídas" value={concluidas} dot="bg-success-600" />
         <Indicador label="Ressalvas" value={ressalvas} dot="bg-warning-600" />
       </div>
-      <div className="mt-7 grid w-full gap-3 lg:grid-cols-[1fr_330px]">
+      <div className="mt-7 grid w-full items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
         <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
           <p className="label-tecnico text-[10px] font-bold text-brand-300">Comparativo recente</p>
-          <p className="mt-1 text-sm font-bold text-white">Painel mensal: {paradasDoMes.length} parada(s) · {taxaConclusaoMes}% concluídas</p>
+          <p className="mt-1 text-sm font-bold text-white">Painel mensal: {textoParadasDoMes} · {taxaConclusaoMes}% concluídas</p>
           <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label="Taxa de conclusão do mês" aria-valuemin={0} aria-valuemax={100} aria-valuenow={taxaConclusaoMes}>
             <div className="h-full rounded-full bg-success-600 transition-[width] duration-500" style={{ width: `${taxaConclusaoMes}%` }} />
           </div>
           <p className="mt-3 text-xs leading-relaxed text-brand-200">Use o Histórico para comparar tempo, eficiência, pendências e recorrências antes de aprovar a próxima programação.</p>
         </div>
-        <section aria-label="Últimos relatórios" className="rounded-2xl bg-white p-4 text-slate-900 shadow-xl">
+        <section aria-label="Últimos relatórios" className="w-full rounded-2xl bg-white p-4 text-slate-900 shadow-xl lg:sticky lg:top-24">
           <p className="label-tecnico text-[10px] font-bold text-slate-500">Últimos relatórios</p>
           {relatoriosRecentes.length ? (
             <ul className="mt-3 space-y-2.5">
