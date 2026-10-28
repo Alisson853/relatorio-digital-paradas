@@ -12,6 +12,9 @@ import { consumirLimite, identificarRequisitante, limiteExcedidoMsg } from "@/li
 type Resultado = { ok: boolean; erro?: string };
 
 function id(): string { return crypto.randomUUID(); }
+// Acesso retirado pelo planejador, mas o nome permanece na escala histórica.
+// Mantemos a exclusão na importação para que a planilha não recrie o login.
+const RES_SEM_ACESSO = new Set(["4790"]);
 function emLotes<T>(itens: T[], tamanho = 200): T[][] {
   const lotes: T[][] = [];
   for (let indice = 0; indice < itens.length; indice += tamanho) lotes.push(itens.slice(indice, indice + tamanho));
@@ -78,8 +81,9 @@ export async function importarProgramacao(formData: FormData): Promise<Resultado
   const usuariosEscala = new Map<string, typeof atividadeUsuarios.$inferInsert>();
   for (const linha of escala.slice(cabEscala + 1)) {
     const nome = textoLimpo(linha[cNome]); const cracha = textoLimpo(linha[cCracha]);
-    if (!nome || !cracha) continue;
+    if (!nome) continue;
     nomesEscala.add(normalizarPessoa(nome));
+    if (!cracha || RES_SEM_ACESSO.has(cracha)) continue;
     usuariosEscala.set(cracha, { id: id(), identificador: cracha, nome, oficina: "", funcao: textoLimpo(linha[cFuncao]), perfil: "funcionario", ativo: true, atualizadoEm: new Date() });
   }
   const terceiros = new Map<string, typeof atividadeUsuarios.$inferInsert>();
