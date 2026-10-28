@@ -48,10 +48,12 @@ export async function importarProgramacao(formData: FormData): Promise<Resultado
   const arquivo = formData.get("arquivo");
   const mes = Number(formData.get("mes"));
   const ano = Number(formData.get("ano"));
-  if (!(arquivo instanceof File) || !arquivo.name.toLocaleLowerCase().endsWith(".xlsx")) return { ok: false, erro: "Envie um arquivo .xlsx." };
+  if (!(arquivo instanceof File) || !/\.(xlsx|xlsm)$/i.test(arquivo.name)) return { ok: false, erro: "Envie uma planilha .xlsx ou .xlsm." };
   if (!Number.isInteger(mes) || mes < 1 || mes > 12 || !Number.isInteger(ano) || ano < 2020 || ano > 2100) return { ok: false, erro: "Informe mês e ano válidos." };
   if (arquivo.size > 25 * 1024 * 1024) return { ok: false, erro: "A planilha ultrapassa o limite de 25 MB." };
-  const workbook = XLSX.read(await arquivo.arrayBuffer(), { type: "array", cellDates: false });
+  // O arquivo .xlsm é tratado apenas como planilha: macros nunca são executadas
+  // no servidor. Importamos somente os valores das abas Programação e Escala.
+  const workbook = XLSX.read(await arquivo.arrayBuffer(), { type: "array", cellDates: false, bookVBA: false });
   const wsProgramacao = workbook.Sheets["Programação"];
   const wsEscala = workbook.Sheets.Escala;
   if (!wsProgramacao || !wsEscala) return { ok: false, erro: "A planilha precisa ter as abas Programação e Escala." };
