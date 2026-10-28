@@ -1,7 +1,7 @@
 "use server";
 
 import * as XLSX from "xlsx";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { atividadeImportacoes, atividadeLancamentos, atividadeProgramacoes, atividadeUsuarios } from "@/lib/db/schema";
 import { getDb } from "@/lib/db";
@@ -12,6 +12,11 @@ import { consumirLimite, identificarRequisitante, limiteExcedidoMsg } from "@/li
 type Resultado = { ok: boolean; erro?: string };
 
 function id(): string { return crypto.randomUUID(); }
+function emLotes<T>(itens: T[], tamanho = 200): T[][] {
+  const lotes: T[][] = [];
+  for (let indice = 0; indice < itens.length; indice += tamanho) lotes.push(itens.slice(indice, indice + tamanho));
+  return lotes;
+}
 function nomeColuna(linha: unknown[], titulo: string): number { return linha.findIndex((c) => normalizarPessoa(c) === normalizarPessoa(titulo)); }
 function lerMinutos(valor: unknown): number {
   if (typeof valor === "number" && Number.isFinite(valor)) return Math.max(0, Math.round(valor * 24 * 60));
@@ -70,16 +75,16 @@ export async function importarProgramacao(formData: FormData): Promise<Resultado
   const eCab = escala[cabEscala];
   const cCracha = nomeColuna(eCab, "Crachá"), cNome = nomeColuna(eCab, "Nome"), cFuncao = nomeColuna(eCab, "Função");
   const nomesEscala = new Set<string>();
+  const usuariosEscala = new Map<string, typeof atividadeUsuarios.$inferInsert>();
   for (const linha of escala.slice(cabEscala + 1)) {
     const nome = textoLimpo(linha[cNome]); const cracha = textoLimpo(linha[cCracha]);
     if (!nome || !cracha) continue;
     nomesEscala.add(normalizarPessoa(nome));
-    const existente = await db.select({ id: atividadeUsuarios.id }).from(atividadeUsuarios).where(eq(atividadeUsuarios.identificador, cracha)).limit(1);
-    const valores = { identificador: cracha, nome, oficina: "", funcao: textoLimpo(linha[cFuncao]), perfil: "funcionario", ativo: true, atualizadoEm: new Date() };
-    if (existente[0]) await db.update(atividadeUsuarios).set(valores).where(eq(atividadeUsuarios.id, existente[0].id));
-    else await db.insert(atividadeUsuarios).values({ id: id(), ...valores });
+    usuariosEscala.set(cracha, { id: id(), identificador: cracha, nome, oficina: "", funcao: textoLimpo(linha[cFuncao]), perfil: "funcionario", ativo: true, atualizadoEm: new Date() });
   }
-  let lidas = 0, importadas = 0;
+  const terceiros = new Map<string, typeof atividadeUsuarios.$inferInsert>();
+  const programacoes = new Map<string, typeof atividadeProgramacoes.$inferInsert>();
+  let lidas = 0;
   for (const linha of programacao.slice(cabecalho + 1)) {
     const dia = lerDia(linha[data]); const nome = textoLimpo(linha[executante]); const numeroOs = textoLimpo(linha[os]);
     if (!dia || !nome || !numeroOs) continue;
@@ -88,23 +93,35 @@ export async function importarProgramacao(formData: FormData): Promise<Resultado
     const normalizado = normalizarPessoa(nome);
     if (!nomesEscala.has(normalizado)) {
       const login = identificadorTerceiro(nome);
-      const existe = await db.select({ id: atividadeUsuarios.id }).from(atividadeUsuarios).where(eq(atividadeUsuarios.identificador, login)).limit(1);
-      if (!existe[0]) await db.insert(atividadeUsuarios).values({ id: id(), identificador: login, nome, oficina: textoLimpo(linha[oficina]), funcao: "Terceiro", perfil: "terceiro", ativo: true });
+      terceiros.set(login, { id: id(), identificador: login, nome, oficina: textoLimpo(linha[oficina]), funcao: "Terceiro", perfil: "terceiro", ativo: true, atualizadoEm: new Date() });
     }
     const valores = {
       chave: chaveProgramacao(numeroOs, nome, dataIso), importacaoId, statusPlanilha: textoLimpo(linha[status]) || "Pendente", data: dataIso, dia,
       equipamento: textoLimpo(linha[equipamento]), descricao: textoLimpo(linha[descricao]), os: numeroOs, tipoServico: textoLimpo(linha[tipo]), tempoPrevistoMinutos: lerMinutos(linha[tempo]),
       oficina: textoLimpo(linha[oficina]), executante: nome, executanteNormalizado: normalizado, prioridade: textoLimpo(linha[prioridade]), justificativaPlanilha: textoLimpo(linha[justificativa]), cancelado: valorVerdadeiro(linha[cancelado]), atualizadoEm: new Date(),
     };
-    const existente = await db.select({ id: atividadeProgramacoes.id }).from(atividadeProgramacoes).where(eq(atividadeProgramacoes.chave, valores.chave)).limit(1);
-    if (existente[0]) await db.update(atividadeProgramacoes).set(valores).where(eq(atividadeProgramacoes.id, existente[0].id));
-    else await db.insert(atividadeProgramacoes).values({ id: id(), ...valores });
-    importadas++;
+    programacoes.set(valores.chave, { id: id(), ...valores });
   }
-  await db.insert(atividadeImportacoes).values({ id: importacaoId, mes, ano, arquivo: textoLimpo(arquivo.name), linhasLidas: lidas, linhasImportadas: importadas, importadoPor: "supervisor" });
-  await registrarAuditoria("supervisor", "importar_programacao", "importacao", importacaoId, { arquivo: arquivo.name, mes, ano, lidas, importadas });
+  const usuarios = [...usuariosEscala.values(), ...terceiros.values()];
+  for (const lote of emLotes(usuarios)) {
+    await db.insert(atividadeUsuarios).values(lote).onConflictDoUpdate({
+      target: atividadeUsuarios.identificador,
+      set: { nome: sql`excluded.nome`, oficina: sql`excluded.oficina`, funcao: sql`excluded.funcao`, perfil: sql`excluded.perfil`, ativo: sql`excluded.ativo`, atualizadoEm: sql`excluded.atualizado_em` },
+    });
+  }
+  const itensProgramacao = [...programacoes.values()];
+  for (const lote of emLotes(itensProgramacao)) {
+    await db.insert(atividadeProgramacoes).values(lote).onConflictDoUpdate({
+      target: atividadeProgramacoes.chave,
+      set: {
+        importacaoId: sql`excluded.importacao_id`, statusPlanilha: sql`excluded.status_planilha`, data: sql`excluded.data`, dia: sql`excluded.dia`, equipamento: sql`excluded.equipamento`, descricao: sql`excluded.descricao`, os: sql`excluded.os`, tipoServico: sql`excluded.tipo_servico`, tempoPrevistoMinutos: sql`excluded.tempo_previsto_minutos`, oficina: sql`excluded.oficina`, executante: sql`excluded.executante`, executanteNormalizado: sql`excluded.executante_normalizado`, prioridade: sql`excluded.prioridade`, justificativaPlanilha: sql`excluded.justificativa_planilha`, cancelado: sql`excluded.cancelado`, atualizadoEm: sql`excluded.atualizado_em`,
+      },
+    });
+  }
+  await db.insert(atividadeImportacoes).values({ id: importacaoId, mes, ano, arquivo: textoLimpo(arquivo.name), linhasLidas: lidas, linhasImportadas: itensProgramacao.length, importadoPor: "supervisor" });
+  await registrarAuditoria("supervisor", "importar_programacao", "importacao", importacaoId, { arquivo: arquivo.name, mes, ano, lidas, importadas: itensProgramacao.length });
   revalidatePath("/atividades"); revalidatePath("/atividades/admin");
-  return { ok: true, lidas, importadas };
+  return { ok: true, lidas, importadas: itensProgramacao.length };
 }
 
 export async function salvarLancamento(input: { programacaoId: string; data: string; inicio: string; fim: string; observacao?: string; status: "Andamento" | "Executado" | "Não executado"; justificativa?: string }): Promise<Resultado> {

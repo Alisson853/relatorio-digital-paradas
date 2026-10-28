@@ -8,6 +8,7 @@ import { atividadeUsuarios } from "@/lib/db/schema";
 import { asc } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 function semanaAtual() {
   const agora = new Date(); const local = new Date(agora.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
