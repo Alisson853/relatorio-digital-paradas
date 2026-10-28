@@ -1,13 +1,15 @@
 "use server";
 
 import * as XLSX from "xlsx";
+import { put } from "@vercel/blob";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { atividadeImportacoes, atividadeLancamentos, atividadeProgramacoes, atividadeUsuarios } from "@/lib/db/schema";
+import { atividadeImportacoes, atividadeLancamentoFotos, atividadeLancamentos, atividadeProgramacoes, atividadeUsuarios } from "@/lib/db/schema";
 import { getDb } from "@/lib/db";
 import { abrirSessaoAtividade, chaveProgramacao, existeSobreposicao, fecharSessaoAtividade, horaParaMinutos, identificadorTerceiro, minutosParaHora, normalizarPessoa, osNumerica, registrarAuditoria, sessaoAtividade, textoLimpo, atualizarStatusProgramacao } from "@/lib/atividades";
 import { ehEditor } from "@/lib/auth/session";
 import { consumirLimite, identificarRequisitante, limiteExcedidoMsg } from "@/lib/rate-limit";
+import { detectarImagem } from "@/lib/validation";
 
 type Resultado = { ok: boolean; erro?: string };
 
@@ -151,6 +153,36 @@ export async function salvarLancamento(input: { programacaoId: string; data: str
   await registrarAuditoria(usuario.id, "salvar_lancamento", "programacao", programacao.id, { status: input.status, horas: minutosParaHora(fim - inicio) });
   revalidatePath("/atividades"); revalidatePath("/atividades/admin");
   return { ok: true };
+}
+
+export async function enviarFotosLancamento(programacaoId: string, formData: FormData): Promise<Resultado & { enviadas?: number }> {
+  const usuario = await sessaoAtividade();
+  if (!usuario) return { ok: false, erro: "Sua sessão expirou. Entre novamente." };
+  if (!/^[0-9a-f-]{36}$/i.test(programacaoId)) return { ok: false, erro: "OS inválida." };
+  const arquivos = formData.getAll("fotos").filter((item): item is File => item instanceof File && item.size > 0);
+  if (!arquivos.length) return { ok: true, enviadas: 0 };
+  if (arquivos.length > 5) return { ok: false, erro: "Envie no máximo 5 fotos por lançamento." };
+  if (arquivos.some((arquivo) => arquivo.size > 12 * 1024 * 1024)) return { ok: false, erro: "Cada foto pode ter no máximo 12 MB." };
+  const limite = await consumirLimite(`atividades-fotos:${await identificarRequisitante()}`, 20, 60);
+  if (!limite.permitido) return { ok: false, erro: limiteExcedidoMsg() };
+  const db = getDb();
+  const programacao = (await db.select().from(atividadeProgramacoes).where(eq(atividadeProgramacoes.id, programacaoId)).limit(1))[0];
+  if (!programacao || normalizarPessoa(programacao.executante) !== normalizarPessoa(usuario.nome)) return { ok: false, erro: "Esta OS não pertence ao seu usuário." };
+  const lancamento = (await db.select().from(atividadeLancamentos).where(eq(atividadeLancamentos.programacaoId, programacaoId)).limit(1))[0];
+  if (!lancamento) return { ok: false, erro: "Salve o lançamento antes de enviar fotos." };
+  const existentes = await db.select({ id: atividadeLancamentoFotos.id }).from(atividadeLancamentoFotos).where(eq(atividadeLancamentoFotos.lancamentoId, lancamento.id));
+  if (existentes.length + arquivos.length > 5) return { ok: false, erro: `Este lançamento já tem ${existentes.length} foto(s); o limite é 5.` };
+  const fotos = [] as { id: string; lancamentoId: string; url: string }[];
+  for (const arquivo of arquivos) {
+    const imagem = await detectarImagem(arquivo);
+    if (!imagem) return { ok: false, erro: "Use apenas imagens JPEG, PNG ou WebP." };
+    const blob = await put(`atividades/${programacaoId}/${crypto.randomUUID()}${imagem.extensao}`, arquivo, { access: "public", contentType: imagem.tipo });
+    fotos.push({ id: id(), lancamentoId: lancamento.id, url: blob.url });
+  }
+  await db.insert(atividadeLancamentoFotos).values(fotos);
+  await registrarAuditoria(usuario.id, "enviar_fotos_lancamento", "lancamento", lancamento.id, { quantidade: fotos.length });
+  revalidatePath("/lancamento");
+  return { ok: true, enviadas: fotos.length };
 }
 
 export async function aprovarLancamentos(ids: string[]): Promise<Resultado> {

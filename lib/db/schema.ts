@@ -173,6 +173,20 @@ export const atividadeLancamentos = pgTable(
   ]
 );
 
+// Fotos opcionais tiradas pelo próprio executante ao lançar as horas. Elas
+// ficam separadas do texto do lançamento para poderem ser consultadas depois
+// sem alterar o que será exportado para o Mantec.
+export const atividadeLancamentoFotos = pgTable(
+  "atividade_lancamento_fotos",
+  {
+    id: text("id").primaryKey(),
+    lancamentoId: text("lancamento_id").notNull().references(() => atividadeLancamentos.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("atividade_lancamento_fotos_lancamento_idx").on(table.lancamentoId)]
+);
+
 export const atividadeAuditoria = pgTable(
   "atividade_auditoria",
   {

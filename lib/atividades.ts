@@ -1,7 +1,7 @@
 import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { cache } from "react";
-import { atividadeAuditoria, atividadeLancamentos, atividadeProgramacoes, atividadeUsuarios } from "@/lib/db/schema";
+import { atividadeAuditoria, atividadeLancamentoFotos, atividadeLancamentos, atividadeProgramacoes, atividadeUsuarios } from "@/lib/db/schema";
 import { getDb } from "@/lib/db";
 import { assinar } from "@/lib/auth/token";
 
@@ -99,8 +99,14 @@ export async function listarProgramacaoDoUsuario(usuario: SessaoAtividade, inici
   if (!permitidas.length) return [];
   const ids = permitidas.map((item) => item.id);
   const lancamentos = await getDb().select().from(atividadeLancamentos).where(inArray(atividadeLancamentos.programacaoId, ids));
+  const fotos = lancamentos.length ? await getDb().select().from(atividadeLancamentoFotos).where(inArray(atividadeLancamentoFotos.lancamentoId, lancamentos.map((item) => item.id))) : [];
   const porProgramacao = new Map(lancamentos.map((item) => [item.programacaoId, item]));
-  return permitidas.map((item) => ({ ...item, lancamento: porProgramacao.get(item.id) ?? null }));
+  const fotosPorLancamento = new Map<string, string[]>();
+  for (const foto of fotos) fotosPorLancamento.set(foto.lancamentoId, [...(fotosPorLancamento.get(foto.lancamentoId) ?? []), foto.url]);
+  return permitidas.map((item) => {
+    const lancamento = porProgramacao.get(item.id);
+    return { ...item, lancamento: lancamento ? { ...lancamento, fotos: fotosPorLancamento.get(lancamento.id) ?? [] } : null };
+  });
 }
 
 export async function existeSobreposicao(usuarioId: string, data: string, inicio: number, fim: number, ignorarId?: string): Promise<boolean> {
