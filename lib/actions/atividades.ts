@@ -114,6 +114,9 @@ export async function importarProgramacao(formData: FormData): Promise<Resultado
     });
   }
   const itensProgramacao = [...programacoes.values()];
+  // A programação referencia esta importação por chave estrangeira. Criamos o
+  // registro antes dos lotes de OS e atualizamos a contagem ao término.
+  await db.insert(atividadeImportacoes).values({ id: importacaoId, mes, ano, arquivo: textoLimpo(arquivo.name), linhasLidas: lidas, linhasImportadas: 0, importadoPor: "supervisor" });
   for (const lote of emLotes(itensProgramacao)) {
     await db.insert(atividadeProgramacoes).values(lote).onConflictDoUpdate({
       target: atividadeProgramacoes.chave,
@@ -122,7 +125,7 @@ export async function importarProgramacao(formData: FormData): Promise<Resultado
       },
     });
   }
-  await db.insert(atividadeImportacoes).values({ id: importacaoId, mes, ano, arquivo: textoLimpo(arquivo.name), linhasLidas: lidas, linhasImportadas: itensProgramacao.length, importadoPor: "supervisor" });
+  await db.update(atividadeImportacoes).set({ linhasImportadas: itensProgramacao.length }).where(eq(atividadeImportacoes.id, importacaoId));
   await registrarAuditoria("supervisor", "importar_programacao", "importacao", importacaoId, { arquivo: arquivo.name, mes, ano, lidas, importadas: itensProgramacao.length });
   revalidatePath("/atividades"); revalidatePath("/atividades/admin");
   return { ok: true, lidas, importadas: itensProgramacao.length };
